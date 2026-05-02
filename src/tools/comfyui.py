@@ -9,6 +9,8 @@ Consolidates all ComfyUI-related @tool functions into a single module:
 
 import json
 import os
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -35,6 +37,17 @@ _object_info_cache: dict | None = None
 _index_cache: list | None = None
 _template_cache: dict[str, dict] = {}
 
+# ── Session-level tool-response caches ──────────────────────────────────────
+# These are reset at the start of each pipeline session via clear_tool_caches().
+# Thread-safety: all access is protected by _tool_cache_lock.
+_tool_cache_lock: threading.Lock = threading.Lock()
+_CATALOG_TTL: int = 3600  # seconds – workflow catalog TTL
+
+_tool_catalog_result: str | None = None         # cached get_workflow_catalog() return value
+_tool_catalog_timestamp: float | None = None    # time.time() when catalog was last fetched
+_tool_dirs_result: str | None = None             # cached get_comfyui_dirs() return value
+_tool_template_results: dict[str, str] = {}     # cached get_workflow_template() results, keyed by name
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Public helpers (non-tool, used by other modules)
@@ -45,6 +58,26 @@ def reset_patch_workflow_guard() -> None:
     global _patch_fail_count, _patch_last_workflow_path
     _patch_fail_count = 0
     _patch_last_workflow_path = None
+
+
+def clear_tool_caches() -> None:
+    """Reset all session-level tool-response caches.
+
+    Call this once at the start of each pipeline session so that every new
+    session fetches fresh data from ComfyUI rather than reusing stale results
+    from a previous session in the same process (e.g. in long-running servers).
+
+    Affected caches:
+      - get_workflow_catalog  (1-hour TTL; cleared so next call fetches fresh)
+      - get_comfyui_dirs      (no TTL; cleared so next call fetches fresh)
+      - get_workflow_template (per-name; cleared so templates re-fetched if changed)
+    """
+    global _tool_catalog_result, _tool_catalog_timestamp, _tool_dirs_result, _tool_template_results
+    with _tool_cache_lock:
+        _tool_catalog_result = None
+        _tool_catalog_timestamp = None
+        _tool_dirs_result = None
+        _tool_template_results = {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -531,7 +564,14 @@ def get_comfyui_dirs() -> str:
 
     Returns a JSON object with keys ``input_dir``, ``output_dir``, ``user_dir``,
     and ``source`` ("argv" when resolved from server flags, "default" otherwise).
+
+    Results are cached for the lifetime of the session (``clear_tool_caches()``
+    resets the cache at the start of every new pipeline session).
     """
+    global _tool_dirs_result
+    with _tool_cache_lock:
+        if _tool_dirs_result is not None:
+            return _tool_dirs_result
     try:
         stats = get_client().get("/system_stats")
         if not isinstance(stats, dict):
@@ -567,7 +607,10 @@ def get_comfyui_dirs() -> str:
             if "user_dir" not in result:
                 result["user_dir"] = str(Path(comfy_root) / "user") if comfy_root else "unknown"
 
-        return json.dumps(result)
+        result_json = json.dumps(result)
+        with _tool_cache_lock:
+            _tool_dirs_result = result_json
+        return result_json
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -988,10 +1031,26 @@ def get_workflow_catalog() -> str:
 
     This is the cheapest way for the Researcher to discover available templates.
     The dictionary keys are the exact names to pass to get_workflow_template().
+
+    Results are cached for up to 1 hour per session (``clear_tool_caches()`` resets
+    the cache at the start of every new pipeline session).
     """
+    global _tool_catalog_result, _tool_catalog_timestamp
+    now = time.time()
+    with _tool_cache_lock:
+        if (
+            _tool_catalog_result is not None
+            and _tool_catalog_timestamp is not None
+            and (now - _tool_catalog_timestamp) < _CATALOG_TTL
+        ):
+            return _tool_catalog_result
     catalog_path = _project_root() / "config" / "workflow_templates.json"
     try:
-        return catalog_path.read_text(encoding="utf-8")
+        data = catalog_path.read_text(encoding="utf-8")
+        with _tool_cache_lock:
+            _tool_catalog_result = data
+            _tool_catalog_timestamp = time.time()
+        return data
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -1004,9 +1063,16 @@ def get_workflow_template(template_name: str) -> str:
     model info, and io metadata. The full workflow JSON is at the returned
     ``workflow_path`` — pass that path to validate_workflow / submit_prompt.
 
+    Results are cached per template name for the lifetime of the session
+    (``clear_tool_caches()`` resets the cache at the start of every new pipeline
+    session).  Error responses are never cached so transient failures are retried.
+
     Args:
         template_name: Template name (without .json) from get_workflow_catalog().
     """
+    with _tool_cache_lock:
+        if template_name in _tool_template_results:
+            return _tool_template_results[template_name]
     try:
         lookup = template_name.removesuffix(".json")
         workflow = None
@@ -1083,7 +1149,10 @@ def get_workflow_template(template_name: str) -> str:
         if metadata.get("io"):
             result["io"] = metadata["io"]
 
-        return json.dumps(result)
+        result_json = json.dumps(result)
+        with _tool_cache_lock:
+            _tool_template_results[template_name] = result_json
+        return result_json
     except Exception as e:
         return json.dumps({"error": str(e)})
 

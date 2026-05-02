@@ -39,6 +39,7 @@ from src.utils.workflow_signal import clear_and_get as _get_workflow_signal
 from src.executor import execute_workflow as _execute_workflow, execute_workflows_batch as _execute_workflows_batch
 from src.utils.memory import format_memories, memory_add, memory_search
 from src.tools.memory_tools import set_session_id as _set_memory_session_id
+from src.tools.comfyui import clear_tool_caches as _clear_tool_caches
 from src.utils.learnings import count_tool_calls, maybe_run_learnings
 
 
@@ -339,6 +340,10 @@ class Pipeline:
         # Bind the memory tools module-level session so memory_read / memory_write
         # always operate on the correct per-session namespace.
         _set_memory_session_id(session_id)
+        # Reset session-level tool-response caches so every new pipeline session
+        # fetches fresh data from ComfyUI instead of reusing stale results from
+        # a previous session in the same process.
+        _clear_tool_caches()
         # Initialise Vision Agent so analyze_image(mode='describe') works for
         # all agents (Researcher, Info, etc.) in this pipeline.
         try:

@@ -42,6 +42,8 @@ from src.tools.comfyui import (  # noqa: F401
     validate_workflow,
     # Public helpers
     reset_patch_workflow_guard,
+    # Session cache management
+    clear_tool_caches,
 )
 from src.tools.image_handling import (  # noqa: F401
     upload_image,

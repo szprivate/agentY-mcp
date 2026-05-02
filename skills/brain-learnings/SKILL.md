@@ -82,3 +82,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-02 | CLIPLoader requires matching type input when updating clip_name | When patching CLIPLoader with specific models, also update the type input to match the architecture, such as qwen_image.
 
 2026-05-02 | Brain fails to call signal_workflow_ready for specific workflow files | Verify if the workflow file has been updated and retry the signal call using the latest version.
+
+2026-05-02 | ModelSamplingAuraFlow validation fails with ModelSamplingFlux error | Include max_shift, base_shift, width, and height in the update_workflow patches for the sampling node.
