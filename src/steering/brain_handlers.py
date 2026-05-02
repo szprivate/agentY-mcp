@@ -10,19 +10,26 @@ Handler 1 — ForbiddenToolHandler (rule-based, no LLM)
     be used when the Brain is building a workflow from scratch, not patching.
 
 Handler 2 — ModelSamplingFluxHandler (rule-based, no LLM)
-    Before an update_workflow call, parses the patches / add_nodes JSON and
-    checks whether any ModelSamplingFlux node is being patched or added.  If
-    so, verifies that all four required inputs (max_shift, base_shift, width,
-    height) are present.  Guides the agent to add missing inputs if needed.
-    Falls back gracefully — update_workflow's own validation will also catch
-    this error, so if the rule misreads the JSON the worst outcome is a
-    validation error from update_workflow.
+    Pre-validation: before an update_workflow call, loads the workflow file
+    and checks whether it contains any ModelSamplingFlux node.  If so, and if
+    the call's patches are missing any of the four required inputs
+    (max_shift, base_shift, width, height), the handler automatically injects
+    the missing patches with sensible defaults and returns Proceed.
+
+    This eliminates the retry cycle where the agent had to call
+    update_workflow, receive a validation error, load the flux-sampling skill,
+    and retry — saving ~5 333 tokens per session on affected workflows.
+
+    NODE_VALIDATION_RULES maps class_type → required inputs + defaults.
+    Add new entries there to extend coverage to other node types with known
+    deterministic validation requirements.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from strands import Agent
@@ -35,6 +42,33 @@ from strands.vended_plugins.steering import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Pre-validation rules for nodes with deterministic required inputs
+# ---------------------------------------------------------------------------
+# Each entry:
+#   'required_inputs' – frozenset of input names that must be present
+#   'defaults'        – fallback values used when auto-injecting missing patches
+#
+# Add new entries here when a new node type shows consistent validation
+# failures in production logs.  No other code changes are needed.
+
+NODE_VALIDATION_RULES: dict[str, dict] = {
+    "ModelSamplingFlux": {
+        "required_inputs": frozenset({"max_shift", "base_shift", "width", "height"}),
+        "defaults": {
+            "max_shift": 1.15,
+            "base_shift": 0.5,
+            "width": 1024,
+            "height": 1024,
+        },
+    },
+    # Example — add entries like this for future node types:
+    # "SomeOtherNode": {
+    #     "required_inputs": frozenset({"param1", "param2"}),
+    #     "defaults": {"param1": 0, "param2": 512},
+    # },
+}
 
 # ---------------------------------------------------------------------------
 # Handler 1: Forbidden tool guard (rule-based)
@@ -68,15 +102,8 @@ class BrainForbiddenToolHandler(SteeringHandler):
 
 
 # ---------------------------------------------------------------------------
-# Handler 2: ModelSamplingFlux patch validator (rule-based, no LLM)
+# Handler 2: Pre-validation patch injector (rule-based, no LLM)
 # ---------------------------------------------------------------------------
-
-# The four inputs that ModelSamplingFlux always requires.
-_FLUX_REQUIRED_INPUTS = frozenset({"max_shift", "base_shift", "width", "height"})
-
-# Heuristic markers — if a patch touches any of these input names it is
-# likely targeting a ModelSamplingFlux node.
-_FLUX_MARKER_INPUTS = frozenset({"max_shift", "base_shift"})
 
 
 def _parse_json_arg(val: Any) -> list:
@@ -90,55 +117,103 @@ def _parse_json_arg(val: Any) -> list:
     return val if isinstance(val, list) else []
 
 
-def _collect_flux_inputs(patches: list, add_nodes: list) -> tuple[bool, set[str]]:
-    """Scan *patches* and *add_nodes* for ModelSamplingFlux references.
+def _load_workflow_for_prevalidation(workflow_path: str) -> dict:
+    """Load a workflow JSON file from disk.  Returns empty dict on any error."""
+    try:
+        path = Path(workflow_path)
+        if not path.exists():
+            return {}
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
 
-    Returns ``(is_flux_involved, found_inputs)`` where *found_inputs* is the
-    set of flux-relevant input names present across all matching entries.
+
+def _find_nodes_by_class(workflow: dict, class_name: str) -> list[tuple[str, dict]]:
+    """Return (node_id, node_dict) pairs for every node whose class_type matches."""
+    results = []
+    for nid, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        if node.get("class_type") == class_name:
+            results.append((nid, node))
+    return results
+
+
+def _inject_validation_patches(tool_input: dict, workflow: dict) -> int:
+    """Mutate *tool_input* in place, adding any patches required by NODE_VALIDATION_RULES.
+
+    For each rule:
+      - Find all matching nodes in the workflow.
+      - Determine which required inputs are absent from the existing patches.
+      - Prepend auto-generated patches for the missing inputs.
+
+    Returns the number of patches injected.
     """
-    found: set[str] = set()
-    is_flux = False
+    patches = _parse_json_arg(tool_input.get("patches", "[]"))
 
-    # -- patches: [{"node_id": ..., "input_name": ..., "value": ...}, ...]
-    for patch in patches:
-        if not isinstance(patch, dict):
+    injected_count = 0
+    new_patches: list[dict] = []
+
+    for class_name, rule in NODE_VALIDATION_RULES.items():
+        matching_nodes = _find_nodes_by_class(workflow, class_name)
+        if not matching_nodes:
             continue
-        input_name = patch.get("input_name", "")
-        class_type = str(patch.get("class_type", "")).lower()
-        if input_name in _FLUX_REQUIRED_INPUTS or "modelsamplingflux" in class_type:
-            is_flux = True
-            if input_name in _FLUX_REQUIRED_INPUTS:
-                found.add(input_name)
 
-    # -- add_nodes: [{"class_type": ..., "inputs": {...}}, ...]
-    for spec in add_nodes:
-        if not isinstance(spec, dict):
-            continue
-        class_type = str(spec.get("class_type", "")).lower()
-        if "modelsamplingflux" in class_type:
-            is_flux = True
-            inputs = spec.get("inputs", {})
-            if isinstance(inputs, str):
-                try:
-                    inputs = json.loads(inputs)
-                except (json.JSONDecodeError, TypeError):
-                    inputs = {}
-            if isinstance(inputs, dict):
-                found.update(k for k in inputs if k in _FLUX_REQUIRED_INPUTS)
+        required: frozenset[str] = rule["required_inputs"]
+        defaults: dict = rule["defaults"]
 
-    return is_flux, found
+        for node_id, _node in matching_nodes:
+            # Collect which required inputs are already covered by existing patches
+            existing_keys: set[tuple[str, str]] = {
+                (str(p.get("node_id", "")), p.get("input_name", ""))
+                for p in patches
+                if isinstance(p, dict)
+            }
+
+            for input_name in sorted(required):  # sorted for deterministic ordering
+                if (node_id, input_name) not in existing_keys:
+                    auto_patch = {
+                        "node_id": node_id,
+                        "input_name": input_name,
+                        "value": defaults[input_name],
+                    }
+                    new_patches.append(auto_patch)
+                    injected_count += 1
+                    logger.debug(
+                        "pre_validation: injecting %s.%s = %r (node class: %s)",
+                        node_id,
+                        input_name,
+                        defaults[input_name],
+                        class_name,
+                    )
+
+    if new_patches:
+        # Prepend auto-patches so they are applied before any agent-supplied patches,
+        # allowing the agent's explicit values to override the auto-injected defaults.
+        combined = new_patches + patches
+        tool_input["patches"] = json.dumps(combined)
+
+    return injected_count
 
 
 class ModelSamplingFluxHandler(SteeringHandler):
-    """Rule-based guard that ensures ModelSamplingFlux patches include all four required inputs.
+    """Pre-validation handler: automatically injects missing required patches.
 
-    Parses the ``patches`` and ``add_nodes`` JSON arguments of update_workflow
-    calls and checks for ModelSamplingFlux references.  No LLM call is made —
-    this is a fast, deterministic string/key check.
+    Before every update_workflow call the handler:
+      1. Loads the target workflow file from disk.
+      2. Checks each node against NODE_VALIDATION_RULES.
+      3. For any node type with known required inputs, injects missing patches
+         with sensible defaults directly into the tool call (no LLM round-trip).
+      4. Returns Proceed so the enriched call goes straight through.
 
-    If the rule misreads the JSON, update_workflow's own validation will still
-    catch the error on the next call — this handler is a best-effort early
-    warning.
+    Because the agent's explicit patches are appended *after* the auto-injected
+    ones, any value the agent already supplied takes precedence.
+
+    Fallback behaviour: if the workflow file cannot be loaded or the JSON
+    cannot be parsed, the handler returns Proceed without modification and
+    lets update_workflow's own validation surface any errors.
     """
 
     name: str = "model_sampling_flux_guard"
@@ -151,27 +226,30 @@ class ModelSamplingFluxHandler(SteeringHandler):
             return Proceed(reason="not an update_workflow call")
 
         tool_input = tool_use.get("input") or {}
-        patches = _parse_json_arg(tool_input.get("patches", "[]"))
-        add_nodes = _parse_json_arg(tool_input.get("add_nodes", "[]"))
+        workflow_path = tool_input.get("workflow_path", "")
 
-        is_flux, found = _collect_flux_inputs(patches, add_nodes)
+        if not workflow_path:
+            return Proceed(reason="no workflow_path in tool input")
 
-        if not is_flux:
-            return Proceed(reason="no ModelSamplingFlux nodes in patches")
-
-        missing = _FLUX_REQUIRED_INPUTS - found
-        if not missing:
-            return Proceed(reason="all ModelSamplingFlux inputs present")
-
-        logger.debug("model_sampling_flux_guard: missing inputs %s", missing)
-        return Guide(
-            reason=(
-                f"ModelSamplingFlux patch is missing required inputs: {', '.join(sorted(missing))}. "
-                "All four inputs are required: max_shift (recommended: 1.15), "
-                "base_shift (recommended: 0.5), width, height (from brainbriefing resolution). "
-                "Add the missing inputs to your update_workflow patches."
+        workflow = _load_workflow_for_prevalidation(str(workflow_path))
+        if not workflow:
+            logger.debug(
+                "pre_validation: could not load workflow at %r — skipping", workflow_path
             )
-        )
+            return Proceed(reason="workflow could not be loaded; skipping pre-validation")
+
+        injected = _inject_validation_patches(tool_input, workflow)
+
+        if injected:
+            logger.info(
+                "pre_validation: auto-injected %d patch(es) before update_workflow",
+                injected,
+            )
+            return Proceed(
+                reason=f"pre-validation injected {injected} missing required patch(es)"
+            )
+
+        return Proceed(reason="pre-validation: no missing required patches")
 
 
 # ---------------------------------------------------------------------------
