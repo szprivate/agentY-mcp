@@ -340,7 +340,8 @@
     "classifiers": [],
     "model_patches": [
       "Wan2_1-InfiniTetalk-Single_fp16.safetensors",
-      "Wan2_1-InfiniteTalk-Multi_fp16.safetensors"
+      "Wan2_1-InfiniteTalk-Multi_fp16.safetensors",
+      "Z-Image-Turbo-Fun-Controlnet-Union.safetensors"
     ],
     "audio_encoders": [
       "wav2vec2-chinese-base_fp16.safetensors",
