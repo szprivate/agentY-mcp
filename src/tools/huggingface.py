@@ -11,14 +11,19 @@ Environment variables:
                            then to the sensible default D:/AI/ComfyUI/models)
 """
 
+import io
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
 import requests
+from tqdm import tqdm
 
+from src.utils.model_node_mapping import NODE_TO_FOLDER, get_storage_path
+from src.utils.progress_signal import push as _push_progress
 from src.utils.secrets import get_secret
 from strands import tool
 
@@ -26,21 +31,6 @@ logger = logging.getLogger(__name__)
 
 HF_API_BASE = "https://huggingface.co/api/models"
 
-# Subfolders to scan when checking for local models
-LOCAL_MODEL_FOLDERS = [
-    "FLUX1",
-    "FLUX2",
-    "WAN21",
-    "WAN22",
-    "MISC",
-    "SD15",
-    "SDXL",
-    "LoRA",
-    "QWEN",
-    "ICLight",
-    "Flux-Dev",
-    "WAN",
-]
 
 
 def _hf_headers() -> dict:
@@ -79,6 +69,60 @@ def _models_base_dir() -> Path:
             pass
 
     return Path("D:/AI/ComfyUI/models")
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _refresh_model_cache() -> None:
+    """Refresh config/models.json and config/custom_nodes.json.
+
+    Mirrors the logic in scripts/refresh_models.py so that the in-process
+    tool call updates the cache immediately after a download, without needing
+    to shell out to the script.
+    """
+    try:
+        from src.utils.comfyui_retrieve_models_customnodes import (
+            fetch_available_models,
+            fetch_custom_node_names,
+        )
+    except Exception as exc:
+        logger.warning("_refresh_model_cache: could not import refresh utils: %s", exc)
+        return
+
+    try:
+        available = fetch_available_models()
+        custom_node_names = fetch_custom_node_names()
+    except Exception as exc:
+        logger.warning("_refresh_model_cache: ComfyUI unreachable – skipping cache refresh: %s", exc)
+        return
+
+    project_root = Path(__file__).parent.parent.parent.resolve()
+
+    models_path = project_root / "config" / "models.json"
+    if models_path.exists():
+        try:
+            raw = "".join(ln for ln in models_path.read_text(encoding="utf-8").splitlines(keepends=True)
+                          if not ln.lstrip().startswith("//"))
+            models_data = json.loads(raw) if raw.strip() else {}
+        except Exception:
+            models_data = {}
+    else:
+        models_data = {}
+
+    models_data["available"] = available
+    with open(models_path, "w", encoding="utf-8") as f:
+        json.dump(models_data, f, indent=2)
+
+    total = sum(len(v) for v in available.values() if isinstance(v, list))
+    logger.info("[refresh_models] models.json refreshed – %d folders, %d files", len(available), total)
+
+    if custom_node_names:
+        cn_path = project_root / "config" / "custom_nodes.json"
+        with open(cn_path, "w", encoding="utf-8") as f:
+            json.dump({"custom_nodes": custom_node_names}, f, indent=2)
+        logger.info("[refresh_models] custom_nodes.json refreshed – %d nodes", len(custom_node_names))
 
 
 # ---------------------------------------------------------------------------
@@ -181,78 +225,55 @@ def get_model_info(model_id: str) -> str:
 
 
 @tool
-def check_local_model(filename: str) -> str:
-    """Check if a model file already exists locally. Always call this before downloading.
-
-    Args:
-        filename: Filename to find e.g. 'flux1-dev-fp8.safetensors' or 'FLUX1/flux1-dev-fp8.safetensors'.
-    """
-    try:
-        base = _models_base_dir()
-        target = Path(filename)
-
-        # If the filename includes a subfolder prefix, check as a direct path
-        direct = base / target
-        if direct.exists():
-            return json.dumps({
-                "ok": True,
-                "found": True,
-                "path": str(direct),
-                "size_mb": round(direct.stat().st_size / (1024 * 1024), 2),
-            })
-
-        # Otherwise scan each known subfolder for the bare filename
-        bare_name = target.name
-        for folder_name in LOCAL_MODEL_FOLDERS:
-            folder = base / folder_name
-            if not folder.is_dir():
-                continue
-            candidate = folder / bare_name
-            if candidate.exists():
-                return json.dumps({
-                    "ok": True,
-                    "found": True,
-                    "path": str(candidate),
-                    "size_mb": round(candidate.stat().st_size / (1024 * 1024), 2),
-                })
-
-        # Also do a recursive search as a last resort
-        if base.is_dir():
-            for match in base.rglob(bare_name):
-                if match.is_file():
-                    return json.dumps({
-                        "ok": True,
-                        "found": True,
-                        "path": str(match),
-                        "size_mb": round(match.stat().st_size / (1024 * 1024), 2),
-                    })
-
-        return json.dumps({"ok": True, "found": False, "searched_base": str(base)})
-    except Exception as exc:
-        logger.error("Error in check_local_model: %s", exc, exc_info=True)
-        return json.dumps({"ok": False, "error": str(exc)})
-
-
-@tool
 def download_hf_model(
     model_id: str,
     filename: str,
-    destination_folder: str,
+    node_class_type: str = "",
+    destination_folder: str = "",
     subfolder: str = "",
 ) -> str:
-    """Download a file from a HuggingFace repo. Call check_local_model first.
+    """Download a file from a HuggingFace repo. Check model availability with check_model first.
+
+    Prefer supplying *node_class_type* (the ComfyUI class name of the node that
+    references the model, e.g. ``"UNETLoader"``).  The correct storage folder is
+    then derived automatically via the NODE_TO_FOLDER mapping.  If
+    *node_class_type* is unknown or omitted, fall back to *destination_folder*
+    (relative path under the models base dir, e.g. ``"FLUX1"``).
 
     Args:
         model_id: HF model ID e.g. 'black-forest-labs/FLUX.1-dev'.
         filename: File to download e.g. 'flux1-dev.safetensors'.
-        destination_folder: Target subfolder under models dir e.g. 'FLUX1'.
+        node_class_type: ComfyUI node class that loads this model
+            e.g. 'UNETLoader', 'CheckpointLoaderSimple', 'LoraLoader'.
+            Used to resolve the correct model sub-folder automatically.
+        destination_folder: Fallback – target subfolder under models dir
+            e.g. 'FLUX1'.  Ignored when *node_class_type* is provided.
         subfolder: Subfolder within the HF repo e.g. 'transformer'.
     """
     try:
         base = _models_base_dir()
-        dest_dir = base / destination_folder
+
+        # Resolve destination: prefer node_class_type → get_storage_path,
+        # fall back to explicit destination_folder, else place in models root.
+        if node_class_type:
+            try:
+                comfyui_base = str(base.parent)
+                full_path = get_storage_path(node_class_type, filename, comfyui_base)
+                dest_path = Path(full_path)
+            except ValueError as mapping_err:
+                logger.warning(
+                    "node_class_type %r not in NODE_TO_FOLDER (%s); "
+                    "falling back to destination_folder.",
+                    node_class_type, mapping_err,
+                )
+                dest_path = base / (destination_folder or "") / filename
+        elif destination_folder:
+            dest_path = base / destination_folder / filename
+        else:
+            dest_path = base / filename
+
+        dest_dir = dest_path.parent
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = dest_dir / filename
 
         # Safety: don't re-download if already present
         if dest_path.exists():
@@ -275,31 +296,61 @@ def download_hf_model(
             headers["Authorization"] = f"Bearer {token}"
 
         logger.info("Downloading %s from %s …", filename, model_id)
+        _push_progress(f"⬇️ Starting download: **{filename}** from `{model_id}`")
 
         resp = requests.get(url, headers=headers, stream=True, timeout=60)
         resp.raise_for_status()
 
         total_size = int(resp.headers.get("content-length", 0))
-        downloaded = 0
         chunk_size = 8 * 1024 * 1024  # 8 MB chunks
+
+        # --- tqdm setup -------------------------------------------------
+        # _TqdmSignalWriter intercepts tqdm's output, strips ANSI / carriage
+        # returns, and pushes each refreshed bar line to the progress signal
+        # (visible in Chainlit) as well as writing to the real stderr
+        # (visible in the terminal).
+        class _TqdmSignalWriter(io.RawIOBase):
+            """File-like wrapper that tees tqdm output to progress_signal."""
+
+            def __init__(self, real_file):
+                self._real = real_file
+                self._last_pushed: str = ""
+
+            def write(self, s: str) -> int:  # tqdm always passes str
+                self._real.write(s)
+                # Strip carriage-returns / ANSI escapes to get a clean line.
+                clean = s.replace("\r", "").replace("\n", "").strip()
+                # Remove ANSI escape codes (colours)
+                import re as _re
+                clean = _re.sub(r"\x1b\[[0-9;]*m", "", clean)
+                if clean and clean != self._last_pushed:
+                    self._last_pushed = clean
+                    _push_progress(f"⬇️ [{clean}]")
+                return len(s)
+
+            def flush(self) -> None:
+                self._real.flush()
+
+        _tqdm_writer = _TqdmSignalWriter(sys.stderr)
 
         # Write to a temp file first, rename on completion
         tmp_path = dest_path.with_suffix(dest_path.suffix + ".downloading")
         try:
-            with open(tmp_path, "wb") as f:
+            with open(tmp_path, "wb") as f, tqdm(
+                total=total_size if total_size > 0 else None,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                desc=filename,
+                file=_tqdm_writer,
+                dynamic_ncols=False,
+                ncols=60,
+                leave=True,
+            ) as pbar:
                 for chunk in resp.iter_content(chunk_size=chunk_size):
                     if chunk:
                         f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size > 0:
-                            pct = (downloaded / total_size) * 100
-                            if downloaded % (64 * 1024 * 1024) < chunk_size:
-                                logger.info(
-                                    "  %.1f%% (%d / %d MB)",
-                                    pct,
-                                    downloaded // (1024 * 1024),
-                                    total_size // (1024 * 1024),
-                                )
+                        pbar.update(len(chunk))
 
             # Rename temp → final
             tmp_path.rename(dest_path)
@@ -310,11 +361,16 @@ def download_hf_model(
             raise
 
         size_mb = round(dest_path.stat().st_size / (1024 * 1024), 2)
+
+        # Refresh the model cache so check_model sees the new file immediately.
+        logger.info("[download_hf_model] Refreshing model cache after download…")
+        _refresh_model_cache()
+
         return json.dumps({
             "ok": True,
             "path": str(dest_path),
             "size_mb": size_mb,
-            "message": f"Downloaded {filename} ({size_mb} MB) to {destination_folder}/",
+            "message": f"Downloaded {filename} ({size_mb} MB) to {dest_dir}/",
         })
     except requests.HTTPError as exc:
         status = exc.response.status_code

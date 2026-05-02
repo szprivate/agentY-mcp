@@ -1,7 +1,7 @@
 ---
 name: assemble-new-workflow
 description: Build a ComfyUI workflow from scratch when no template matches (template.name == "build_new"). Derives the node graph from brainbriefing data using comfyui-core pipeline patterns.
-allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, get_node_schema, search_nodes, get_models_in_folder, get_model_types
+allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, get_node_schema, search_nodes
 ---
 
 # Assemble New Workflow from Scratch
@@ -62,7 +62,7 @@ For any node class you are not certain about:
 - **`search_nodes(query)`** — use when you need to find the right `class_type` for a capability (e.g., `"video combine"`, `"load image path"`).
 
 Verify model paths:
-- If the brainbriefing does not specify a model file, call `get_models_in_folder(folder)` to list available files and pick the most appropriate one.
+- Model paths come from the brainbriefing. Do NOT look up models here — the Researcher has already verified them via `check_model`.
 
 ---
 
@@ -138,7 +138,7 @@ update_workflow(workflow_path, patches=<patches_json>, add_nodes=<add_nodes_json
 
 ## Rules
 
-- **Never guess model file names** — always verify via `get_models_in_folder` if not listed in `brainbriefing`.
+- **Never guess model file names** — model paths come from the brainbriefing (Researcher-verified). Never look them up here.
 - **Never reuse node IDs** that appear in `remove_nodes` — assign fresh IDs to all added nodes.
 - **Always wire output nodes** (`SaveImage`, `VHS_VideoCombine`, etc.) to the final IMAGE/LATENT/AUDIO output of the pipeline. An unconnected output node will cause a validation failure.
 - **All connections must be type-safe** — verify output index and type via `get_node_schema` when unsure. See `comfyui-core` references/common-nodes.md for standard node types.

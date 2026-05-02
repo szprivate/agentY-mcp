@@ -10,8 +10,8 @@ Handler 3 — JsonOutputEnforcer (rule-based, no LLM)
 Handler 4 — BriefingHallucinationGuard (rule-based, no LLM, uses LedgerProvider)
     After the Researcher produces its final response, performs two checks:
     a) Extracts model file paths from the brainbriefing JSON and verifies each
-       was returned by get_workflow_template, get_models_in_folder, or
-       get_model_types tool calls recorded in the session ledger.
+       was returned by get_workflow_template or check_model tool calls recorded
+       in the session ledger.
     b) Extracts input image filenames from input_images / input_nodes and
        verifies each against file paths used in analyze_image,
        get_image_resolution, or upload_image tool calls, plus any file paths
@@ -215,8 +215,7 @@ _IMAGE_EXTENSIONS = re.compile(
 # Tool names whose results contain authoritative model/file paths.
 _PATH_SOURCE_TOOLS = frozenset({
     "get_workflow_template",
-    "get_models_in_folder",
-    "get_model_types",
+    "check_model",
 })
 
 # Tool names whose *arguments* contain authoritative image file paths.
@@ -369,8 +368,7 @@ class BriefingHallucinationGuard(SteeringHandler):
 
     1. **Model paths** — extracts file paths ending in model-weight extensions
        from the brainbriefing and verifies each against strings returned by
-       authoritative tools (get_workflow_template, get_models_in_folder,
-       get_model_types).
+       authoritative tools (get_workflow_template, check_model).
     2. **Image filenames** — extracts ``input_images[].filename`` and
        ``input_nodes[].filename`` / ``.path`` from the brainbriefing and
        verifies each against file paths that appeared in tool call arguments
@@ -426,9 +424,9 @@ class BriefingHallucinationGuard(SteeringHandler):
                 if suspect_models:
                     issues.append(
                         "Model file paths not verified against any "
-                        "get_workflow_template / get_models_in_folder / get_model_types "
+                        "get_workflow_template / check_model "
                         "tool result: " + ", ".join(suspect_models)
-                        + ". Verify via get_models_in_folder / get_model_types or correct them."
+                        + ". Verify via check_model or correct them."
                     )
 
         # ---- Check 2: input image filenames ---------------------------

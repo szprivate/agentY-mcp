@@ -1,10 +1,10 @@
 ---
 name: model-reference
 description: Pre-validated model reference table. Activate during step 8 (Resolve parameters) to look up model shortnames and paths without calling list_models. Also includes the resolution procedure for unknown models.
-allowed-tools: get_model_types, get_models_in_folder
+allowed-tools: check_model, search_huggingface_models, get_model_info, download_hf_model
 ---
 
-# Model Reference â€” Known Pre-Validated Models
+# Model Reference – Known Pre-Validated Models
 
 Model paths are relative to the external model directory configured on the ComfyUI server.
 
@@ -14,9 +14,10 @@ Model paths are relative to the external model directory configured on the Comfy
 
 ## Resolution procedure
 
-1. **Check this table** â†’ if the shortname is listed, use the path directly. No tool call needed.
-2. **Not in table** â†’ call `get_models_in_folder` or `get_model_types` to verify the path on the server.
-3. **Still not found** â†’ do NOT fabricate a path. Note the model as unverified in the brainbriefing. Flag as BLOCKER if no fallback exists.
+1. **Check this table** → if the shortname is listed, use `check_model([filename])` to confirm it exists and get the exact path.
+2. **Not in table** → call `check_model([filename])` with the expected filename. If found, use the returned path verbatim.
+3. **`check_model` returns `"False"`** → model is not installed. Use `search_huggingface_models` / `get_model_info` to find it, then `download_hf_model` to install. Flag as WARNING in brainbriefing.
+4. **Still not found** → do NOT fabricate a path. Set `status: "blocked"` in the brainbriefing.
 
 ---
 

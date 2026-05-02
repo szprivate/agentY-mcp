@@ -31,6 +31,7 @@ from src.tools.image_handling import set_vision_agent as _set_vision_agent
 from src.utils.chat_summary import summarize_conversation, log_agent_messages
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
 from src.utils.comfyui_progress import stream_comfyui_job as _stream_comfyui_job
+from src.utils.progress_signal import drain as _drain_progress
 from src.utils.costs import compute_cost_from_usage
 from src.utils.models import AgentSession, ChatSummary, MessageIntent, TriageResult
 from src.utils.triage import triage as _triage, route as _route
@@ -2046,6 +2047,10 @@ class Pipeline:
                     if chunk:
                         chunks.append(chunk)
                 yield event
+                # Drain any progress lines pushed by sync tools (e.g. download_hf_model)
+                # and surface them as plain data events so Chainlit can display them.
+                for _prog_line in _drain_progress():
+                    yield {"data": _prog_line}
 
             last_response = "".join(chunks)
             label = "initial" if attempt == 0 else f"retry {attempt}"

@@ -1,7 +1,7 @@
 ---
 name: upscale-ultimatesd
 description: Ultimate SD upscaler on Flux1-dev fp8 (template upscale_ultimateSD). Activate in the Researcher when the selected template is upscale_ultimateSD. Activate in the Brain during assembly of the upscale_ultimateSD template to patch the UltimateSDUpscale node, ensure the Flux1-dev fp8 checkpoint is present (download from HuggingFace if missing), and wire the LoadImage input + SaveImage output correctly.
-allowed-tools: update_workflow, get_workflow_template, check_local_model, download_hf_model, search_huggingface_models, get_model_info, get_models_in_folder
+allowed-tools: update_workflow, get_workflow_template, check_model, download_hf_model, search_huggingface_models, get_model_info
 ---
 
 # Ultimate SD Upscale — Flux1-dev fp8 Skill
@@ -44,15 +44,11 @@ Note any non-default upscale factor, denoise, or tile size as a WARNING in `bloc
 
 ### Assembly steps
 
-**1. Ensure the diffusion checkpoint is on disk**
+**1. Ensure the diffusion checkpoint is on disk** *(Researcher step)*
 
-Before patching, verify `flux1-dev-fp8.safetensors` exists. The model ships under `FLUX1/`:
-
-```
-check_local_model(filename="flux1-dev-fp8.safetensors")
-```
-
-If the response reports the file is missing, download it from HuggingFace:
+The Researcher MUST call `check_model(["flux1-dev-fp8.safetensors"])` during step 8.
+- If it returns a path → put that path in the brainbriefing verbatim.
+- If it returns `"False"` → download via:
 
 ```
 download_hf_model(
@@ -62,9 +58,7 @@ download_hf_model(
 )
 ```
 
-If `check_local_model` is ambiguous, fall back to `get_models_in_folder(folder="checkpoints")` and look for `FLUX1/flux1-dev-fp8.safetensors`.
-
-Do not proceed to `update_workflow` until the file is confirmed present — LoadCheckpoint validation will fail otherwise.
+Do not proceed to handoff until the file is confirmed present.
 
 **2. Patch input node (node 8 LoadImage)**
 
@@ -118,7 +112,7 @@ Apply only the parameters the user / brainbriefing overrides. The template defau
 | `4x-UltraSharp.pth`                 | If user wants a 4× pass driven by the ESRGAN model itself            |
 | `4x_foolhardy_Remacri.pth`          | Illustration / anime source                                          |
 
-If the user requests a different upscale model, verify it exists via `get_models_in_folder(folder="upscale_models")` before patching. Do not fabricate a filename.
+If the user requests a different upscale model, the Researcher must call `check_model(["model_name.pth"])` to verify it exists before putting it in the brainbriefing. Do not fabricate a filename.
 
 ---
 
@@ -146,7 +140,7 @@ Minimal patch set (2× upscale, default prompts, denoise 0.15):
 
 | Problem                                                    | Fix                                                                                               |
 |------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| `checkpoint not found: flux1-dev-fp8.safetensors`          | Run `check_local_model` → `download_hf_model(Kijai/flux-fp8, flux1-dev-fp8.safetensors, FLUX1)`.  |
+| `checkpoint not found: flux1-dev-fp8.safetensors`          | Researcher error — `check_model` should have caught this. Researcher must re-run and download via `download_hf_model`.  |
 | Output looks identical to input                            | `denoise` too low — raise to `0.15`–`0.25`.                                                       |
 | Output drifts / faces change                               | `denoise` too high — drop to `0.1`–`0.15`; Flux is very sensitive at the upscaler stage.          |
 | Visible tile seams                                         | Increase `mask_blur` to `16`, `tile_padding` to `64`, or switch `mode_type` to `Chess`.           |
@@ -169,7 +163,7 @@ Minimal patch set (2× upscale, default prompts, denoise 0.15):
 - [ ] Non-default upscale factor / denoise / tile size flagged as WARNING
 
 **Brain:**
-- [ ] `check_local_model` confirmed `flux1-dev-fp8.safetensors` present (downloaded via `download_hf_model` if missing)
+- [ ] Brain receives confirmed model path from brainbriefing (verified by Researcher via `check_model`)
 - [ ] Input image uploaded to ComfyUI input directory
 - [ ] Node `8` `image` patched to uploaded filename
 - [ ] Node `7` `filename_prefix` patched from brainbriefing output

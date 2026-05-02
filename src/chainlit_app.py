@@ -858,6 +858,7 @@ async def on_message(message: cl.Message) -> None:
     think_step: cl.Step | None = None
     qa_step: cl.Step | None = None
     comfy_step: cl.Step | None = None  # live-updating ComfyUI progress bar step
+    download_step: cl.Step | None = None  # live-updating HF download progress step
 
     # Markers that identify Vision-QA output coming from the executor.
     QA_MARKERS = ("🔍 QA `", "🔍 Running Vision QA")
@@ -1021,6 +1022,19 @@ async def on_message(message: cl.Message) -> None:
             if not chunk:
                 continue
 
+            # HF download progress lines (⬇️ [...]) → live-updating Step.
+            # Must be checked BEFORE the researcher_step pass-through so that
+            # download progress is routed to its own step rather than being
+            # swallowed by the researcher's collapsible output.
+            if chunk.startswith("⬇️ "):
+                inner = chunk[len("⬇️ "):].strip()
+                if download_step is None:
+                    download_step = cl.Step(name="⬇️ HF Download", type="tool")
+                    await download_step.send()
+                download_step.output = inner
+                await download_step.update()
+                continue
+
             # Researcher / brain output goes into its collapsible step.
             if researcher_step is not None:
                 await researcher_step.stream_token(chunk)
@@ -1078,6 +1092,8 @@ async def on_message(message: cl.Message) -> None:
             await brain_step.update()
         if planner_step is not None:
             await planner_step.update()
+        if download_step is not None:
+            await download_step.update()
         if think_step is not None:
             await think_step.update()
         if qa_step is not None:

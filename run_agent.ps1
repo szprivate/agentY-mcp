@@ -220,6 +220,12 @@ try {
         Write-Host "[run_agent] Docker not found - skipping MinIO startup. File uploads will not persist." -ForegroundColor Yellow
     }
 
+    # ── Refresh ComfyUI model caches ────────────────────────────────────────
+    Write-Host "[run_agent] Refreshing ComfyUI model cache..." -ForegroundColor Cyan
+    python scripts/refresh_models.py
+    $env:COMFYUI_MODELS_REFRESHED = "1"  # prevent re-runs in child processes
+    Write-Host ""
+
     # Build chainlit arguments
     $ChainlitArgs = @("run", "src/chainlit_app.py", "--port", $Port)
     if ($Watch) { $ChainlitArgs += "-w" }

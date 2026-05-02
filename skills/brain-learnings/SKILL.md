@@ -73,3 +73,10 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-04-27 | update_workflow fails validation if LoadImage nodes are not all patched | When updating image paths, ensure all LoadImage nodes in the workflow are patched to avoid null value errors.
 
 2026-04-28 | update_workflow fails if LoadImage nodes reference files not yet uploaded | Always upload all input images using upload_image before updating or validating the workflow to ensure files exist on the server.
+
+2026-05-02 | ModelSamplingAuraFlow triggers validation errors for missing Flux inputs | Add max_shift (1.15) and base_shift (0.5) to the update_workflow patches to satisfy the validation requirement.
+
+2026-05-02 | system validator erroneously requires Flux parameters for AuraFlow nodes | Include base_shift and max_shift in the update_workflow patch to satisfy the false-positive validation error.
+2026-05-02 | update_workflow fails because model names or paths are incorrect | Use get_node_schema on the loader node to find the exact valid strings and directory prefixes.
+
+2026-05-02 | CLIPLoader requires matching type input when updating clip_name | When patching CLIPLoader with specific models, also update the type input to match the architecture, such as qwen_image.

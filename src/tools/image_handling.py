@@ -360,23 +360,19 @@ def analyze_image(
             )
         else:
             try:
-                import base64 as _base64
-                b64 = _base64.b64encode(data).decode("ascii")
-                media_type = f"image/{'jpeg' if img_fmt == 'jpeg' else img_fmt}"
-                # Build a multimodal content message (Strands / Anthropic format).
+                # Strands-native ContentBlock format for multimodal input.
+                # OllamaModel expects {"image": {"format": ..., "source": {"bytes": <raw bytes>}}}.
                 user_message = [
                     {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": b64,
-                        },
+                        "image": {
+                            "format": img_fmt,
+                            "source": {"bytes": data},
+                        }
                     },
-                    {"type": "text", "text": question or "Describe this image in detail."},
+                    {"text": question or "Describe this image in detail."},
                 ]
-                # Reset history so every call is fully independent.
-                _vision_agent.conversation_manager.messages = []
+                # Wipe history so every invocation is fully independent.
+                _vision_agent.messages.clear()
                 vision_result = str(_vision_agent(user_message))
                 print(f"[analyze_image] describe result length: {len(vision_result):,} chars")
                 label = source_name if source_name else "provided image"

@@ -6,9 +6,6 @@ Learnings, ErrorChecker, and VisionAgent agents.
 """
 
 from src.tools.comfyui import (  # noqa: F401
-    # Models
-    get_model_types,
-    get_models_in_folder,
     # Execution control
     interrupt_execution,
     free_memory,
@@ -52,10 +49,10 @@ from src.tools.image_handling import (  # noqa: F401
     get_image_resolution,
     analyze_image,
 )
+from src.tools.comfyui import check_model  # noqa: F401
 from src.tools.huggingface import (  # noqa: F401
     search_huggingface_models,
     get_model_info,
-    check_local_model,
     download_hf_model,
 )
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
@@ -73,8 +70,7 @@ INFO_TOOLS: list = [
     memory_read,
     get_workflow_catalog,
     get_workflow_template,
-    get_model_types,
-    get_models_in_folder,
+    check_model,
     get_node_schema,
     search_nodes,
     read_text_file,
@@ -90,7 +86,7 @@ INFO_TOOLS: list = [
 RESEARCHER_TOOLS: list = [
     get_workflow_catalog,
     get_workflow_template,
-    get_model_types,
+    check_model,         # verify model files exist in the ComfyUI installation
     get_comfyui_dirs,
     read_text_file,
     get_image_resolution,
@@ -101,6 +97,10 @@ RESEARCHER_TOOLS: list = [
     calculator,
     memory_read,
     memory_write,
+    # HuggingFace – discover and download missing models
+    search_huggingface_models,
+    get_model_info,
+    download_hf_model,
     stop,
 ]
 
@@ -138,9 +138,7 @@ ERROR_CHECKER_TOOLS: list = [
 ]
 
 BRAIN_TOOLS: list = [
-    # Models / nodes
-    get_model_types,
-    get_models_in_folder,
+    # Node inspection (schema lookup only – no model checking)
     get_node_schema,
     get_workflow_node_info,
     # Server directories (resolve authoritative output path)
@@ -148,11 +146,12 @@ BRAIN_TOOLS: list = [
     # Upload input images
     upload_image,
     get_image_resolution,
-    # Workflow assembly, modification & validatione
+    # Workflow assembly, modification & validation
     get_workflow_template,
     update_workflow,
     save_workflow,
     search_nodes,
+    check_model,
     # Handoff to executor (replaces submit_prompt)
     signal_workflow_ready,
     # Batch: duplicate workflow for each iteration
@@ -161,11 +160,6 @@ BRAIN_TOOLS: list = [
     run_script,
     # Iteration utility
     iterate,
-    # Hugging Face model management
-    search_huggingface_models,
-    get_model_info,
-    check_local_model,
-    download_hf_model,
     # File operations (strands built-in + project)
     file_read,
     read_text_file,

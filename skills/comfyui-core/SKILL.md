@@ -1,7 +1,7 @@
 ---
 name: comfyui-core
 description: Core ComfyUI knowledge — workflow JSON format, node connection semantics, data types, pipeline patterns, and agentY tool usage. Activate whenever building or patching a workflow.
-allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, signal_workflow_ready, duplicate_workflow, get_node_schema, search_nodes, get_model_types, get_models_in_folder, interrupt_execution, free_memory
+allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, signal_workflow_ready, duplicate_workflow, get_node_schema, search_nodes, interrupt_execution, free_memory
 ---
 
 # ComfyUI Core Knowledge
@@ -177,11 +177,6 @@ SetLatentNoiseMask (samples, mask) → LATENT → KSampler.latent_image
 
 - **`get_node_schema(node_class)`** — returns required/optional inputs, types, defaults, and outputs for a node class. Use when you need to verify connection types or discover required inputs before patching.
 - **`search_nodes(query, limit=10)`** — search available nodes by keyword across names, descriptions, and categories. Use when you need to find the right node class name.
-
-### Model Inspection
-
-- **`get_model_types()`** — list available model folder types (checkpoints, loras, unet, vae, clip, etc.).
-- **`get_models_in_folder(folder)`** — list model files in a specific folder. Use to verify a model exists before referencing it in a patch.
 
 ### Memory and Execution Control
 

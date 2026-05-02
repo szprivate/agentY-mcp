@@ -164,8 +164,8 @@ def _build_model_table() -> str:
     lines: list[str] = [
         "## Models",
         "",
-        "Use these paths verbatim. Never guess a path.",
-        "Call `get_models_in_folder()` only for models not listed here.",
+        "Use these paths verbatim — they come from the Researcher's brainbriefing.",
+        "Do NOT check, download, or guess model paths yourself.",
     ]
 
     for key, title in category_titles.items():

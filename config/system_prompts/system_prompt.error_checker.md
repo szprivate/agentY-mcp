@@ -37,7 +37,7 @@ Output **raw JSON only** — no markdown fences, no prose before or after:
 {
   "status": "error_fixable",
   "errors": ["FileNotFoundError: model.safetensors not found"],
-  "fix_plan": "Node 1 (CheckpointLoaderSimple) references a model file that does not exist. Call get_models_in_folder('checkpoints') to find the correct filename, then patch node 1 input 'ckpt_name' with the correct value via update_workflow.",
+  "fix_plan": "Node 1 (CheckpointLoaderSimple) references a model file that does not exist. Call check_model(['model.safetensors']) to find the correct path, then patch node 1 input 'ckpt_name' with the correct value via update_workflow.",
   "user_message": "The workflow failed because the checkpoint model file was not found. Retrying with the correct path."
 }
 ```

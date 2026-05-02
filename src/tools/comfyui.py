@@ -334,23 +334,64 @@ def _parse_inputs_schema(spec: dict) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
-def get_model_types() -> str:
-    """List available model folder types in ComfyUI (checkpoints, loras, unet, vae, clip, etc.)."""
-    try:
-        return json.dumps(get_client().get("/models"))
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+def check_model(model_names: list) -> str:
+    """Check whether model files exist in the current ComfyUI installation.
 
+    Searches the cached model inventory in config/models.json (refreshed at
+    startup) across ALL model folders (checkpoints, loras, vae, unet, clip,
+    etc.) using a permissive, case-insensitive filename match.
 
-@tool
-def get_models_in_folder(folder: str) -> str:
-    """List model files in a ComfyUI model folder.
+    The search is by **exact filename** (case-insensitive), ignoring the
+    subfolder.  This means you can pass just the bare filename and the tool
+    will find it even if it lives in an unexpected subfolder.
 
     Args:
-        folder: Folder name e.g. 'checkpoints', 'loras', 'vae', 'clip', 'unet'.
+        model_names: List of model filenames to look up, e.g.
+            ["flux1-dev-fp8.safetensors", "detail_tweaker_xl.safetensors"].
+            You may include or omit the subfolder prefix — only the filename
+            part is matched.
+
+    Returns a JSON object mapping each queried name to either:
+    - The full relative path as it appears in ComfyUI (e.g.
+      ``"FLUX1/flux1-dev-fp8.safetensors"``), ready to drop into a
+      ``Load Checkpoint`` or ``Load LoRA`` node.
+    - The string ``"False"`` when the model is not found in the inventory.
+
+    Example output::
+
+        {
+            "flux1-dev-fp8.safetensors": "FLUX1/flux1-dev-fp8.safetensors",
+            "missing_model.safetensors": "False"
+        }
+
+    If models.json is missing or has no ``available`` key, all entries will
+    return ``"False"``.
     """
     try:
-        return json.dumps(get_client().get(f"/models/{folder}"))
+        models_path = _project_root() / "config" / "models.json"
+        available: dict = {}
+        if models_path.exists():
+            raw = "".join(
+                ln for ln in models_path.read_text(encoding="utf-8").splitlines(keepends=True)
+                if not ln.lstrip().startswith("//")
+            )
+            data = json.loads(raw) if raw.strip() else {}
+            available = data.get("available", {})
+
+        # Build a flat lookup: lowercase_basename -> full_relative_path
+        basename_index: dict[str, str] = {}
+        for folder_entries in available.values():
+            if not isinstance(folder_entries, list):
+                continue
+            for entry in folder_entries:
+                basename_index[Path(entry).name.lower()] = entry
+
+        result: dict[str, str] = {}
+        for name in model_names:
+            key = Path(name).name.lower()
+            result[name] = basename_index.get(key, "False")
+
+        return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 

@@ -22,8 +22,7 @@ Additionally to your capabilities, the system can:
 ## Tool usage
 - Call `get_workflow_catalog` to see all available workflow templates
 - Call `get_workflow_template` to fetch the full details of a specific template (inputs, model, description)
-- Call `get_model_types` to list model folder types (checkpoints, loras, etc.)
-- Call `get_models_in_folder` to list actual model files in a given folder
+- Call `check_model([...filenames...])` to verify whether specific model files are available
 - Call `get_node_schema` or `search_nodes` for questions about ComfyUI node types
 - Call `read_text_file` if you need to read a local documentation or config file
 - Call `analyze_image` and respond with a description if the user asks you to

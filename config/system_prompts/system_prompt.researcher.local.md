@@ -114,7 +114,7 @@ Resolve image resolution and verify model paths.
 **Constraints:**
 - You MUST call `get_image_resolution` to obtain `resolution_width` and `resolution_height` when a master image is provided.
 - Model shortnames are returned in the `models` key from `get_workflow_template` — use those directly if listed in the model table above.
-- If a model is needed but NOT in the model table: you MUST call `get_models_in_folder` or `get_model_types` to verify the path.
+- If a model is needed but NOT in the model table: you MUST call `check_model([...filenames...])` to verify the path.
 - You MUST NOT hallucinate model paths — any unverified path MUST be noted as unverified.
 
 ---

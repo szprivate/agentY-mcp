@@ -1,7 +1,7 @@
 ---
 name: troubleshooting
 description: Common ComfyUI errors and fixes — OOM, missing nodes, dtype mismatches, black images, and debugging strategies
-allowed-tools: get_history, get_logs, get_system_stats, get_node_schema, get_models_in_folder, get_model_types, search_huggingface_models, search_nodes, queue, download_hf_model
+allowed-tools: get_history, get_logs, get_system_stats, get_node_schema, check_model, search_huggingface_models, search_nodes, queue, download_hf_model
 ---
 
 # ComfyUI Troubleshooting Guide
@@ -18,7 +18,7 @@ When a workflow fails, follow this systematic approach:
 2. **Check logs**: Use `get_logs` with keyword filters like `"error"`, `"warning"`, `"traceback"`
 3. **Identify the failing node**: The history response includes the `node_id` and `node_type` that failed
 4. **Cross-reference inputs**: Use `get_node_schema` to verify the failing node's expected input schema
-5. **Check models**: Use `get_models_in_folder` / `get_model_types` to verify all referenced model files exist
+5. **Check models**: Use `check_model([...filenames...])` to verify all referenced model files exist
 
 ## Out of Memory (OOM)
 
@@ -306,7 +306,7 @@ RuntimeError: PytorchStreamReader failed reading zip archive
 
 ### Fixes
 
-1. **Verify the model exists**: `get_models_in_folder(folder="checkpoints")` — use `get_model_types()` to see valid folder names
+1. **Verify the model exists**: `check_model(["model_filename.safetensors"])` — searches across all folders in the cached inventory
 2. **Check the exact filename**: Model names in workflows must match the filename exactly (case-sensitive)
 3. **Re-download**: If hash mismatch or corruption:
    ```
@@ -406,10 +406,7 @@ get_node_schema("ControlNetApply")       # Verify custom nodes loaded
 ### Verify Models
 
 ```
-get_model_types()                                 # List all valid folder names
-get_models_in_folder(folder="checkpoints")        # Installed checkpoints
-get_models_in_folder(folder="loras")              # Installed LoRAs
-get_models_in_folder(folder="controlnet")         # Installed ControlNets
+check_model(["model.safetensors", "lora.safetensors"])  # Check one or more models across all folders
 ```
 
 ## Quick Reference: Error to Fix
