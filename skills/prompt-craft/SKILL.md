@@ -37,20 +37,19 @@ Use in **negatives** for SD 1.5 / SDXL: `embedding:easynegative`, `embedding:bad
 
 ### SDXL
 - **Negative: moderate importance.**
-- Natural language preferred over tags. Dual CLIP supports ~154 tokens natively.
-- Use `CLIPTextEncodeSDXL` for separate `text_g` (global) / `text_l` (local) control.
-- Turbo/Lightning: CFG 1.0–2.0, minimal or empty negative.
+- Natural language preferred over tags. Dual CLIP supports ~154 tokens natively — no `BREAK` needed unless prompt exceeds ~154 tokens.
+- Use `CLIPTextEncodeSDXL` for separate `text_g` (global concept) / `text_l` (local detail) control.
+- Turbo/Lightning variants: use minimal or empty negative.
 
 ### Flux
-- **No negative prompt. CFG must = 1.0** (higher → artifacts).
+- **No negative prompt** — omit the negative entirely.
 - T5-XXL encoder: write natural descriptive sentences, not tag lists.
 - Long prompts (200+ tokens) work fine.
-- Schnell: 4 steps. Dev: 20–50 steps, sgm_uniform scheduler.
 - **Don't use** quality tags (`masterpiece`, `best quality`) — describe quality in prose.
 
 ### SD3 / SD3.5
 - Triple CLIP (CLIP-L + CLIP-G + T5-XXL). Long natural language prompts.
-- CFG 4–7. Minimal negatives (`low quality, blurry` is enough).
+- Minimal negatives (`low quality, blurry` is enough).
 
 ## Prompt Order (SD 1.5 / SDXL)
 1. Quality modifiers → 2. Subject → 3. Subject details → 4. Action/pose → 5. Environment → 6. Composition → 7. Lighting → 8. Style → 9. Technical quality
@@ -80,13 +79,15 @@ BREAK
 
 **Negative prompt (supported):** `worst quality, low quality, blurry, static, morphing, warping, flickering, deformed face, extra fingers, watermark, subtitle`
 
-**WAN 2.2 vs 2.1:** 2.2 uses MoE architecture — sharper frames, better multi-object scenes, more reliable camera direction. The 5B hybrid model runs at 720p on a single 4090. Prompt approach is the same.
+**WAN 2.2 vs 2.1:** Prompt approach is identical for both versions. Camera direction is more reliable in 2.2.
 
 ---
 
 ### Kling (2.x / 3.0)
 **Prompt formula:** `Subject (specific details) + Action (precise movement) + Context (3–5 elements) + Style (camera, lighting, mood)`  
 Write like a film director giving scene instructions, not like an image prompt.
+
+**Hard limits (API-enforced):** positive prompt ≤ 2500 characters · negative prompt ≤ 2500 characters. Prompts exceeding these are rejected — not silently truncated.
 
 **Key principles:**
 - Always specify camera behavior explicitly — without it, the model guesses and output looks static or random.
@@ -95,7 +96,7 @@ Write like a film director giving scene instructions, not like an image prompt.
 - Use motion endpoints to prevent hangs: `"spins, then settles back into place"`.
 - Negative prompts are recommended: `smiling, cartoonish, smooth plastic skin, floating limbs, sliding feet, text morphing`
 
-**Kling 3.0 additions:** Multi-shot up to 6 shots in one prompt — label each explicitly (`Shot 1: …, Shot 2: …`). Native audio/dialogue: name speakers explicitly. Character consistency via "Elements" feature (upload reference from multiple angles). Reference images addressable as `@image1`, `@image2`.
+**Kling 3.0 additions:** Multi-shot up to 6 shots in one prompt — label each explicitly (`Shot 1: …, Shot 2: …`). Native audio/dialogue: name speakers explicitly. Reference images addressable as `@image1`, `@image2`.
 
 **Physics tip (walking):** Describe weight transfer explicitly — `"each step lands heel-first, rolls forward with visible weight transfer"` — to prevent the AI moonwalk.
 
@@ -104,6 +105,8 @@ Write like a film director giving scene instructions, not like an image prompt.
 ### Kling 3.0 — Multishot
 **Prompt formula per shot:** `[CHARACTER LOCK] + [ENVIRONMENT] + [TRANSITION CUE] + [SUBJECT MOTION] + [CAMERA MOVE] + [END STATE] + [STYLE]`  
 Label shots explicitly: `Shot 1: … Shot 2: …` up to 6 shots per generation.
+
+**Hard limits (API-enforced):** entire multi-shot prompt ≤ 2500 characters total · negative prompt ≤ 2500 characters. With 6 shots this leaves ~400 characters per shot — keep each shot description tight.
 
 **Character lock:** Paste the **exact same** character description at the start of every shot. Never paraphrase — Kling anchors identity to this string.
 
@@ -117,16 +120,6 @@ Label shots explicitly: `Shot 1: … Shot 2: …` up to 6 shots per generation.
 **Camera vocabulary:** `slow push-in` · `pull-back reveal` · `static locked` · `orbit/arc shot` · `crane up` · `handheld drift` · `rack focus`
 
 **End-frame handoff:** Describe the subject's final position at the end of each shot. Open the next shot referencing that state — this is what creates continuity across separate generations.
-
-**Settings:**
-
-| Parameter | Value |
-|---|---|
-| Duration | 5s (10s accumulates more drift) |
-| CFG | 0.5–0.6 |
-| Motion strength | Medium |
-| First frame | Last frame of previous shot |
-| Aspect ratio | Pick one, never mix across sequence |
 
 **Negative prompt (apply to all shots):** `blurry, deformed hands, morphing face, identity change, flickering, jerky motion, warped background, two people`
 
@@ -155,7 +148,6 @@ This model takes an **instruction** rather than a descriptive prompt. It uses du
 **Do:**
 - Be explicit and short. One clear edit goal per instruction.
 - Specify what must stay unchanged — the model uses this to preserve identity and geometry.
-- Use the Lightning LoRA for fast iteration; disable for maximum fidelity.
 
 **Don't:**
 - Stack multiple conflicting edits in one pass.
@@ -166,15 +158,7 @@ This model takes an **instruction** rather than a descriptive prompt. It uses du
 ---
 
 ### Nano Banana 2 / Nano Banana Pro (Gemini Image)
-These are **API-only, cloud-side models** running via Google's Gemini API (ComfyUI Partner Nodes). No local weights.
-
-| | Nano Banana 2 (gemini-3.1-flash-image) | Nano Banana Pro (gemini-3-pro-image) |
-|---|---|---|
-| Speed | Fast / Flash | Slower, reasoning-first |
-| Best for | Editing, style transfer, iteration | Complex layouts, infographics, text rendering, brand consistency |
-| Thinking | Optional (Minimal / Dynamic) | Deep Think default |
-| Max refs | 14 (10 objects + 4 chars) | 14 |
-| Resolution | Up to 1K (512px option) | 1K–4K native |
+**Nano Banana 2** — best for editing, style transfer, iteration. **Nano Banana Pro** — best for complex layouts, infographics, text rendering, brand consistency. Both support up to 14 reference images (10 objects + 4 characters).
 
 **Both models:** Natural language only — no tag soups, no quality keywords like `masterpiece`. They reason through prompts before generating.
 
@@ -197,6 +181,5 @@ Example: `"A stoic robot barista with glowing blue optics preparing espresso in 
 3. Missing `BREAK` on 60+ word prompts → silent truncation
 4. Weight > 1.5 → artifacts / color bleed
 5. Conflicting weighted terms → confuses model
-6. Missing embedding file → node error
-7. Wrong LoRA trigger word → concept doesn't activate
-8. Quality tags (`masterpiece`) in Flux prompts → ignored
+6. Wrong LoRA trigger word → concept doesn't activate
+7. Quality tags (`masterpiece`) in Flux prompts → ignored
