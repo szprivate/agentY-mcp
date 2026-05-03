@@ -810,18 +810,6 @@
   {
     "templates": [
       {
-        "name": "video_ltx2_3_i2v",
-        "models": [],
-        "io": {
-          "inputs": [],
-          "outputs": []
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
         "name": "video_wan2_2_14B_flf2v",
         "models": [],
         "io": {
@@ -993,6 +981,36 @@
               "nodeType": "SaveImage",
               "file": "",
               "mediaType": "image"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "video_ltx2_3_i2v",
+        "models": [
+          "ltx-2.3-22b-dev-fp8",
+          "ltx-2.3-22b-distilled-lora-384",
+          "gemma-3-12b-it-abliterated_lora_rank64_bf16"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 269,
+              "nodeType": "LoadImage",
+              "file": "egyptian_queen.png",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 277,
+              "nodeType": "VHS_VideoCombine",
+              "file": "",
+              "mediaType": "video"
             }
           ]
         }

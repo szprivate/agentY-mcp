@@ -1158,12 +1158,6 @@ def build_skill_from_workflow(
     skill_md = skill_dir / "SKILL.md"
     skill_md.write_text(content, encoding="utf-8")
 
-    # Return stats (embedded in path for the CLI to pretty-print)
-    skill_md._stats = {  # type: ignore[attr-defined]
-        "patchable": len(bucket_a),
-        "locked": len(bucket_c),
-        "models": len(bucket_b),
-    }
     return str(skill_md)
 
 

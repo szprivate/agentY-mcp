@@ -603,6 +603,7 @@ async def on_message(message: cl.Message) -> None:
         try:
             import json as _json
             from src.utils.workflow_parser import parse_workflow as _parse_workflow, _custom_index_path
+            await cl.Message(content=f"⏳ Parsing workflow `{_parts[1].strip()}`…", author="system").send()
             with open(_wf_path, encoding="utf-8") as _f:
                 _wf_data = _json.load(_f)
             _stem = _wf_path.stem
@@ -626,7 +627,17 @@ async def on_message(message: cl.Message) -> None:
             # Build SKILL.md for the newly registered workflow
             _skill_msg = ""
             try:
-                from scripts.build_skill import build_skill_from_workflow as _build_skill
+                await cl.Message(content="⏳ Building SKILL.md (loading LLM, this may take a moment)…", author="system").send()
+                import importlib.util as _ilu
+                import sys as _sys
+                _bs_path = str(_project_root / "scripts" / "build_skill.py")
+                _mod = _sys.modules.get("_agenty_build_skill")
+                if _mod is None:
+                    _spec = _ilu.spec_from_file_location("_agenty_build_skill", _bs_path)
+                    _mod = _ilu.module_from_spec(_spec)
+                    _sys.modules["_agenty_build_skill"] = _mod
+                    _spec.loader.exec_module(_mod)
+                _build_skill = _mod.build_skill_from_workflow
                 _skill_path = _build_skill(str(_wf_path))
                 _skill_rel = Path(_skill_path).relative_to(_project_root)
                 _skill_msg = f" SKILL.md written to `{_skill_rel}`."
