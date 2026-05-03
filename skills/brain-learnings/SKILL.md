@@ -92,3 +92,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-03 | update_workflow reports missing required inputs for ComfyMathExpression despite valid connections | Verify node connections by reading the workflow JSON directly if update_workflow returns misleading validation errors.
 
 2026-05-03 | ComfyMathExpression validation error reports missing values input despite existing connections | Patch the values input with an empty list [] to satisfy the validator.
+
+2026-05-03 | update_workflow fails validation for ComfyMathExpression nodes using values.a connections | Manually rewrite the node inputs in the JSON to use standard values objects instead of the values.a connection pattern.

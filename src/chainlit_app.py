@@ -623,8 +623,17 @@ async def on_message(message: cl.Message) -> None:
             else:
                 _tpl_msg = f" `{_stem}` already present in `config/workflow_templates.json`."
             _idx = _custom_index_path()
+            # Build SKILL.md for the newly registered workflow
+            _skill_msg = ""
+            try:
+                from scripts.build_skill import build_skill_from_workflow as _build_skill
+                _skill_path = _build_skill(str(_wf_path))
+                _skill_rel = Path(_skill_path).relative_to(_project_root)
+                _skill_msg = f" SKILL.md written to `{_skill_rel}`."
+            except Exception as _skill_exc:
+                _skill_msg = f" ⚠️ Skill build failed: {_skill_exc}"
             await cl.Message(
-                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}",
+                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_skill_msg}",
                 author="system",
             ).send()
         except Exception as _exc:
@@ -663,8 +672,17 @@ async def on_message(message: cl.Message) -> None:
                     _tpl_msg = f" `{_wf_name}` not found in `config/workflow_templates.json`."
             else:
                 _tpl_msg = ""
+            # Remove skill directory (kebab-case derived from template name)
+            _kebab = _wf_name.lower().replace("_", "-")
+            _skill_dir = _project_root / "skills" / _kebab
+            if _skill_dir.exists():
+                import shutil as _shutil
+                _shutil.rmtree(_skill_dir)
+                _skill_msg = f" Removed skill directory `skills/{_kebab}`."
+            else:
+                _skill_msg = ""
             await cl.Message(
-                content=f"✅ Workflow `{_wf_name}` removed from `{_idx}`.{_tpl_msg}",
+                content=f"✅ Workflow `{_wf_name}` removed from `{_idx}`.{_tpl_msg}{_skill_msg}",
                 author="system",
             ).send()
         except Exception as _exc:

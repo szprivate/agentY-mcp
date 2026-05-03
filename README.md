@@ -335,14 +335,14 @@ Previous conversations are accessible from the sidebar. Without `DATABASE_URL` t
 Use the helper scripts to register a workflow JSON and make it available to the agent:
 
 ```powershell
-# Register a new workflow template
-.\add_workflow.ps1 path\to\your_workflow_api.json
+# Register a new workflow template (also generates a SKILL.md)
+.\scripts\add_workflow.ps1 path\to\your_workflow_api.json
 
-# Remove a registered template
-.\remove_workflow.ps1 your_workflow_api
+# Remove a registered template (also removes its skill directory)
+.\scripts\remove_workflow.ps1 your_workflow_api
 ```
 
-`add_workflow.ps1` parses the workflow, extracts node metadata, and adds an entry to `config/workflow_templates.json`. Custom templates live in `comfyui_workflow_templates_custom/templates/`.
+`scripts/add_workflow.ps1` parses the workflow, extracts node metadata, adds an entry to `config/workflow_templates.json`, and calls `scripts/build_skill.py` to generate a `SKILL.md` in the matching `skills/` directory. Custom templates live in `comfyui_workflow_templates_custom/templates/`.
 
 ---
 
@@ -407,8 +407,12 @@ agentY/
 ├── requirements.txt
 ├── install_agent.ps1           Cross-platform automated install script (pwsh 7+)
 ├── run_agent.ps1               Windows launcher (starts Chainlit GUI)
-├── add_workflow.ps1            Register a custom workflow template
-└── remove_workflow.ps1         Remove a registered workflow template
+├── scripts/
+│   ├── add_workflow.ps1        Register a custom workflow template + build its SKILL.md
+│   ├── build_skill.py          Generate a SKILL.md from a ComfyUI API workflow JSON
+│   ├── refresh_models.py       Refresh ComfyUI model caches
+│   ├── remove_workflow.ps1     Remove a registered workflow template + its skill directory
+│   └── update_all_workflows.ps1  Re-register every template in comfyui_workflow_templates_custom/
 ```
 
 > The ComfyUI custom node lives in its own repo: **[agentY-comfyui-extension](https://github.com/szprivate/agentY-comfyui-extension)**.
