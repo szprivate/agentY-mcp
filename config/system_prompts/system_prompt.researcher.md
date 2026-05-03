@@ -132,7 +132,13 @@ Resolve image resolution and verify model paths.
 - You MUST call `get_image_resolution` to obtain `resolution_width` and `resolution_height` when a master image is provided.
 - Model shortnames are returned in the `models` key from `get_workflow_template`. For every model name referenced in the workflow (checkpoint, lora, vae, unet, clip, etc.) you MUST call `check_model([...list of filenames...])` to verify it exists in the current ComfyUI installation.
 - `check_model` returns the exact relative path (e.g. `"FLUX1/flux1-dev-fp8.safetensors"`) to put directly into the node — use this verbatim in the brainbriefing.
-- If `check_model` returns `"False"` for a model: use `search_huggingface_models` / `get_model_info` to find the correct file, then call `download_hf_model` to install it before handing off. You MUST pass `node_class_type` set to the ComfyUI class name of the node that references the model (e.g. `"UNETLoader"`, `"CheckpointLoaderSimple"`, `"LoraLoader"`) — the tool uses this to determine the correct storage folder automatically via the `NODE_TO_FOLDER` mapping. Set a WARNING in the brainbriefing.
+- If `check_model` returns `"False"` for a model: **you must actively attempt to locate and download it** using the following escalating steps — do NOT declare it unavailable without working through all steps:
+  1. Call `find_hf_file(filename, hints)` first. This searches HF by filename with full-text matching across progressively broader queries. Each match includes an `exact` boolean — if `exact=true` the file was verified in the repo's file list; if `exact=false` it is the nearest available variant (different quantization or version). It is the most reliable way to find models whose name does not match any obvious repo name.
+  2. If `find_hf_file` returns `exact=true` matches, call `download_hf_model` using the returned `repo_id`, `filename`, `subfolder`, and the appropriate `node_class_type`.
+  3. If `find_hf_file` returns only `exact=false` (close variant) matches, use the returned `filename` (not the originally requested one) and set a WARNING in the brainbriefing noting the substitution.
+  3. Only if `find_hf_file` returns no matches: try `search_huggingface_models` with relevant keywords, then `get_model_info` on promising results to verify the file exists in siblings, then `download_hf_model`.
+  4. If all three steps yield nothing, set a BLOCKER in the brainbriefing explaining exactly what was tried.
+  You MUST pass `node_class_type` to `download_hf_model` (e.g. `"UNETLoader"`, `"CheckpointLoaderSimple"`, `"LoraLoader"`) so the tool places the file in the correct folder. Set a WARNING in the brainbriefing once the download succeeds.
 - You MUST NOT hallucinate model paths — every path in the brainbriefing must come from a `check_model` result.
 
 ---

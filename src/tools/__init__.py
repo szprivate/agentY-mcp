@@ -55,6 +55,7 @@ from src.tools.comfyui import check_model  # noqa: F401
 from src.tools.huggingface import (  # noqa: F401
     search_huggingface_models,
     get_model_info,
+    find_hf_file,
     download_hf_model,
 )
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
@@ -102,6 +103,7 @@ RESEARCHER_TOOLS: list = [
     # HuggingFace – discover and download missing models
     search_huggingface_models,
     get_model_info,
+    find_hf_file,       # locate a file by name across HF (API + DDG fallback)
     download_hf_model,
     stop,
 ]

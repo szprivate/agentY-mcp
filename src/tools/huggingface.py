@@ -11,11 +11,16 @@ Environment variables:
                            then to the sensible default D:/AI/ComfyUI/models)
 
 Note on ``find_hf_file``:
-    The HF search API only indexes repo names and metadata, not individual file
-    listings.  Filename-specific lookups — especially community quantizations
-    (e.g. ``gemma_3_12B_it_fp4_mixed.safetensors``) — therefore need a web-
-    search fallback.  ``find_hf_file`` tries the HF API first and falls back
-    to a DuckDuckGo HTML search when the API returns nothing useful.
+    The HF search API tokenises on word boundaries — dots and full extensions
+    break tokenisation entirely, so searching with a raw filename like
+    ``gemma_3_12B_it_fp4_mixed.safetensors`` returns nothing.  The tool first
+    does a single bulk scan of the Comfy-Org HF organisation (which repackages
+    models specifically for ComfyUI and includes files like gemma text encoders
+    and LTX checkpoints).  If that misses, it falls back to progressively
+    broader stem-based queries (full stem → 4-token prefix → 3-token → 2-token
+    → hints), verifying each candidate repo's sibling list for an exact match.
+    When no exact match exists the tool returns close variants so the agent can
+    pick the nearest available file.
 """
 
 import io
@@ -203,152 +208,224 @@ def find_hf_file(filename: str, hints: str = "") -> str:
     Useful for finding community quantizations or obscure model files whose
     repo name does not obviously match the filename.
 
-    Strategy:
-    1. Full-text HF API search (matches model card / README content).
-       For each candidate, verify the file appears in the repo's sibling list.
-    2. DuckDuckGo web-search fallback for cases the HF API still misses.
+    Strategy (fully automatic, no agent loop needed):
+
+    Pass 0 – Comfy-Org bulk scan.  A single HF API call with ``author=Comfy-Org``
+              and ``full=true`` returns all ~60 Comfy-Org repos with their full
+              sibling lists inline.  Comfy-Org repos are curated specifically for
+              ComfyUI and are checked first.  Stops here on an exact match.
+
+    The HF search API tokenises on word boundaries — dots and full extensions
+    break matching entirely, so passes 1-5 never search with the raw filename.
+    Instead, progressively broader queries are built from the filename stem:
+
+    Pass 1 – exact stem (e.g. ``ltx-2.3-22b-dev-fp8``).
+    Pass 2 – first 4 hyphen/underscore tokens (``ltx 2 3 22b``).
+    Pass 3 – first 3 tokens (``ltx 2 3``).
+    Pass 4 – first 2 tokens (``ltx 2``).
+    Pass 5 – ``hints`` string alone (if provided).
+
+    Each pass fetches up to 10 candidate repos and checks every candidate's
+    sibling list for the exact filename.  Searching stops as soon as at least
+    one verified exact match is found.
+
+    If no exact match is found across all passes, the tool returns the best
+    *close matches* (files from the same repo whose stem shares a prefix with
+    the requested filename) so the agent can make an informed decision.
 
     Args:
         filename: Exact filename to locate e.g.
             'gemma_3_12B_it_fp4_mixed.safetensors'.
-        hints: Optional extra search keywords to narrow results e.g.
-            'gemma 12b quantized'.
+        hints: Optional extra search keywords to narrow / broaden results
+            e.g. 'gemma 12b quantized'.  Also used as a dedicated search pass
+            when the stem-based passes return nothing.
 
     Returns:
-        JSON with ``matches`` list, each entry containing ``repo_id``,
-        ``filename``, ``subfolder``, and ``url`` — ready to pass directly
-        to ``download_hf_model``.
+        JSON ``{"ok": true, "count": N, "matches": [...]}`` where each match
+        has ``repo_id``, ``filename``, ``subfolder``, ``url``, and
+        ``exact`` (bool).  Feeds directly into ``download_hf_model``.
     """
-    import re
-    from urllib.parse import quote_plus
-
-    matches: list[dict] = []
-
-    # ------------------------------------------------------------------
-    # Step 1: HF API full-text search
-    # ------------------------------------------------------------------
-    try:
-        search_query = f"{filename} {hints}".strip()
-        params: dict = {
-            "search": search_query,
-            "limit": 5,
-            "sort": "downloads",
-            "direction": "-1",
-            "full_text_search": "true",
+    def _make_match(repo_id: str, rfilename: str, *, exact: bool) -> dict:
+        if "/" in rfilename:
+            subfolder, found_name = rfilename.rsplit("/", 1)
+        else:
+            subfolder, found_name = "", rfilename
+        return {
+            "repo_id": repo_id,
+            "filename": found_name,
+            "subfolder": subfolder,
+            "url": f"https://huggingface.co/{repo_id}/resolve/main/{rfilename}",
+            "exact": exact,
         }
-        resp = requests.get(
-            HF_API_BASE,
-            headers=_hf_headers(),
-            params=params,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        candidates = resp.json()
 
-        for candidate in candidates:
-            model_id = candidate.get("modelId") or candidate.get("id", "")
-            if not model_id:
-                continue
-            try:
-                info_resp = requests.get(
-                    f"{HF_API_BASE}/{model_id}",
-                    headers=_hf_headers(),
-                    timeout=30,
-                )
-                info_resp.raise_for_status()
-                info = info_resp.json()
-            except requests.HTTPError as exc:
-                logger.warning("find_hf_file: could not fetch info for %s: %s", model_id, exc)
-                continue
-            except Exception as exc:
-                logger.warning("find_hf_file: unexpected error fetching info for %s: %s", model_id, exc)
-                continue
-
-            for sibling in info.get("siblings", []):
-                rfilename = sibling.get("rfilename", "")
-                if rfilename.endswith("/" + filename) or rfilename == filename:
-                    # Extract optional subfolder
-                    if "/" in rfilename:
-                        subfolder = rfilename.rsplit("/", 1)[0]
-                        found_name = rfilename.rsplit("/", 1)[1]
-                    else:
-                        subfolder = ""
-                        found_name = rfilename
-                    url = f"https://huggingface.co/{model_id}/resolve/main/{rfilename}"
-                    matches.append({
-                        "repo_id": model_id,
-                        "filename": found_name,
-                        "subfolder": subfolder,
-                        "url": url,
-                    })
-                    break  # one match per repo is enough
-    except requests.HTTPError as exc:
-        logger.warning("find_hf_file: HF API search failed (%s) – trying web fallback", exc)
-    except Exception as exc:
-        logger.warning("find_hf_file: HF API step error: %s", exc)
-
-    # ------------------------------------------------------------------
-    # Step 2: DuckDuckGo web-search fallback
-    # ------------------------------------------------------------------
-    if not matches:
+    def _fetch_siblings(model_id: str) -> list[dict]:
         try:
-            ddg_query = f"site:huggingface.co {filename} {hints}".strip()
-            ddg_url = f"https://html.duckduckgo.com/html/?q={quote_plus(ddg_query)}"
-            ddg_resp = requests.get(
-                ddg_url,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/124.0.0.0 Safari/537.36"
-                    )
+            r = requests.get(
+                f"{HF_API_BASE}/{model_id}",
+                headers=_hf_headers(),
+                timeout=30,
+            )
+            r.raise_for_status()
+            return r.json().get("siblings", [])
+        except Exception as exc:
+            logger.warning("find_hf_file: could not fetch siblings for %s: %s", model_id, exc)
+            return []
+
+    def _search_candidates(query: str, limit: int = 10) -> list[str]:
+        """Return list of model_ids from an HF API search."""
+        try:
+            r = requests.get(
+                HF_API_BASE,
+                headers=_hf_headers(),
+                params={
+                    "search": query,
+                    "limit": limit,
+                    "sort": "downloads",
+                    "direction": "-1",
+                    "full_text_search": "true",
                 },
                 timeout=30,
             )
-            ddg_resp.raise_for_status()
-
-            # Extract HF blob/resolve URLs from the raw HTML
-            pattern = re.compile(
-                r"https://huggingface\.co/"
-                r"([\w\-\.]+/[\w\-\.]+)"
-                r"/(?:blob|resolve)/main/"
-                r"([^\s\"'>]+)"
-            )
-            seen: set[str] = set()
-            for repo_path, file_path in pattern.findall(ddg_resp.text):
-                if len(matches) >= 5:
-                    break
-                # Only keep hits where the filename actually matches
-                tail = file_path.split("/")[-1]
-                if tail != filename:
-                    continue
-                key = f"{repo_path}|{file_path}"
-                if key in seen:
-                    continue
-                seen.add(key)
-
-                if "/" in file_path:
-                    subfolder = file_path.rsplit("/", 1)[0]
-                    found_name = file_path.rsplit("/", 1)[1]
-                else:
-                    subfolder = ""
-                    found_name = file_path
-
-                url = f"https://huggingface.co/{repo_path}/resolve/main/{file_path}"
-                matches.append({
-                    "repo_id": repo_path,
-                    "filename": found_name,
-                    "subfolder": subfolder,
-                    "url": url,
-                })
-        except requests.HTTPError as exc:
-            logger.error("find_hf_file: DuckDuckGo search HTTP error: %s", exc)
-            return json.dumps({"ok": False, "error": f"Web fallback HTTP {exc.response.status_code}: {exc.response.text[:300]}"})
+            r.raise_for_status()
+            return [m.get("modelId") or m.get("id", "") for m in r.json() if m.get("modelId") or m.get("id")]
         except Exception as exc:
-            logger.error("find_hf_file: DuckDuckGo search error: %s", exc, exc_info=True)
-            return json.dumps({"ok": False, "error": str(exc)})
+            logger.warning("find_hf_file: search query %r failed: %s", query, exc)
+            return []
 
-    return json.dumps({"ok": True, "count": len(matches), "matches": matches})
+    def _scan_org_repos(org: str, fname: str, ext: str, stem_prefix: str) -> tuple[list[dict], list[dict]]:
+        """Bulk-scan all repos in *org* for *fname* using a single API call.
+
+        Returns (exact_matches, close_matches).
+        """
+        exact: list[dict] = []
+        close: list[dict] = []
+        try:
+            r = requests.get(
+                HF_API_BASE,
+                headers=_hf_headers(),
+                params={"author": org, "limit": 200, "full": "true"},
+                timeout=30,
+            )
+            r.raise_for_status()
+            repos = r.json()
+            logger.info("find_hf_file: Comfy-Org scan – %d repos fetched", len(repos))
+            for repo in repos:
+                mid = repo.get("modelId") or repo.get("id", "")
+                if not mid:
+                    continue
+                found_exact = False
+                for sibling in repo.get("siblings", []):
+                    rf = sibling.get("rfilename", "")
+                    tail = rf.rsplit("/", 1)[-1] if "/" in rf else rf
+                    if tail == fname:
+                        exact.append(_make_match(mid, rf, exact=True))
+                        found_exact = True
+                        break
+                if not found_exact and ext:
+                    for sibling in repo.get("siblings", []):
+                        rf = sibling.get("rfilename", "")
+                        tail = rf.rsplit("/", 1)[-1] if "/" in rf else rf
+                        if tail.endswith("." + ext) and stem_prefix in tail.lower():
+                            close.append(_make_match(mid, rf, exact=False))
+                            break
+        except Exception as exc:
+            logger.warning("find_hf_file: Comfy-Org scan failed: %s", exc)
+        return exact, close
+
+    # Build stem-based query passes
+    stem = filename.rsplit(".", 1)[0]          # strip extension
+    ext = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    # Normalise to hyphen-separated tokens (underscores and dots become hyphens)
+    tokens = [t for t in stem.replace("_", "-").replace(".", "-").split("-") if t]
+    stem_prefix = stem[:min(8, len(stem))].replace("_", "-").replace(".", "-").lower()
+
+    queries: list[str] = [stem]  # Pass 1: full stem
+    for n in (4, 3, 2):
+        if len(tokens) > n:
+            q = " ".join(tokens[:n])
+            if q not in queries:
+                queries.append(q)
+    if hints and hints not in queries:
+        queries.append(hints)  # Pass 5: hints alone
+
+    close_matches: list[dict] = []
+    seen_repos: set[str] = set()
+    exact_matches: list[dict] = []
+
+    # ------------------------------------------------------------------
+    # Pass 0: Comfy-Org bulk scan (single request, all repos + siblings)
+    # ------------------------------------------------------------------
+    comfy_exact, comfy_close = _scan_org_repos("Comfy-Org", filename, ext, stem_prefix)
+    for m in comfy_exact:
+        seen_repos.add(m["repo_id"])
+    for m in comfy_close:
+        seen_repos.add(m["repo_id"])
+    exact_matches.extend(comfy_exact)
+    close_matches.extend(comfy_close)
+
+    if exact_matches:
+        logger.info("find_hf_file: Comfy-Org exact match found – skipping further passes")
+        return json.dumps({"ok": True, "count": len(exact_matches[:5]), "matches": exact_matches[:5]})
+
+    # ------------------------------------------------------------------
+    # Passes 1-N: stem-based HF-wide search
+    # ------------------------------------------------------------------
+    for pass_num, query in enumerate(queries, 1):
+        candidates = _search_candidates(query)
+        logger.info(
+            "find_hf_file: pass %d query=%r → %d candidates",
+            pass_num, query, len(candidates),
+        )
+
+        for model_id in candidates:
+            if model_id in seen_repos:
+                continue
+            seen_repos.add(model_id)
+
+            siblings = _fetch_siblings(model_id)
+
+            for sibling in siblings:
+                rf = sibling.get("rfilename", "")
+                tail = rf.rsplit("/", 1)[-1] if "/" in rf else rf
+
+                if tail == filename:
+                    exact_matches.append(_make_match(model_id, rf, exact=True))
+                    break  # one exact hit per repo is enough
+
+            else:
+                # No exact match — look for close variant in same extension
+                if ext:
+                    for sibling in siblings:
+                        rf = sibling.get("rfilename", "")
+                        tail = rf.rsplit("/", 1)[-1] if "/" in rf else rf
+                        if (
+                            tail.endswith("." + ext)
+                            and stem_prefix in tail.lower()
+                        ):
+                            close_matches.append(_make_match(model_id, rf, exact=False))
+                            break  # one close match per repo
+
+        if exact_matches:
+            logger.info(
+                "find_hf_file: found %d exact match(es) on pass %d – stopping",
+                len(exact_matches), pass_num,
+            )
+            break
+
+    # Return exact matches if found, otherwise best close matches (up to 5)
+    if exact_matches:
+        results = exact_matches[:5]
+    else:
+        results = close_matches[:5]
+        if results:
+            logger.info(
+                "find_hf_file: no exact match for '%s' – returning %d close variant(s)",
+                filename, len(results),
+            )
+        else:
+            logger.info("find_hf_file: no match or close variant found for '%s'", filename)
+
+    return json.dumps({"ok": True, "count": len(results), "matches": results})
 
 
 @tool
