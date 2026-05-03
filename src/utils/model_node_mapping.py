@@ -89,6 +89,8 @@ NODE_TO_FOLDER: dict[str, str] = {
 
     # LTX Video
     "LTXVModelLoader": "models/ltxv",
+    "LTXAVTextEncoderLoader": "models/text_encoders",
+    "LTXVAudioVAELoader": "models/vae_audio",
 
     # Model Patches
     "ModelPatchLoader": "models/model_patches",
@@ -132,6 +134,8 @@ NODE_TO_PARAM: dict[str, str | list[str]] = {
     "CogVideoXModelLoader": "model",
     "MochiModelLoader": "model_name",
     "LTXVModelLoader": "model_name",
+    "LTXAVTextEncoderLoader": "t5xxl_name",
+    "LTXVAudioVAELoader": "vae_name",
     "ModelPatchLoader": "model_patch_name",
 }
 
