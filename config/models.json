@@ -203,7 +203,8 @@
       "SDXL\\SDXL_textEncoder.safetensors",
       "UMT5\\umt5-xxl-enc-bf16.safetensors",
       "UMT5\\umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-      "WAN\\open-clip-xlm-roberta-large-vit-huge-14_fp16.safetensors"
+      "WAN\\open-clip-xlm-roberta-large-vit-huge-14_fp16.safetensors",
+      "gemma_3_12B_it_fp4_mixed.safetensors"
     ],
     "diffusion_models": [
       "FLUX1\\flux1-canny-dev.safetensors",
