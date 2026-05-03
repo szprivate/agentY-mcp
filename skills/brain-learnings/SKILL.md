@@ -84,3 +84,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-02 | Brain fails to call signal_workflow_ready for specific workflow files | Verify if the workflow file has been updated and retry the signal call using the latest version.
 
 2026-05-02 | ModelSamplingAuraFlow validation fails with ModelSamplingFlux error | Include max_shift, base_shift, width, and height in the update_workflow patches for the sampling node.
+
+2026-05-03 | update_workflow fails for ComfyMathExpression nodes due to missing values input | Patch the 'values' input with an empty list [] to satisfy the required schema for ComfyMathExpression nodes.

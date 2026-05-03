@@ -50,6 +50,7 @@ NODE_TO_FOLDER: dict[str, str] = {
 
     # Upscale Models
     "UpscaleModelLoader": "models/upscale_models",
+    "LatentUpscaleModelLoader": "models/latent_upscale_models",
 
     # GLIGEN (text-to-image guidance)
     "GLIGENLoader": "models/gligen",
@@ -90,7 +91,7 @@ NODE_TO_FOLDER: dict[str, str] = {
     # LTX Video
     "LTXVModelLoader": "models/ltxv",
     "LTXAVTextEncoderLoader": "models/text_encoders",
-    "LTXVAudioVAELoader": "models/vae_audio",
+    "LTXVAudioVAELoader": "models/checkpoints",
 
     # Model Patches
     "ModelPatchLoader": "models/model_patches",
@@ -120,6 +121,7 @@ NODE_TO_PARAM: dict[str, str | list[str]] = {
     "DiffControlNetLoader": "control_net_name",
     "ControlNetLoaderAdvanced": "control_net_name",
     "UpscaleModelLoader": "model_name",
+    "LatentUpscaleModelLoader": "model_name",
     "GLIGENLoader": "gligen_name",
     "StyleModelLoader": "style_model_name",
     "HypernetworkLoader": "hypernetwork_name",
