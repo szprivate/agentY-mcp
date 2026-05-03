@@ -9,6 +9,13 @@ Environment variables:
     COMFYUI_MODELS_DIR  – Base directory where ComfyUI stores models
                           (falls back to config/settings.json → comfyui_models_dir,
                            then to the sensible default D:/AI/ComfyUI/models)
+
+Note on ``find_hf_file``:
+    The HF search API only indexes repo names and metadata, not individual file
+    listings.  Filename-specific lookups — especially community quantizations
+    (e.g. ``gemma_3_12B_it_fp4_mixed.safetensors``) — therefore need a web-
+    search fallback.  ``find_hf_file`` tries the HF API first and falls back
+    to a DuckDuckGo HTML search when the API returns nothing useful.
 """
 
 import io
@@ -135,6 +142,7 @@ def search_huggingface_models(
     query: str,
     filter_tag: str = "",
     limit: int = 10,
+    full_text_search: bool = False,
 ) -> str:
     """Search the Hugging Face Hub for models by keyword.
 
@@ -142,6 +150,10 @@ def search_huggingface_models(
         query: Search string e.g. 'flux lora', 'wan2.1 video'.
         filter_tag: Optional pipeline/library tag e.g. 'diffusers', 'flux'.
         limit: Max results (default 10, max 50).
+        full_text_search: When True, enables full-text search so the query also
+            matches README / model card content — useful when a specific
+            filename is referenced in a model card but not in the repo name
+            (e.g. community quantization files).
     """
     try:
         params: dict = {
@@ -152,6 +164,8 @@ def search_huggingface_models(
         }
         if filter_tag:
             params["filter"] = filter_tag
+        if full_text_search:
+            params["full_text_search"] = "true"
 
         resp = requests.get(
             HF_API_BASE,
@@ -180,6 +194,161 @@ def search_huggingface_models(
     except Exception as exc:
         logger.error("Error in search_huggingface_models: %s", exc, exc_info=True)
         return json.dumps({"ok": False, "error": str(exc)})
+
+
+@tool
+def find_hf_file(filename: str, hints: str = "") -> str:
+    """Locate which Hugging Face repo(s) host a specific file.
+
+    Useful for finding community quantizations or obscure model files whose
+    repo name does not obviously match the filename.
+
+    Strategy:
+    1. Full-text HF API search (matches model card / README content).
+       For each candidate, verify the file appears in the repo's sibling list.
+    2. DuckDuckGo web-search fallback for cases the HF API still misses.
+
+    Args:
+        filename: Exact filename to locate e.g.
+            'gemma_3_12B_it_fp4_mixed.safetensors'.
+        hints: Optional extra search keywords to narrow results e.g.
+            'gemma 12b quantized'.
+
+    Returns:
+        JSON with ``matches`` list, each entry containing ``repo_id``,
+        ``filename``, ``subfolder``, and ``url`` — ready to pass directly
+        to ``download_hf_model``.
+    """
+    import re
+    from urllib.parse import quote_plus
+
+    matches: list[dict] = []
+
+    # ------------------------------------------------------------------
+    # Step 1: HF API full-text search
+    # ------------------------------------------------------------------
+    try:
+        search_query = f"{filename} {hints}".strip()
+        params: dict = {
+            "search": search_query,
+            "limit": 5,
+            "sort": "downloads",
+            "direction": "-1",
+            "full_text_search": "true",
+        }
+        resp = requests.get(
+            HF_API_BASE,
+            headers=_hf_headers(),
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        candidates = resp.json()
+
+        for candidate in candidates:
+            model_id = candidate.get("modelId") or candidate.get("id", "")
+            if not model_id:
+                continue
+            try:
+                info_resp = requests.get(
+                    f"{HF_API_BASE}/{model_id}",
+                    headers=_hf_headers(),
+                    timeout=30,
+                )
+                info_resp.raise_for_status()
+                info = info_resp.json()
+            except requests.HTTPError as exc:
+                logger.warning("find_hf_file: could not fetch info for %s: %s", model_id, exc)
+                continue
+            except Exception as exc:
+                logger.warning("find_hf_file: unexpected error fetching info for %s: %s", model_id, exc)
+                continue
+
+            for sibling in info.get("siblings", []):
+                rfilename = sibling.get("rfilename", "")
+                if rfilename.endswith("/" + filename) or rfilename == filename:
+                    # Extract optional subfolder
+                    if "/" in rfilename:
+                        subfolder = rfilename.rsplit("/", 1)[0]
+                        found_name = rfilename.rsplit("/", 1)[1]
+                    else:
+                        subfolder = ""
+                        found_name = rfilename
+                    url = f"https://huggingface.co/{model_id}/resolve/main/{rfilename}"
+                    matches.append({
+                        "repo_id": model_id,
+                        "filename": found_name,
+                        "subfolder": subfolder,
+                        "url": url,
+                    })
+                    break  # one match per repo is enough
+    except requests.HTTPError as exc:
+        logger.warning("find_hf_file: HF API search failed (%s) – trying web fallback", exc)
+    except Exception as exc:
+        logger.warning("find_hf_file: HF API step error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Step 2: DuckDuckGo web-search fallback
+    # ------------------------------------------------------------------
+    if not matches:
+        try:
+            ddg_query = f"site:huggingface.co {filename} {hints}".strip()
+            ddg_url = f"https://html.duckduckgo.com/html/?q={quote_plus(ddg_query)}"
+            ddg_resp = requests.get(
+                ddg_url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    )
+                },
+                timeout=30,
+            )
+            ddg_resp.raise_for_status()
+
+            # Extract HF blob/resolve URLs from the raw HTML
+            pattern = re.compile(
+                r"https://huggingface\.co/"
+                r"([\w\-\.]+/[\w\-\.]+)"
+                r"/(?:blob|resolve)/main/"
+                r"([^\s\"'>]+)"
+            )
+            seen: set[str] = set()
+            for repo_path, file_path in pattern.findall(ddg_resp.text):
+                if len(matches) >= 5:
+                    break
+                # Only keep hits where the filename actually matches
+                tail = file_path.split("/")[-1]
+                if tail != filename:
+                    continue
+                key = f"{repo_path}|{file_path}"
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                if "/" in file_path:
+                    subfolder = file_path.rsplit("/", 1)[0]
+                    found_name = file_path.rsplit("/", 1)[1]
+                else:
+                    subfolder = ""
+                    found_name = file_path
+
+                url = f"https://huggingface.co/{repo_path}/resolve/main/{file_path}"
+                matches.append({
+                    "repo_id": repo_path,
+                    "filename": found_name,
+                    "subfolder": subfolder,
+                    "url": url,
+                })
+        except requests.HTTPError as exc:
+            logger.error("find_hf_file: DuckDuckGo search HTTP error: %s", exc)
+            return json.dumps({"ok": False, "error": f"Web fallback HTTP {exc.response.status_code}: {exc.response.text[:300]}"})
+        except Exception as exc:
+            logger.error("find_hf_file: DuckDuckGo search error: %s", exc, exc_info=True)
+            return json.dumps({"ok": False, "error": str(exc)})
+
+    return json.dumps({"ok": True, "count": len(matches), "matches": matches})
 
 
 @tool

@@ -140,7 +140,6 @@
       "bepicRoofTop\\bepictopfloor-000006.safetensors",
       "bepicRoofTop\\bepictopfloor.safetensors",
       "bepicRoofTop\\d3g3-000006.safetensors",
-      "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
       "hands\\Detailed_Hands-000001.safetensors",
       "hands\\realistic hands.safetensors",
       "lora_berlingo\\Flux.eBerlingo.02-000006.safetensors",
@@ -162,8 +161,7 @@
       "lora_bmw-jacket\\epochs\\bmw-jacket-000008.safetensors",
       "lora_bmw-jacket\\epochs\\bmw-jacket-000012.safetensors",
       "lora_bmw-jacket\\epochs\\bmw-jacket-01-000004.safetensors",
-      "lora_treets\\treets-crispy-04_masked.safetensors",
-      "ltx-2.3-22b-distilled-lora-384.safetensors"
+      "lora_treets\\treets-crispy-04_masked.safetensors"
     ],
     "vae": [
       "FLUX1\\ae.safetensors",
@@ -203,8 +201,7 @@
       "SDXL\\SDXL_textEncoder.safetensors",
       "UMT5\\umt5-xxl-enc-bf16.safetensors",
       "UMT5\\umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-      "WAN\\open-clip-xlm-roberta-large-vit-huge-14_fp16.safetensors",
-      "gemma_3_12B_it_fp4_mixed.safetensors"
+      "WAN\\open-clip-xlm-roberta-large-vit-huge-14_fp16.safetensors"
     ],
     "diffusion_models": [
       "FLUX1\\flux1-canny-dev.safetensors",
@@ -283,8 +280,6 @@
       "WAN22\\wan2.2_t2v_low_noise_14B_fp16.safetensors",
       "WAN22\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
       "lotusDepth\\lotus-depth-d-v1-1.safetensors",
-      "ltx-2.3-22b-dev-fp8.safetensors",
-      "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
       "z_image_turbo_bf16.safetensors"
     ],
     "clip_vision": [
@@ -332,9 +327,7 @@
       "2xNomosUni_compact_otf_medium.pth",
       "4x-ClearRealityV1.pth",
       "4x_NMKD-Siax_200k.pth",
-      "8xNMKDSuperscale_150000G.pt",
-      "ltxv-spatial-upscaler-0.9.7.safetensors",
-      "ltxv-temporal-upscaler-0.9.7.safetensors"
+      "8xNMKDSuperscale_150000G.pt"
     ],
     "latent_upscale_models": [
       "ltx-2-spatial-upscaler-x2-1.0.safetensors",

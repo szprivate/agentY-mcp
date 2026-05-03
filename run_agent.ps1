@@ -222,6 +222,7 @@ try {
 
     # ── Refresh ComfyUI model caches ────────────────────────────────────────
     Write-Host "[run_agent] Refreshing ComfyUI model cache..." -ForegroundColor Cyan
+    $env:COMFYUI_MODELS_REFRESHED = ""   # clear any leftover value from a previous run in this session
     python scripts/refresh_models.py
     $env:COMFYUI_MODELS_REFRESHED = "1"  # prevent re-runs in child processes
     Write-Host ""

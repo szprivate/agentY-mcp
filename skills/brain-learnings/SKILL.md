@@ -86,3 +86,9 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-02 | ModelSamplingAuraFlow validation fails with ModelSamplingFlux error | Include max_shift, base_shift, width, and height in the update_workflow patches for the sampling node.
 
 2026-05-03 | update_workflow fails for ComfyMathExpression nodes due to missing values input | Patch the 'values' input with an empty list [] to satisfy the required schema for ComfyMathExpression nodes.
+
+2026-05-03 | update_workflow reports missing values in ComfyMathExpression nodes despite existing connections | Check the raw workflow JSON via read_text_file to ensure required inputs are correctly serialized in the node inputs field.
+
+2026-05-03 | update_workflow reports missing required inputs for ComfyMathExpression despite valid connections | Verify node connections by reading the workflow JSON directly if update_workflow returns misleading validation errors.
+
+2026-05-03 | ComfyMathExpression validation error reports missing values input despite existing connections | Patch the values input with an empty list [] to satisfy the validator.
