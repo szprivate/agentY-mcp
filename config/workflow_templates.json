@@ -30,7 +30,6 @@
     "NanoBananaPro_3x3CharacterSheet_closeups": "API character sheet generation FOR FACE CLOSEUPS via Nano-Banana Pro. 1 character image → 1 image output (3x3 sheet). Uses an LLM call to generate a prompt from the reference, then renders 9 character views with varying facial expressions in a single sheet.",
     "qwen2511_imageEdit": "Local image editing via QWEN-Image-Edit-2511-Lightning. Up to 3 images (including optional depth/canny control inputs) → 1 edited image output. Supports text-guided edits with optional structural control.",
     "styletransfer_NanoBananaPro": "Local style transfer FOR FULL BODY SHOTS via Nano-Banana Pro (Gemini). 1 video (layout reference) + 7 images (style + hero elements) → 2 image outputs. Transfers the style reference onto the first video frame while integrating the look of hero element references.",
-    "video_ltx2_3_flf2v": "Local first-last-frame-to-video via LTX 2.3. 2 images (start + end frame) → 1 video output. Generates short video sequences with consistent style and motion between the two provided frames.",
     "video_wan2_2_14B_flf2v": "Local first-last-frame-to-video via Wan 2.2 14B. 2 images (start + end frame) → 2 video outputs. Generates smooth video transitions between the defined keyframes.",
     "video_wan2_2_14B_fun_camera": "Local image-to-video with camera control via Wan 2.2 14B Fun. 1 image → 2 video outputs. Generates video with controllable camera movements including pan, zoom, and rotation.",
     "video_wan2_2_14B_fun_control": "Local controlled video generation via Wan 2.2 14B Fun. 1 image + 1 control video → 2 video outputs. Guides video generation using pose, depth, and edge ControlNet maps.",
@@ -41,5 +40,6 @@
     "Wan22Vace_VID2VID": "Local video-to-video via Wan 2.2 VACE. 1 control video (depth/canny/pose) + 2 reference images (start/end keyframes) → 1 video output. Applies the style of the reference images to the input video while preserving motion consistency.",
     "upscale_using_model": "Local, simple image upscaling via specified ESRGAN model. 1 image → 1 upscaled image output. Supports various models.",
     "upscale_ultimateSD": "Local image upscaling using UltimateSD upscale node (this uses a diffusion model for the upscale process, allowing a creative upscale that invents details). Setup with Flux-1 dev fp8. 1 image → 1 upscaled image output.",
-    "video_ltx2_3_i2v": ""
+    "video_ltx2_3_i2v": "Local image-to-video via LTX 2.3. 1 image → 1 video output. Generates video with improved motion consistency, fine details, and enhanced portrait format and audio quality.",
+    "video_ltx2_3_flf2v": "Local first-last-frame-to-video via LTX 2.3. 2 images (start + end frame) → 1 video output. Generates short video sequences with consistent style and motion between the two provided frames."
 }

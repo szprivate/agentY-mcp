@@ -35,7 +35,8 @@
       "SDXL_Turbo\\wildcardxXLTURBO_wildcardxXLTURBOV10.safetensors",
       "SUPIR\\SUPIR-v0F_fp16.safetensors",
       "TXT2GIF\\hsxl_temporal_layers.safetensors",
-      "ltx-2.3-22b-dev-fp8.safetensors"
+      "ltx-2.3-22b-dev-fp8.safetensors",
+      "ltx-2.3-22b-distilled-fp8.safetensors"
     ],
     "configs": [],
     "loras": [

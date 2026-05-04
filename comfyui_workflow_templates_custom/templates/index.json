@@ -798,18 +798,6 @@
   {
     "templates": [
       {
-        "name": "video_ltx2_3_flf2v",
-        "models": [],
-        "io": {
-          "inputs": [],
-          "outputs": []
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
         "name": "video_wan2_2_14B_flf2v",
         "models": [],
         "io": {
@@ -1008,6 +996,40 @@
           "outputs": [
             {
               "nodeId": 277,
+              "nodeType": "VHS_VideoCombine",
+              "file": "",
+              "mediaType": "video"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "video_ltx2_3_flf2v",
+        "models": [
+          "ltx-2.3-22b-distilled-fp8"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 31,
+              "nodeType": "LoadImage",
+              "file": "high_view_classic_car.png",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 39,
+              "nodeType": "LoadImage",
+              "file": "low_view_classic_car.png",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 130,
               "nodeType": "VHS_VideoCombine",
               "file": "",
               "mediaType": "video"
