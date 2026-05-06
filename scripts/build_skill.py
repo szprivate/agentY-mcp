@@ -27,6 +27,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.utils.secrets import get_secret
+from src.utils.workflow_parser import INPUT_NODE_TYPES, OUTPUT_NODE_TYPES
 
 
 # ---------------------------------------------------------------------------
@@ -611,6 +612,349 @@ def _call_llm_prose(analysis_summary: dict, skill_name: str) -> dict:
         ],
         "notes_overrides": {},
     }
+
+
+# ---------------------------------------------------------------------------
+# Workflow template description generation
+# ---------------------------------------------------------------------------
+
+
+def _extract_model_hints_from_filename(workflow_name: str) -> dict:
+    """Extract model/service hints from the template filename.
+    
+    Returns a dict with keys like 'provider', 'model_name', 'api_type', etc.
+    """
+    name_lower = workflow_name.lower()
+    hints = {}
+    
+    # Detect provider from filename
+    if "api_" in name_lower:
+        hints["provider"] = "API"
+        if "kling" in name_lower:
+            hints["service"] = "Kling"
+        elif "ideogram" in name_lower:
+            hints["service"] = "Ideogram"
+        elif "seedream" in name_lower:
+            hints["service"] = "ByteDance Seedream"
+        elif "magnific" in name_lower:
+            hints["service"] = "Magnific"
+        elif "meshy" in name_lower:
+            hints["service"] = "Meshy"
+        elif "topaz" in name_lower:
+            hints["service"] = "Topaz"
+        elif "veo" in name_lower:
+            hints["service"] = "Google Veo"
+        elif "ltx" in name_lower:
+            hints["service"] = "Lightricks LTX"
+        elif "wan" in name_lower:
+            hints["service"] = "Wan"
+        elif "nano" in name_lower and "banana" in name_lower:
+            hints["service"] = "Nano-Banana"
+    elif "image_" in name_lower or "video_" in name_lower:
+        hints["provider"] = "Local"
+        if "flux" in name_lower:
+            hints["model_name"] = "Flux"
+        elif "ltx" in name_lower:
+            hints["model_name"] = "LTX-Video"
+        elif "wan" in name_lower:
+            hints["model_name"] = "Wan"
+        elif "kling" in name_lower:
+            hints["model_name"] = "Kling"
+        elif "qwen" in name_lower:
+            hints["model_name"] = "Qwen"
+        elif "zimage" in name_lower or "z_image_turbo" in name_lower:
+            hints["model_name"] = "Z-Image-Turbo"
+    else:
+        # Try to extract from any part of the name
+        if "flux" in name_lower:
+            hints["provider"] = "Local"
+            hints["model_name"] = "Flux"
+        elif "ltx" in name_lower or "ltxv" in name_lower:
+            hints["provider"] = "Local"
+            hints["model_name"] = "LTX-Video"
+        elif "wan" in name_lower:
+            hints["provider"] = "Local"
+            hints["model_name"] = "Wan"
+        elif "nano" in name_lower and "banana" in name_lower:
+            hints["provider"] = "API"
+            hints["service"] = "Nano-Banana"
+    
+    return hints
+
+
+def _try_websearch_workflow_description(workflow_name: str) -> str | None:
+    """Try to use Strands webSearch tool to find workflow description.
+    
+    Returns the search result or None if unavailable.
+    """
+    try:
+        # Check if webSearch is available from Strands
+        from strands_tools import webSearch
+        
+        # Format the search query
+        clean_name = workflow_name.replace("_", " ").replace("-", " ")
+        query = f"ComfyUI workflow {clean_name}"
+        
+        # Call webSearch (this is synchronous for now)
+        result = webSearch(query)
+        if result and isinstance(result, str) and len(result) > 20:
+            return result
+    except ImportError:
+        # webSearch not available in this version of Strands
+        pass
+    except Exception as exc:
+        # Silently fail and fall back to other methods
+        print(f"[generate_description] webSearch failed: {exc}", file=sys.stderr)
+    
+    return None
+
+
+def _detect_api_or_local(workflow: dict) -> tuple[str, str]:
+    """Detect if workflow is API-based or local. Return (type, service_name).
+    
+    Returns
+    -------
+    tuple[str, str]
+        ("API", "Service Name") or ("Local", "Model Family")
+    """
+    # Collect all class types
+    class_types = []
+    for node in workflow.values():
+        if isinstance(node, dict) and "class_type" in node:
+            class_types.append(node["class_type"])
+    
+    all_types = " ".join(class_types).lower()
+    
+    # Detect API services
+    if "api_" in all_types or "klingapinode" in all_types:
+        if "kling" in all_types:
+            return "API", "Kling"
+        if "ideogram" in all_types:
+            return "API", "Ideogram"
+        if "seedream" in all_types:
+            return "API", "ByteDance Seedream"
+        if "magnific" in all_types:
+            return "API", "Magnific"
+        if "meshy" in all_types:
+            return "API", "Meshy"
+        if "topaz" in all_types:
+            return "API", "Topaz"
+        if "ltx" in all_types and "api" in all_types:
+            return "API", "Lightricks LTX"
+        if "veo" in all_types:
+            return "API", "Google Veo"
+        if "wan" in all_types and "api" in all_types:
+            return "API", "Wan"
+        if "nano_banana" in all_types or "nanobanana" in all_types:
+            return "API", "Nano-Banana"
+        return "API", "API Service"
+    
+    # Detect local models
+    if "flux" in all_types:
+        return "Local", "Flux"
+    if "ltx" in all_types or "ltxv" in all_types:
+        return "Local", "LTX-Video"
+    if "wan" in all_types:
+        return "Local", "Wan"
+    if "kling" in all_types:
+        return "Local", "Kling"
+    if "qwen" in all_types:
+        return "Local", "Qwen"
+    if "zimage" in all_types or "z_image" in all_types:
+        return "Local", "Z-Image-Turbo"
+    
+    # Default to local
+    return "Local", "ComfyUI Model"
+
+
+def _extract_count_info(workflow: dict) -> tuple[int, int]:
+    """Count distinct input and output nodes. Return (input_count, output_count).
+    
+    Uses the same INPUT_NODE_TYPES and OUTPUT_NODE_TYPES definitions as workflow_parser.
+    """
+    input_count = 0
+    output_count = 0
+    
+    for node in workflow.values():
+        if isinstance(node, dict):
+            ct = node.get("class_type", "")
+            if ct in INPUT_NODE_TYPES:
+                input_count += 1
+            elif ct in OUTPUT_NODE_TYPES:
+                output_count += 1
+    
+    return max(1, input_count), max(1, output_count)
+
+
+def _generate_workflow_template_description(workflow: dict, workflow_name: str) -> str:
+    """Generate a one-line description for workflow_templates.json.
+    
+    Strategy (in order of priority):
+    1. Try webSearch to find what the workflow does
+    2. Extract hints from the workflow filename (model, API/Local detection)
+    3. Analyze the workflow structure (inputs/outputs, node types)
+    4. Use LLM to generate a polished description
+    5. Fall back to deterministic template if all else fails
+    
+    Parameters
+    ----------
+    workflow:
+        The workflow dict
+    workflow_name:
+        The template name (filename stem)
+    
+    Returns
+    -------
+    str
+        Description in the format: "[API|Local] <operation> via <service>. <inputs> → <outputs>. <purpose>"
+    """
+    # ─ Step 1: Try webSearch first ─────────────────────────────────────────
+    websearch_result = _try_websearch_workflow_description(workflow_name)
+    if websearch_result:
+        print(f"[generate_description] webSearch found info for '{workflow_name}'", file=sys.stderr)
+        # Use webSearch result to inform the LLM call
+    
+    # ─ Step 2: Extract hints from filename ──────────────────────────────────
+    filename_hints = _extract_model_hints_from_filename(workflow_name)
+    
+    # ─ Step 3: Extract basic workflow info ─────────────────────────────────
+    wf_type, service = _detect_api_or_local(workflow)
+    input_count, output_count = _extract_count_info(workflow)
+    
+    # Classify nodes for analysis
+    bucket_a, bucket_b, bucket_c = _classify_nodes(workflow)
+    rev_deps = _build_reverse_deps(workflow)
+    downstream_notes = _apply_downstream_notes(bucket_a, bucket_c, rev_deps)
+    constraints = _infer_constraints(workflow, bucket_a, bucket_b, bucket_c)
+    
+    # Build minimal analysis
+    analysis = {
+        "workflow_type": wf_type,
+        "service": service,
+        "input_count": input_count,
+        "output_count": output_count,
+        "patchable_count": len(bucket_a),
+        "locked_count": len(bucket_c),
+        "model_loader_count": len(bucket_b),
+        "template_name": workflow_name,
+        "filename_hints": filename_hints,
+        "websearch_info": websearch_result,
+    }
+    
+    # Extract media info
+    media_inputs = []
+    for n in bucket_a:
+        if n["class_type"] in ("LoadImage", "LoadImageMask"):
+            media_inputs.append("image")
+        elif n["class_type"] in ("VHS_LoadVideo", "VHS_LoadImages"):
+            media_inputs.append("video")
+    media_inputs = sorted(set(media_inputs)) or ["text"]
+    analysis["media_types"] = media_inputs
+    
+    # Detect output type
+    output_nodes = [n for n in bucket_a if n["class_type"] in ("SaveImage", "VHS_VideoCombine", "CreateVideo")]
+    if output_nodes:
+        out_ct = output_nodes[0]["class_type"]
+        if out_ct == "SaveImage":
+            analysis["output_type"] = "image"
+        else:
+            analysis["output_type"] = "video"
+    else:
+        analysis["output_type"] = "unknown"
+    
+    # Detect operation type
+    if "video" in analysis["output_type"]:
+        if "image" in analysis["media_types"]:
+            operation = "image-to-video"
+        else:
+            operation = "text-to-video"
+    elif "image" in analysis["media_types"]:
+        operation = "image editing"
+    else:
+        operation = "generation"
+    
+    analysis["operation"] = operation
+    
+    # Apply filename hints to analysis if not already detected
+    if filename_hints.get("provider") and not wf_type:
+        wf_type = filename_hints["provider"]
+    if filename_hints.get("service") and service == "API Service":
+        service = filename_hints["service"]
+    if filename_hints.get("model_name") and service == "ComfyUI Model":
+        service = filename_hints["model_name"]
+    
+    # ─ Step 4: Build LLM prompt for template description ──────────────────
+    prompt = (
+        "You are writing a concise, one-line description for a ComfyUI workflow template.\n"
+        "These descriptions go into config/workflow_templates.json and help users understand what the workflow does.\n\n"
+        f"WORKFLOW ANALYSIS:\n{json.dumps(analysis, indent=2)}\n\n"
+        "Return ONLY a single line description following this exact format:\n"
+        f'"[{wf_type}] [operation] via [{service}]. [inputs_summary] → [outputs_summary]. [brief_purpose]."\n\n'
+        "Examples:\n"
+        '"API image editing via ByteDance Seedream 5.0 Lite. 2 image inputs + text prompt → 1 image output. Modifies a source image based on prompt instructions, using a second image as additional reference."\n'
+        '"Local text-to-image via Flux 2 Klein distilled. Text prompt only → 2 image outputs. BFL distilled model delivering outstanding quality at sub-second speed, ideal for real-time generation."\n'
+        '"API first-last-frame-to-video via Kling O3 (Kling 3.0). Up to 4 reference/keyframe images → 1 video output. Generates videos with precise semantic control, longer duration, and improved narrative coherence."\n\n'
+        "Rules:\n"
+        "1. Start with [API|Local] exactly as shown.\n"
+        "2. Include operation type (text-to-image, image-to-video, editing, upscaling, etc).\n"
+        f'3. Include "via [{service}]" with the exact service/model name.\n'
+        f"4. Summarize inputs based on analysis: {input_count} input(s) of type {analysis['media_types']}.\n"
+        f"5. Summarize outputs: {output_count} output(s) of type {analysis['output_type']}.\n"
+        "6. End with a single sentence describing purpose/capabilities.\n"
+        "7. Start first letter after numbers/brackets as uppercase.\n"
+        "8. Keep entire description under 200 characters if possible.\n"
+        "Return ONLY the description string, no quotes, no preamble."
+    )
+    
+    # Resolve provider + model
+    raw_setting = _settings_get("llm", "pipeline", "build_skill", default="ollama,gemma4:26b")
+    provider, model_id = _parse_provider_model(raw_setting)
+    
+    raw_text: str | None = None
+    
+    # Try Claude first if configured
+    if provider == "claude":
+        _model = model_id or _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
+        api_key = get_secret("ANTHROPIC_API_KEY")
+        if api_key:
+            try:
+                import anthropic as _anthropic
+                client = _anthropic.Anthropic(api_key=api_key)
+                msg = client.messages.create(
+                    model=_model,
+                    max_tokens=300,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                raw_text = msg.content[0].text.strip()
+            except Exception as exc:
+                print(f"[generate_description] Claude call failed: {exc}. Falling back to Ollama.", file=sys.stderr)
+    
+    # Try Ollama (primary when provider=='ollama', or fallback from Claude)
+    if raw_text is None:
+        _model = model_id if provider == "ollama" else _settings_get("llm", "pipeline", "llm_functions", default="gemma4:26b")
+        _host = _settings_get("llm", "ollama", "host", default="http://localhost:11434")
+        try:
+            raw_text = _ollama_chat_sync(prompt, model=_model, host=_host)
+        except Exception as exc:
+            print(f"[generate_description] Ollama call failed: {exc}. Using template fallback.", file=sys.stderr)
+            raw_text = None
+    
+    # Use LLM response if available
+    if raw_text:
+        desc = raw_text.strip()
+        # Clean up any stray quotes
+        desc = desc.strip('"\'')
+        if desc and len(desc) > 10:  # Sanity check
+            return desc
+    
+    # ─ Step 5: Fallback: deterministic template description ───────────────
+    input_desc = f"{input_count} " + ("image" if "image" in analysis["media_types"] else "") + ("video" if "video" in analysis["media_types"] else "") + " input" + ("s" if input_count > 1 else "")
+    if "image" not in analysis["media_types"] and "video" not in analysis["media_types"]:
+        input_desc = "text input"
+    
+    output_desc = f"{output_count} " + ("image" if analysis["output_type"] == "image" else "video") + " output" + ("s" if output_count > 1 else "")
+    
+    return f"{wf_type} {operation} via {service}. {input_desc} → {output_desc}. Processes and generates content using ComfyUI workflows."
 
 
 def _workflow_purpose(analysis: dict) -> str:

@@ -542,41 +542,6 @@
   {
     "templates": [
       {
-        "name": "image_z_image_turbo",
-        "models": [
-          "qwen_3_4b",
-          "ae",
-          "z_image_turbo_bf16"
-        ],
-        "io": {
-          "inputs": [],
-          "outputs": [
-            {
-              "nodeId": 9,
-              "nodeType": "SaveImage",
-              "file": "",
-              "mediaType": "image"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
-        "name": "image_z_image_turbo_fun_union_controlnet",
-        "models": [],
-        "io": {
-          "inputs": [],
-          "outputs": []
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
         "name": "Kling3_multiShot",
         "models": [],
         "io": {
@@ -882,48 +847,6 @@
   {
     "templates": [
       {
-        "name": "Wan22Vace_VID2VID",
-        "models": [
-          "wan_2.1_vae",
-          "umt5_xxl_fp8_e4m3fn_scaled",
-          "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank256_bf16"
-        ],
-        "io": {
-          "inputs": [
-            {
-              "nodeId": 995,
-              "nodeType": "LoadImage",
-              "file": "2875b7cd-5300-462d-8db2-59aac56995c1.png",
-              "mediaType": "image"
-            },
-            {
-              "nodeId": 996,
-              "nodeType": "LoadImage",
-              "file": "2875b7cd-5300-462d-8db2-59aac56995c1.png",
-              "mediaType": "image"
-            },
-            {
-              "nodeId": 997,
-              "nodeType": "LoadVideo",
-              "file": "",
-              "mediaType": "video"
-            }
-          ],
-          "outputs": [
-            {
-              "nodeId": 999,
-              "nodeType": "SaveVideo",
-              "file": "",
-              "mediaType": "video"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
         "name": "upscale_using_model",
         "models": [],
         "io": {
@@ -1035,6 +958,120 @@
               "mediaType": "video"
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "image_z_image_turbo_fun_union_controlnet",
+        "models": [
+          "qwen_3_4b",
+          "z_image_turbo_bf16",
+          "ae"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 58,
+              "nodeType": "LoadImage",
+              "file": "image_z_image_turbo_fun_union_controlnet_input_image.png",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 9,
+              "nodeType": "SaveImage",
+              "file": "",
+              "mediaType": "image"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "Wan22Vace_VID2VID",
+        "models": [
+          "wan_2.1_vae",
+          "umt5_xxl_fp8_e4m3fn_scaled",
+          "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank256_bf16"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 995,
+              "nodeType": "LoadImage",
+              "file": "2875b7cd-5300-462d-8db2-59aac56995c1.png",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 996,
+              "nodeType": "LoadImage",
+              "file": "2875b7cd-5300-462d-8db2-59aac56995c1.png",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 997,
+              "nodeType": "LoadVideo",
+              "file": "",
+              "mediaType": "video"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 999,
+              "nodeType": "SaveVideo",
+              "file": "",
+              "mediaType": "video"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "image_z_image_turbo",
+        "models": [
+          "qwen_3_4b",
+          "ae",
+          "z_image_turbo_bf16"
+        ],
+        "io": {
+          "inputs": [],
+          "outputs": [
+            {
+              "nodeId": 9,
+              "nodeType": "SaveImage",
+              "file": "",
+              "mediaType": "image"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "video_gemini_motionPromptGeneration",
+        "models": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 2,
+              "nodeType": "VHS_LoadVideoPath",
+              "file": "",
+              "mediaType": "video"
+            }
+          ],
+          "outputs": []
         }
       }
     ]

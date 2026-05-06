@@ -79,7 +79,13 @@
       "QWEN\\Qwen-Image-Edit-2509-Lightning-8steps-V1.0-fp32.safetensors",
       "QWEN\\Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
       "QWEN\\Qwen-Image-Edit-2511-Lightning-8steps-V1.0-fp32.safetensors",
+      "QWEN\\Qwen-Image-Edit-2511-Ultra-Realistic-Portrait-05epochs.safetensors",
+      "QWEN\\Qwen-Image-Edit-2511-Ultra-Realistic-Portrait-10epochs.safetensors",
+      "QWEN\\Qwen-Image-Edit-2511-Ultra-Realistic-Portrait-15epochs.safetensors",
+      "QWEN\\Qwen-Image-Edit-2511-Ultra-Realistic-Portrait.safetensors",
       "QWEN\\Qwen-Image-Lightning-4steps-V1.0.safetensors",
+      "QWEN\\qwen-edit-skin.safetensors",
+      "QWEN\\qwen-edit-skin_1.1_000002750.safetensors",
       "QWEN\\qwen-image-edit-2511-multiple-angles-lora.safetensors",
       "Style\\2000analogcore_v3.safetensors",
       "Style\\AnimateLCM_sd15_t2v_lora.safetensors",
@@ -351,6 +357,7 @@
       "wav2vec2-chinese-base_fp16.safetensors",
       "wav2vec2-large-xlsr-53-german.bin"
     ],
+    "frame_interpolation": [],
     ".cache": [],
     "Hunyuan": [
       "split_files\\clip_vision\\sigclip_vision_patch14_384.safetensors",

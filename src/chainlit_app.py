@@ -608,14 +608,40 @@ async def on_message(message: cl.Message) -> None:
                 _wf_data = _json.load(_f)
             _stem = _wf_path.stem
             _entry = _parse_workflow(_wf_data, name=_stem, update_index=True)
-            # Update config/workflow_templates.json
+            
+            # ─ Generate workflow template description ─────────────────────────
+            _desc_msg = ""
+            _description = ""
+            try:
+                await cl.Message(content="⏳ Generating workflow description (loading LLM)…", author="system").send()
+                import importlib.util as _ilu
+                import sys as _sys
+                _bs_path = str(_project_root / "scripts" / "build_skill.py")
+                _mod = _sys.modules.get("_agenty_build_skill")
+                if _mod is None:
+                    _spec = _ilu.spec_from_file_location("_agenty_build_skill", _bs_path)
+                    _mod = _ilu.module_from_spec(_spec)
+                    _sys.modules["_agenty_build_skill"] = _mod
+                    _spec.loader.exec_module(_mod)
+                _gen_desc = _mod._generate_workflow_template_description
+                _description = _gen_desc(_wf_data, _stem)
+                await cl.Message(
+                    content=f"📝 **Generated Description:**\n```\n{_description}\n```\n\nPlease review for correctness. This will be saved to `config/workflow_templates.json`.",
+                    author="system",
+                ).send()
+                _desc_msg = " Description generated via LLM."
+            except Exception as _desc_exc:
+                _desc_msg = f" ⚠️ Description generation failed: {_desc_exc}"
+                print(f"[/add_workflow] Description generation error: {_desc_exc}", file=__import__("sys").stderr)
+            
+            # ─ Update config/workflow_templates.json ──────────────────────────
             _templates_path = _project_root / "config" / "workflow_templates.json"
             if _templates_path.exists():
                 _tpl = _json.loads(_templates_path.read_text(encoding="utf-8"))
             else:
                 _tpl = {}
             if _stem not in _tpl:
-                _tpl[_stem] = ""
+                _tpl[_stem] = _description
                 _templates_path.write_text(
                     _json.dumps(_tpl, indent=4, ensure_ascii=False) + "\n",
                     encoding="utf-8",
@@ -624,7 +650,8 @@ async def on_message(message: cl.Message) -> None:
             else:
                 _tpl_msg = f" `{_stem}` already present in `config/workflow_templates.json`."
             _idx = _custom_index_path()
-            # Build SKILL.md for the newly registered workflow
+            
+            # ─ Build SKILL.md for the newly registered workflow ──────────────
             _skill_msg = ""
             try:
                 await cl.Message(content="⏳ Building SKILL.md (loading LLM, this may take a moment)…", author="system").send()
@@ -644,7 +671,7 @@ async def on_message(message: cl.Message) -> None:
             except Exception as _skill_exc:
                 _skill_msg = f" ⚠️ Skill build failed: {_skill_exc}"
             await cl.Message(
-                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_skill_msg}",
+                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_desc_msg}{_skill_msg}",
                 author="system",
             ).send()
         except Exception as _exc:
