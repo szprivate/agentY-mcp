@@ -99,7 +99,7 @@ if (-not $ProjectRoot) {
 # 1. Preflight checks
 # ---------------------------------------------------------------------------
 
-Write-Header "1 / 8  Preflight checks"
+Write-Header "1 / 9  Preflight checks"
 
 # uv
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -109,6 +109,12 @@ Install it from: https://docs.astral.sh/uv/getting-started/installation/
 "@
 }
 Write-Success "uv found: $(uv --version)"
+
+# git (needed to clone chainlit-datalayer)
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Exit-WithError "git is not installed or not on PATH. Install it from https://git-scm.com/ and try again."
+}
+Write-Success "git found: $(git --version)"
 
 # Docker CLI
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -142,7 +148,7 @@ Write-Success "docker-compose.yml found"
 # 2. Virtual environment
 # ---------------------------------------------------------------------------
 
-Write-Header "2 / 8  Virtual environment"
+Write-Header "2 / 9  Virtual environment"
 
 $Script:VenvDir = Join-Path $ProjectRoot ".venv"
 
@@ -193,7 +199,7 @@ Write-Success ".venv activated"
 # 3. Python dependencies
 # ---------------------------------------------------------------------------
 
-Write-Header "3 / 8  Python dependencies"
+Write-Header "3 / 9  Python dependencies"
 
 Push-Location $ProjectRoot
 try {
@@ -223,7 +229,7 @@ Write-Success "Python dependencies installed"
 # 4. .env setup
 # ---------------------------------------------------------------------------
 
-Write-Header "4 / 8  .env setup"
+Write-Header "4 / 9  .env setup"
 
 $EnvFile    = Join-Path $ProjectRoot ".env"
 $EnvExample = Join-Path $ProjectRoot ".env_example"
@@ -244,7 +250,7 @@ if (-not (Test-Path $EnvFile)) {
 # 5. Chainlit auth setup
 # ---------------------------------------------------------------------------
 
-Write-Header "5 / 8  Chainlit auth setup"
+Write-Header "5 / 9  Chainlit auth setup"
 
 # Username
 Write-Host ""
@@ -306,16 +312,86 @@ Set-EnvKey -FilePath $EnvFile -Key "CHAINLIT_PASSWORD"    -Value $ChainlitPasswo
 Write-Success "Chainlit auth credentials written to .env"
 
 # ---------------------------------------------------------------------------
-# 6. Docker services
+# 6. Chainlit datalayer (postgres + localstack) - cloned into the project root
 # ---------------------------------------------------------------------------
 
-Write-Header "6 / 8  Docker services (MinIO + PostgreSQL)"
+Write-Header "6 / 9  Chainlit datalayer setup"
 
+$SettingsFile     = Join-Path $ProjectRoot "config\settings.json"
+$DefaultDlDir     = Join-Path $ProjectRoot "chainlit-datalayer"
+$DatalayerRepoUrl = "https://github.com/Chainlit/chainlit-datalayer.git"
+
+# Resolve target directory: prefer existing valid value in settings.json,
+# otherwise clone into the project root.
+$Script:DlDir = ""
+if (Test-Path $SettingsFile) {
+    try {
+        $settingsObj  = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        $existingDl   = $settingsObj.chainlit_datalayer_dir
+        if ($existingDl -and (Test-Path (Join-Path $existingDl "compose.yaml"))) {
+            $Script:DlDir = (Resolve-Path $existingDl).Path
+            Write-Info "Using existing chainlit-datalayer at $Script:DlDir"
+        }
+    } catch {
+        Write-Info "Could not parse settings.json - falling back to default datalayer dir"
+    }
+}
+
+if (-not $Script:DlDir) {
+    if (-not (Test-Path $DefaultDlDir)) {
+        Write-Info "Cloning chainlit-datalayer into $DefaultDlDir ..."
+        git clone $DatalayerRepoUrl $DefaultDlDir
+        if ($LASTEXITCODE -ne 0) { Exit-WithError "git clone of chainlit-datalayer failed." }
+        Write-Success "chainlit-datalayer cloned"
+    } else {
+        Write-Info "chainlit-datalayer directory already present at $DefaultDlDir - skipping clone"
+    }
+    $Script:DlDir = (Resolve-Path $DefaultDlDir).Path
+}
+
+$Script:DlComposeFile = Join-Path $Script:DlDir "compose.yaml"
+if (-not (Test-Path $Script:DlComposeFile)) {
+    Exit-WithError "chainlit-datalayer compose file not found at $Script:DlComposeFile (clone may have failed)."
+}
+
+# Persist the resolved absolute path back into config/settings.json so
+# run_agent.ps1 picks it up on subsequent launches. We use a regex replace
+# rather than a JSON round-trip so we don't churn key ordering or strip
+# any in-file comments the user may add later.
+if (Test-Path $SettingsFile) {
+    $settingsRaw = Get-Content $SettingsFile -Raw
+    # JSON-escape backslashes in the path: \ -> \\
+    $jsonPath = $Script:DlDir -replace '\\', '\\'
+    $pattern  = '"chainlit_datalayer_dir"\s*:\s*"[^"]*"'
+    $newLine  = '"chainlit_datalayer_dir": "' + $jsonPath + '"'
+    if ($settingsRaw -match $pattern) {
+        # Use MatchEvaluator delegate to avoid replacement-string interpretation
+        $evaluator = [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $newLine }
+        $settingsRaw = [System.Text.RegularExpressions.Regex]::Replace($settingsRaw, $pattern, $evaluator)
+        [System.IO.File]::WriteAllText($SettingsFile, $settingsRaw, [System.Text.UTF8Encoding]::new($false))
+        Write-Success "Updated chainlit_datalayer_dir in config/settings.json"
+    } else {
+        Write-Info "chainlit_datalayer_dir key not found in settings.json - leaving file untouched"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 7. Docker services (chainlit-datalayer postgres + localstack, plus MinIO)
+# ---------------------------------------------------------------------------
+
+Write-Header "7 / 9  Docker services"
+
+# Bring up chainlit-datalayer (postgres + localstack)
+Write-Info "Starting chainlit-datalayer compose project ..."
+docker compose -f $Script:DlComposeFile up -d
+if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d for chainlit-datalayer failed." }
+
+# Bring up this repo's compose stack (MinIO)
 Push-Location $ProjectRoot
 try {
-    Write-Info "Starting containers with docker compose up -d ..."
+    Write-Info "Starting MinIO compose project ..."
     docker compose up -d
-    if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d failed." }
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d failed for MinIO." }
 } finally {
     Pop-Location
 }
@@ -346,20 +422,22 @@ if (-not $MinioOk) {
 }
 Write-Success "MinIO is healthy"
 
-# Wait for PostgreSQL
+# Wait for PostgreSQL inside the chainlit-datalayer compose project.
+# pg_isready exits non-zero while the DB is still booting, which under
+# $ErrorActionPreference='Stop' would otherwise escalate to a script-killing
+# NativeCommandError. We wrap each poll in try/catch so transient failures
+# during the wait phase are treated as 'not ready yet'.
 Write-Info "Waiting for PostgreSQL to be ready ..."
-$Elapsed  = 0
-$PgOk     = $false
+$Elapsed = 0
+$PgOk    = $false
 
 while ($Elapsed -lt $MaxWait) {
-    Push-Location $ProjectRoot
+    $pgExit = 1
     try {
-        # No 2>&1: it wraps stderr as NativeCommandError (e.g. docker-compose
-        # warnings) and Stop-on-error would crash the script. Discard streams.
-        docker compose exec -T postgres pg_isready *> $null
+        docker compose -f $Script:DlComposeFile exec -T postgres pg_isready *> $null
         $pgExit = $LASTEXITCODE
-    } finally {
-        Pop-Location
+    } catch {
+        $pgExit = 1
     }
 
     if ($pgExit -eq 0) {
@@ -373,15 +451,15 @@ while ($Elapsed -lt $MaxWait) {
 Write-Host ""
 
 if (-not $PgOk) {
-    Exit-WithError "PostgreSQL did not become ready within ${MaxWait}s. Check `docker compose logs postgres`."
+    Exit-WithError "PostgreSQL did not become ready within ${MaxWait}s. Check `docker compose -f `"$Script:DlComposeFile`" logs postgres`."
 }
 Write-Success "PostgreSQL is ready"
 
 # ---------------------------------------------------------------------------
-# 7. Prisma migration
+# 8. Prisma migration
 # ---------------------------------------------------------------------------
 
-Write-Header "7 / 8  Prisma migration"
+Write-Header "8 / 9  Prisma migration"
 
 Push-Location $ProjectRoot
 try {
@@ -398,16 +476,17 @@ if ($PrismaExit -ne 0) {
 Write-Success "Prisma migrations applied"
 
 # ---------------------------------------------------------------------------
-# 8. Final summary
+# 9. Final summary
 # ---------------------------------------------------------------------------
 
-Write-Header "8 / 8  Setup complete"
+Write-Header "9 / 9  Setup complete"
 Write-Host ""
 Write-Host "  agentY is ready to go!  Here's what was set up:" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  * Python .venv created and dependencies installed" -ForegroundColor White
 Write-Host "  * .env created and Chainlit auth credentials written" -ForegroundColor White
-Write-Host "  * MinIO and PostgreSQL containers are running" -ForegroundColor White
+Write-Host "  * chainlit-datalayer cloned at $Script:DlDir (postgres + localstack running)" -ForegroundColor White
+Write-Host "  * MinIO container is running" -ForegroundColor White
 Write-Host "  * Prisma migrations applied" -ForegroundColor White
 Write-Host ""
 Write-Host "  --- Next steps ---" -ForegroundColor DarkGray

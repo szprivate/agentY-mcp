@@ -10,6 +10,9 @@ build/
 # Official Comfy-Org workflow templates (cloned repo — large)
 comfyui_workflow_templates_official_deprecated/
 
+# Chainlit datalayer (cloned by install_agent.ps1)
+chainlit-datalayer/
+
 
 #Logs and outputs
 .logs/
