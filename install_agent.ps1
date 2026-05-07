@@ -461,9 +461,24 @@ Write-Success "PostgreSQL is ready"
 
 Write-Header "8 / 9  Prisma migration"
 
-Push-Location $ProjectRoot
+# The Prisma schema lives in the chainlit-datalayer repo at prisma/schema.prisma.
+# Migrations must therefore be run from inside the datalayer directory, and
+# prisma reads DATABASE_URL from .env in CWD - so seed .env from .env.example
+# on a fresh clone before invoking prisma.
+$DlEnvFile     = Join-Path $Script:DlDir ".env"
+$DlEnvExample  = Join-Path $Script:DlDir ".env.example"
+if (-not (Test-Path $DlEnvFile)) {
+    if (Test-Path $DlEnvExample) {
+        Copy-Item $DlEnvExample $DlEnvFile
+        Write-Info "Seeded chainlit-datalayer .env from .env.example"
+    } else {
+        Write-Info "No .env.example found in chainlit-datalayer - prisma will rely on environment variables"
+    }
+}
+
+Push-Location $Script:DlDir
 try {
-    Write-Info "Running npx prisma migrate deploy ..."
+    Write-Info "Running npx prisma migrate deploy in $Script:DlDir ..."
     npx prisma migrate deploy
     $PrismaExit = $LASTEXITCODE
 } finally {
