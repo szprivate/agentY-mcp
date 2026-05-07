@@ -170,6 +170,11 @@ Write-Info "Installing asyncpg and boto3 …"
 uv pip install asyncpg boto3
 if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install asyncpg boto3 failed." }
 
+# Verify chainlit is available
+Write-Info "Verifying chainlit installation …"
+python -m chainlit --version | Out-Null
+if ($LASTEXITCODE -ne 0) { Exit-WithError "chainlit verification failed after installation." }
+
 Pop-Location
 Write-Success "Python dependencies installed"
 
@@ -228,10 +233,14 @@ while ($true) {
 # Generate Chainlit auth secret
 Write-Info "Generating Chainlit auth secret …"
 Push-Location $ProjectRoot
-$SecretOutput = chainlit create-secret 2>&1
+
+# Use python -m chainlit instead of direct chainlit command to ensure venv context
+$SecretOutput = python -m chainlit create-secret 2>&1
+$CreateSecretExit = $LASTEXITCODE
+
 Pop-Location
 
-if ($LASTEXITCODE -ne 0) {
+if ($CreateSecretExit -ne 0) {
     Exit-WithError "chainlit create-secret failed. Is chainlit installed? ($SecretOutput)"
 }
 

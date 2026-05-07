@@ -98,3 +98,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-03 | update_workflow reports missing inputs for ComfyMathExpression nodes despite valid connections | Verify connections using read_text_file. If inputs are present in the JSON, proceed with signal_workflow_ready to bypass strict validation errors.
 
 2026-05-03 | update_workflow reports missing ComfyMathExpression inputs despite valid connections | Verify connections in the workflow JSON; if inputs are present, treat validation errors as false positives and proceed.
+
+2026-05-06 | update_workflow fails for LoadVideo nodes when using 'video' as input name | Use 'file' as the input_name for LoadVideo. Check get_node_schema to verify correct input keys when encountering validation errors.
+
+2026-05-06 | update_workflow fails when the patch input_name key is incorrect | Use get_node_schema to verify the exact input_name required, such as 'file' instead of 'video'.

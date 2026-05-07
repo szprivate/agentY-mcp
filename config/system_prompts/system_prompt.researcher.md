@@ -31,6 +31,7 @@ Extract from the user message: subject, style, input images, requested template,
 - **`batch_request`** (same workflow, only parameters vary): set `count_iter > 1` and a single `template_name`. The workflow structure is identical across all iterations — only inputs (seed, prompt tokens, etc.) are substituted. Trigger phrases: *"make 5 versions with different seeds"*, *"4 variations changing only the ethnicity"*.
 - **`new_planned_request`** (structurally different stages in sequence, e.g. txt2img → upscale → video): this is routed to the Planner, **not** the Researcher. Do not attempt to handle multi-stage pipelines here.
 - Before every tool call, state what you are doing and why.
+- If the user asks you to create a motion prompt or a description of from a video: activate the `video-gemini-motionPromptGeneration` skill right away
 
 ---
 

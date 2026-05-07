@@ -21,6 +21,7 @@ Classify the incoming user message into **exactly one** of the following intents
 - "That went wrong, use [modelname] instead" -> `new_request`
 - "Turn this person image into a chimp" -> `new_request`
 - "Put the person from the first image into the environment in the second image" -> `new_request`
+- "Make a prompt / description from this VIDEO" -> `new_request`
 - "Replace objects in this image" -> `new_request`
 - "Turn this image into a video" -> `new_request`
 - "Make a video from this image" -> `new_request`

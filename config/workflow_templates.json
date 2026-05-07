@@ -42,5 +42,5 @@
     "image_z_image_turbo_fun_union_controlnet": "[Local] image editing via Z-Image-Turbo. 1 image input → 1 image output. Uses ControlNet for precise and controlled image editing.",
     "Wan22Vace_VID2VID": "[Local] image editing via Wan. 3 image inputs → 1 image output. Performs advanced image-to-image editing and transformations.",
     "image_z_image_turbo": "[Local] text-to-image via Z-Image-Turbo. 1 text input → 1 image output. High-speed image generation from text prompts.",
-    "video_gemini_motionPromptGeneration": "[Local] motion prompt generation via ComfyUI Model. 1 text input → 1 output. Generates descriptive motion prompts for video generation."
+    "video_gemini_motionPromptGeneration": "[API] motion prompt generation via Gemini, analyses a video and output a desscription of the motion in it. 1 video input → 1 output. Generates descriptive motion prompts for video generation."
 }

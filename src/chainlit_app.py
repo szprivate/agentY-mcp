@@ -733,30 +733,29 @@ async def on_message(message: cl.Message) -> None:
     # ── /switch_model <agent> <provider,model> ────────────────────────────────
     if _text.lower().startswith("/switch_model") or _text.lower().startswith("switch_model"):
         _parts = _text.split(None, 2)  # [cmd, agent_name, provider,model]
-        _AGENTS = {"researcher", "brain", "info", "triage", "planner"}
+        _AGENTS = {"researcher", "brain", "info", "triage", "planner", "error_checker"}
+        _SETTINGS_KEYS = {"build_skill", "llm_functions", "executor_vision_model"}
+        _ALL_SWITCHABLE = _AGENTS | _SETTINGS_KEYS
         if len(_parts) < 3:
             await cl.Message(
                 content=(
                     "⚠️ Usage: `/switch_model <agent> <provider,model>`\n\n"
                     f"Agents: `{', '.join(sorted(_AGENTS))}`\n"
+                    f"Utilities: `{', '.join(sorted(_SETTINGS_KEYS))}`\n"
                     "Examples:\n"
                     "- `/switch_model brain claude,claude-opus-4-7`\n"
-                    "- `/switch_model researcher ollama,qwen3:14b`"
+                    "- `/switch_model build_skill ollama,qwen3:14b`"
                 ),
                 author="system",
             ).send()
             return
         _agent_name = _parts[1].lower()
         _llm_spec = _parts[2].strip()
-        if _agent_name not in _AGENTS:
+        if _agent_name not in _ALL_SWITCHABLE:
             await cl.Message(
-                content=f"❌ Unknown agent `{_agent_name}`. Valid agents: `{', '.join(sorted(_AGENTS))}`",
+                content=f"❌ Unknown agent/utility `{_agent_name}`. Valid options: `{', '.join(sorted(_ALL_SWITCHABLE))}`",
                 author="system",
             ).send()
-            return
-        _pipeline = cl.user_session.get("pipeline")
-        if _pipeline is None:
-            await cl.Message(content="⚠️ Pipeline not initialised. Please reload the page.", author="system").send()
             return
         _provider, _, _model = _llm_spec.partition(",")
         _provider = _provider.strip().lower()
@@ -772,13 +771,31 @@ async def on_message(message: cl.Message) -> None:
             author="system",
         ).send()
         try:
+            # Handle utility settings (build_skill, llm_functions, executor_vision_model)
+            if _agent_name in _SETTINGS_KEYS:
+                from src.agent import _settings as _get_settings
+                _cfg_settings = _get_settings()
+                _cfg_settings.setdefault("llm", {}).setdefault("pipeline", {})[_agent_name] = _llm_spec
+                _display = f"`{_provider},{_model}`" if _model else f"`{_provider}`"
+                await cl.Message(
+                    content=f"✅ `{_agent_name}` now using {_display}.",
+                    author="system",
+                ).send()
+                return
+            
+            # Handle pipeline agents
             from src.agent import (
                 create_researcher_agent,
                 create_brain_agent,
                 create_info_agent,
                 create_triage_agent,
                 create_planner_agent,
+                create_error_checker_agent,
             )
+            _pipeline = cl.user_session.get("pipeline")
+            if _pipeline is None:
+                await cl.Message(content="⚠️ Pipeline not initialised. Please reload the page.", author="system").send()
+                return
             _kwargs = {"llm": _provider}
             if _model:
                 if _provider == "ollama":
@@ -791,6 +808,7 @@ async def on_message(message: cl.Message) -> None:
                 "info":       create_info_agent,
                 "triage":     create_triage_agent,
                 "planner":    create_planner_agent,
+                "error_checker": create_error_checker_agent,
             }
             _new_agent = _factory_map[_agent_name](**_kwargs)
             _attr_map = {
@@ -799,6 +817,7 @@ async def on_message(message: cl.Message) -> None:
                 "info":       "_info_agent",
                 "triage":     "_triage_agent",
                 "planner":    "_planner_agent",
+                "error_checker": "_error_checker_agent",
             }
             setattr(_pipeline, _attr_map[_agent_name], _new_agent)
             _display = f"`{_provider},{_model}`" if _model else f"`{_provider}`"
