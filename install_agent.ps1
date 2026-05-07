@@ -140,6 +140,7 @@ if (-not (Test-Path $VenvDir)) {
 # Activate (cross-platform)
 # $IsWindows is a PS 7 automatic variable; fall back to OS detection for safety
 $onWindows = if (Test-Path Variable:\IsWindows) { $IsWindows } else { $true }
+$VenvPython     = Join-Path $VenvDir (& { if ($onWindows) { "Scripts\python.exe" } else { "bin/python" } })
 if ($onWindows) {
     $ActivateScript = Join-Path $VenvDir "Scripts\Activate.ps1"
 } else {
@@ -170,9 +171,9 @@ Write-Info "Installing asyncpg and boto3 …"
 uv pip install asyncpg boto3
 if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install asyncpg boto3 failed." }
 
-# Verify chainlit is available via uv run (uses venv, bypasses Windows Store python alias)
+# Verify chainlit is available using the venv python directly
 Write-Info "Verifying chainlit installation …"
-uv run python -m chainlit --version | Out-Null
+& $VenvPython -m chainlit --version | Out-Null
 if ($LASTEXITCODE -ne 0) { Exit-WithError "chainlit verification failed after installation." }
 
 Pop-Location
@@ -234,8 +235,8 @@ while ($true) {
 Write-Info "Generating Chainlit auth secret …"
 Push-Location $ProjectRoot
 
-# Use uv run to invoke chainlit — avoids Windows Store python alias, always uses venv
-$SecretOutput = uv run python -m chainlit create-secret 2>&1
+# Call chainlit via the venv python directly
+$SecretOutput = & $VenvPython -m chainlit create-secret 2>&1
 $CreateSecretExit = $LASTEXITCODE
 
 Pop-Location
