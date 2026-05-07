@@ -478,6 +478,19 @@ if (-not (Test-Path $DlEnvFile)) {
 
 Push-Location $Script:DlDir
 try {
+    # chainlit-datalayer pins prisma ^6.x in its package.json; without a local
+    # install, npx resolves to whatever it has cached globally (currently 7.x),
+    # which has dropped support for `url`/`directUrl` in schema.prisma. Install
+    # local node_modules so npx picks up the pinned 6.x bin.
+    $DlNodeModules = Join-Path $Script:DlDir "node_modules"
+    if (-not (Test-Path $DlNodeModules)) {
+        Write-Info "Installing chainlit-datalayer node dependencies (npm install) ..."
+        npm install
+        if ($LASTEXITCODE -ne 0) { Exit-WithError "npm install in chainlit-datalayer failed." }
+    } else {
+        Write-Info "chainlit-datalayer node_modules present - skipping npm install"
+    }
+
     Write-Info "Running npx prisma migrate deploy in $Script:DlDir ..."
     npx prisma migrate deploy
     $PrismaExit = $LASTEXITCODE
