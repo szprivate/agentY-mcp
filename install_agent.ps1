@@ -4,8 +4,15 @@
     Works on Windows PowerShell 5.1+ and PowerShell 7+, and macOS with PowerShell 7+.
 #>
 
-Set-StrictMode -Version Latest
+Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
+
+# Detect Windows once, deterministically. $IsWindows is a PS 7 automatic variable;
+# PS 5.1 only exists on Windows, so default to $true when the variable is missing.
+$Script:OnWindows = $true
+if (Get-Variable -Name IsWindows -Scope Global -ErrorAction SilentlyContinue) {
+    $Script:OnWindows = [bool]$IsWindows
+}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -124,35 +131,49 @@ Write-Success "docker-compose.yml found"
 
 Write-Header "2 / 8  Virtual environment"
 
-$VenvDir = Join-Path $ProjectRoot ".venv"
+$Script:VenvDir = Join-Path $ProjectRoot ".venv"
 
-if (-not (Test-Path $VenvDir)) {
+if ($Script:OnWindows) {
+    $Script:VenvBin        = Join-Path $Script:VenvDir "Scripts"
+    $Script:VenvPython     = Join-Path $Script:VenvBin "python.exe"
+    $Script:ActivateScript = Join-Path $Script:VenvBin "Activate.ps1"
+} else {
+    $Script:VenvBin        = Join-Path $Script:VenvDir "bin"
+    $Script:VenvPython     = Join-Path $Script:VenvBin "python"
+    $Script:ActivateScript = Join-Path $Script:VenvBin "Activate.ps1"
+}
+
+# An existing .venv directory with no python is a corrupted half-install —
+# treat it as missing so we recreate cleanly.
+$venvLooksValid = (Test-Path $Script:VenvDir) -and (Test-Path $Script:VenvPython)
+
+if (-not $venvLooksValid) {
+    if (Test-Path $Script:VenvDir) {
+        Write-Info ".venv exists but appears incomplete — recreating"
+        Remove-Item -Recurse -Force $Script:VenvDir
+    }
     Write-Info "Creating .venv with uv …"
     Push-Location $ProjectRoot
-    uv venv .venv
-    if ($LASTEXITCODE -ne 0) { Exit-WithError "uv venv failed." }
-    Pop-Location
+    try {
+        uv venv .venv
+        if ($LASTEXITCODE -ne 0) { Exit-WithError "uv venv failed." }
+    } finally {
+        Pop-Location
+    }
     Write-Success ".venv created"
 } else {
     Write-Info ".venv already exists — skipping creation"
 }
 
-# Activate (cross-platform)
-# $IsWindows is a PS 7 automatic variable; fall back to OS detection for safety
-$onWindows = if (Test-Path Variable:\IsWindows) { $IsWindows } else { $true }
-$VenvPython     = Join-Path $VenvDir (& { if ($onWindows) { "Scripts\python.exe" } else { "bin/python" } })
-if ($onWindows) {
-    $ActivateScript = Join-Path $VenvDir "Scripts\Activate.ps1"
-} else {
-    $ActivateScript = Join-Path $VenvDir "bin/Activate.ps1"
+if (-not (Test-Path $Script:VenvPython)) {
+    Exit-WithError "Could not find venv python at: $Script:VenvPython"
 }
-
-if (-not (Test-Path $ActivateScript)) {
-    Exit-WithError "Could not find activation script at: $ActivateScript"
+if (-not (Test-Path $Script:ActivateScript)) {
+    Exit-WithError "Could not find activation script at: $Script:ActivateScript"
 }
 
 Write-Info "Activating .venv …"
-& $ActivateScript
+& $Script:ActivateScript
 Write-Success ".venv activated"
 
 # ---------------------------------------------------------------------------
@@ -162,21 +183,27 @@ Write-Success ".venv activated"
 Write-Header "3 / 8  Python dependencies"
 
 Push-Location $ProjectRoot
+try {
+    $RequirementsFile = Join-Path $ProjectRoot "requirements.txt"
+    if (-not (Test-Path $RequirementsFile)) {
+        Exit-WithError "requirements.txt not found at $RequirementsFile."
+    }
 
-Write-Info "Installing requirements.txt …"
-uv pip install -r requirements.txt
-if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install -r requirements.txt failed." }
+    Write-Info "Installing requirements.txt …"
+    uv pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install -r requirements.txt failed." }
 
-Write-Info "Installing asyncpg and boto3 …"
-uv pip install asyncpg boto3
-if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install asyncpg boto3 failed." }
+    Write-Info "Installing asyncpg and boto3 …"
+    uv pip install asyncpg boto3
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install asyncpg boto3 failed." }
 
-# Verify chainlit is available using the venv python directly
-Write-Info "Verifying chainlit installation …"
-& $VenvPython -m chainlit --version | Out-Null
-if ($LASTEXITCODE -ne 0) { Exit-WithError "chainlit verification failed after installation." }
-
-Pop-Location
+    # Verify chainlit is available using the venv python directly
+    Write-Info "Verifying chainlit installation …"
+    & $Script:VenvPython -m chainlit --version | Out-Null
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "chainlit verification failed after installation." }
+} finally {
+    Pop-Location
+}
 Write-Success "Python dependencies installed"
 
 # ---------------------------------------------------------------------------
@@ -232,14 +259,19 @@ while ($true) {
 }
 
 # Generate Chainlit auth secret
+if (-not $Script:VenvPython -or -not (Test-Path $Script:VenvPython)) {
+    Exit-WithError "Internal error: venv python is not available at this point ($Script:VenvPython)."
+}
+
 Write-Info "Generating Chainlit auth secret …"
 Push-Location $ProjectRoot
-
-# Call chainlit via the venv python directly
-$SecretOutput = & $VenvPython -m chainlit create-secret 2>&1
-$CreateSecretExit = $LASTEXITCODE
-
-Pop-Location
+try {
+    # Call chainlit via the venv python directly
+    $SecretOutput = & $Script:VenvPython -m chainlit create-secret 2>&1
+    $CreateSecretExit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
 
 if ($CreateSecretExit -ne 0) {
     Exit-WithError "chainlit create-secret failed. Is chainlit installed? ($SecretOutput)"
@@ -250,7 +282,8 @@ $SecretLine = ($SecretOutput | Where-Object { $_ -match "CHAINLIT_AUTH_SECRET\s*
 if (-not $SecretLine) {
     Exit-WithError "Could not parse CHAINLIT_AUTH_SECRET from chainlit create-secret output.`nOutput was:`n$SecretOutput"
 }
-$ChainlitSecret = ($SecretLine -replace "^.*CHAINLIT_AUTH_SECRET\s*=\s*", "").Trim()
+# Strip optional surrounding quotes from the parsed value.
+$ChainlitSecret = ($SecretLine -replace "^.*CHAINLIT_AUTH_SECRET\s*=\s*", "").Trim().Trim('"').Trim("'")
 
 # Write to .env
 Set-EnvKey -FilePath $EnvFile -Key "CHAINLIT_AUTH_SECRET" -Value $ChainlitSecret
@@ -266,10 +299,13 @@ Write-Success "Chainlit auth credentials written to .env"
 Write-Header "6 / 8  Docker services (MinIO + PostgreSQL)"
 
 Push-Location $ProjectRoot
-Write-Info "Starting containers with docker compose up -d …"
-docker compose up -d
-if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d failed." }
-Pop-Location
+try {
+    Write-Info "Starting containers with docker compose up -d …"
+    docker compose up -d
+    if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d failed." }
+} finally {
+    Pop-Location
+}
 
 # Wait for MinIO
 Write-Info "Waiting for MinIO to be healthy …"
@@ -304,9 +340,12 @@ $PgOk     = $false
 
 while ($Elapsed -lt $MaxWait) {
     Push-Location $ProjectRoot
-    $pgOut = docker compose exec -T postgres pg_isready 2>&1
-    $pgExit = $LASTEXITCODE
-    Pop-Location
+    try {
+        $null   = docker compose exec -T postgres pg_isready 2>&1
+        $pgExit = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
 
     if ($pgExit -eq 0) {
         $PgOk = $true
@@ -330,10 +369,13 @@ Write-Success "PostgreSQL is ready"
 Write-Header "7 / 8  Prisma migration"
 
 Push-Location $ProjectRoot
-Write-Info "Running npx prisma migrate deploy …"
-npx prisma migrate deploy
-$PrismaExit = $LASTEXITCODE
-Pop-Location
+try {
+    Write-Info "Running npx prisma migrate deploy …"
+    npx prisma migrate deploy
+    $PrismaExit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
 
 if ($PrismaExit -ne 0) {
     Exit-WithError "npx prisma migrate deploy failed (exit code $PrismaExit). Check the output above for details."
