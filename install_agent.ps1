@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Cross-platform install script for the agentY project.
     Works on Windows PowerShell 5.1+ and PowerShell 7+, and macOS with PowerShell 7+.
@@ -143,16 +143,16 @@ if ($Script:OnWindows) {
     $Script:ActivateScript = Join-Path $Script:VenvBin "Activate.ps1"
 }
 
-# An existing .venv directory with no python is a corrupted half-install —
+# An existing .venv directory with no python is a corrupted half-install -
 # treat it as missing so we recreate cleanly.
 $venvLooksValid = (Test-Path $Script:VenvDir) -and (Test-Path $Script:VenvPython)
 
 if (-not $venvLooksValid) {
     if (Test-Path $Script:VenvDir) {
-        Write-Info ".venv exists but appears incomplete — recreating"
+        Write-Info ".venv exists but appears incomplete - recreating"
         Remove-Item -Recurse -Force $Script:VenvDir
     }
-    Write-Info "Creating .venv with uv …"
+    Write-Info "Creating .venv with uv ..."
     Push-Location $ProjectRoot
     try {
         uv venv .venv
@@ -162,7 +162,7 @@ if (-not $venvLooksValid) {
     }
     Write-Success ".venv created"
 } else {
-    Write-Info ".venv already exists — skipping creation"
+    Write-Info ".venv already exists - skipping creation"
 }
 
 if (-not (Test-Path $Script:VenvPython)) {
@@ -172,7 +172,7 @@ if (-not (Test-Path $Script:ActivateScript)) {
     Exit-WithError "Could not find activation script at: $Script:ActivateScript"
 }
 
-Write-Info "Activating .venv …"
+Write-Info "Activating .venv ..."
 & $Script:ActivateScript
 Write-Success ".venv activated"
 
@@ -189,16 +189,16 @@ try {
         Exit-WithError "requirements.txt not found at $RequirementsFile."
     }
 
-    Write-Info "Installing requirements.txt …"
+    Write-Info "Installing requirements.txt ..."
     uv pip install -r requirements.txt
     if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install -r requirements.txt failed." }
 
-    Write-Info "Installing asyncpg and boto3 …"
+    Write-Info "Installing asyncpg and boto3 ..."
     uv pip install asyncpg boto3
     if ($LASTEXITCODE -ne 0) { Exit-WithError "uv pip install asyncpg boto3 failed." }
 
     # Verify chainlit is available using the venv python directly
-    Write-Info "Verifying chainlit installation …"
+    Write-Info "Verifying chainlit installation ..."
     & $Script:VenvPython -m chainlit --version | Out-Null
     if ($LASTEXITCODE -ne 0) { Exit-WithError "chainlit verification failed after installation." }
 } finally {
@@ -220,11 +220,11 @@ if (-not (Test-Path $EnvFile)) {
         Exit-WithError ".env_example not found in project root. Cannot create .env."
     }
     Copy-Item $EnvExample $EnvFile
-    Write-Info "Copied .env_example → .env"
+    Write-Info "Copied .env_example -> .env"
     Write-Host ""
-    Write-Host "  ⚠  ACTION REQUIRED: Open .env and fill in your API keys before running the agent." -ForegroundColor Magenta
+    Write-Host "  !  ACTION REQUIRED: Open .env and fill in your API keys before running the agent." -ForegroundColor Magenta
 } else {
-    Write-Info ".env already exists — skipping copy"
+    Write-Info ".env already exists - skipping copy"
 }
 
 # ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ while ($true) {
     $Password1 = Read-Host "  Enter Chainlit password" -AsSecureString
     $Password2 = Read-Host "  Confirm Chainlit password" -AsSecureString
 
-    # Convert SecureString → plain text for comparison
+    # Convert SecureString -> plain text for comparison
     $Plain1 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password1))
     $Plain2 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
@@ -263,7 +263,7 @@ if (-not $Script:VenvPython -or -not (Test-Path $Script:VenvPython)) {
     Exit-WithError "Internal error: venv python is not available at this point ($Script:VenvPython)."
 }
 
-Write-Info "Generating Chainlit auth secret …"
+Write-Info "Generating Chainlit auth secret ..."
 Push-Location $ProjectRoot
 try {
     # Call chainlit via the venv python directly
@@ -300,7 +300,7 @@ Write-Header "6 / 8  Docker services (MinIO + PostgreSQL)"
 
 Push-Location $ProjectRoot
 try {
-    Write-Info "Starting containers with docker compose up -d …"
+    Write-Info "Starting containers with docker compose up -d ..."
     docker compose up -d
     if ($LASTEXITCODE -ne 0) { Exit-WithError "docker compose up -d failed." }
 } finally {
@@ -308,7 +308,7 @@ try {
 }
 
 # Wait for MinIO
-Write-Info "Waiting for MinIO to be healthy …"
+Write-Info "Waiting for MinIO to be healthy ..."
 $MinioUrl  = "http://localhost:9000/minio/health/live"
 $MaxWait   = 30
 $Elapsed   = 0
@@ -334,7 +334,7 @@ if (-not $MinioOk) {
 Write-Success "MinIO is healthy"
 
 # Wait for PostgreSQL
-Write-Info "Waiting for PostgreSQL to be ready …"
+Write-Info "Waiting for PostgreSQL to be ready ..."
 $Elapsed  = 0
 $PgOk     = $false
 
@@ -370,7 +370,7 @@ Write-Header "7 / 8  Prisma migration"
 
 Push-Location $ProjectRoot
 try {
-    Write-Info "Running npx prisma migrate deploy …"
+    Write-Info "Running npx prisma migrate deploy ..."
     npx prisma migrate deploy
     $PrismaExit = $LASTEXITCODE
 } finally {
