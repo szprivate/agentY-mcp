@@ -55,10 +55,23 @@ function Set-EnvKey {
     $content = Get-Content $FilePath -Raw
     if ($null -eq $content) { $content = "" }
 
+    # Values containing characters that docker-compose's .env parser would
+    # interpolate ($, #, leading/trailing whitespace) must be single-quoted
+    # so both docker-compose and python-dotenv treat them as literal.
+    $needsQuoting = ($Value -match '[\$#]') -or ($Value -ne $Value.Trim()) -or ($Value -eq "")
+    if ($needsQuoting) {
+        if ($Value -match "'") {
+            Exit-WithError "Cannot write $Key to .env: value contains a single quote, which is not supported."
+        }
+        $writtenValue = "'$Value'"
+    } else {
+        $writtenValue = $Value
+    }
+
     # Escape the key for regex use
     $escapedKey = [regex]::Escape($Key)
     $pattern    = "(?m)^$escapedKey=.*$"
-    $replacement = "$Key=$Value"
+    $replacement = "$Key=$writtenValue"
 
     if ($content -match $pattern) {
         $content = $content -replace $pattern, $replacement
@@ -103,11 +116,11 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 Write-Success "Docker CLI found"
 
-# Docker daemon running
-try {
-    $null = docker info 2>&1
-    if ($LASTEXITCODE -ne 0) { throw }
-} catch {
+# Docker daemon running. Don't use 2>&1: PowerShell wraps native-command stderr
+# as NativeCommandError, which $ErrorActionPreference='Stop' would escalate even
+# when the exe exits 0. Send all streams to $null and rely on $LASTEXITCODE.
+docker info *> $null
+if ($LASTEXITCODE -ne 0) {
     Exit-WithError "Docker daemon is not running. Start Docker Desktop (or the Docker service) and try again."
 }
 Write-Success "Docker daemon is running"
@@ -341,7 +354,9 @@ $PgOk     = $false
 while ($Elapsed -lt $MaxWait) {
     Push-Location $ProjectRoot
     try {
-        $null   = docker compose exec -T postgres pg_isready 2>&1
+        # No 2>&1: it wraps stderr as NativeCommandError (e.g. docker-compose
+        # warnings) and Stop-on-error would crash the script. Discard streams.
+        docker compose exec -T postgres pg_isready *> $null
         $pgExit = $LASTEXITCODE
     } finally {
         Pop-Location
