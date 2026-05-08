@@ -1,5 +1,5 @@
 ---
-name: video-gemini-motionPromptGeneration
+name: video-gemini-motionpromptgeneration
 description: "Analyse video input using Gemini, create motion prompts. Activate when brainbriefing template name contains 'video_gemini_motionPromptGeneration'. Patchable: Input video, Output; Locked: Structural nodes, Sampler recipe, and Resolution-driven logic."
 allowed-tools: patch_workflow check_model
 ---
