@@ -9,13 +9,11 @@ An AI agent that constructs and executes [ComfyUI](https://github.com/comfyanony
 - **Natural language → ComfyUI workflow** — describe what you want; the pipeline builds, submits, and QA-checks the workflow automatically.
 - **Image & video generation** — Flux, WAN2.1/2.2, Qwen, HunyuanVideo, and many other models.
 - **Image editing** — reference-based editing, inpainting, upscaling, and more.
-- **Multi-stage pipeline** — Triage routes requests; a lightweight Researcher (Ollama by default) resolves templates, model paths, and sampler settings; the Brain (Claude by default) assembles the workflow, executes it, and runs vision QA.
 - **Persistent chat history** — Chainlit SQLAlchemy datalayer stores conversation threads and messages in PostgreSQL; uploaded files are persisted to a local MinIO S3 bucket.
 - **FAISS memory** — long-term memory via mem0 + local Ollama embeddings (`nomic-embed-text`).
 - **Hugging Face model management** — search, check local availability, and download models on demand.
 - **Chainlit web GUI** — interact via a browser-based chat UI; images and videos are delivered inline.
 - **Multiple LLM backends** — Claude and Ollama, configurable per pipeline stage.
-- **50+ workflow templates** — from Comfy-Org, loaded and patched automatically.
 - **Skills system** — drop shell/Python scripts into `skills/` and they become agent-callable tools.
 - **ComfyUI extension** — a companion custom node ([agentY-comfyui-extension](https://github.com/szprivate/agentY-comfyui-extension)) lets you send images directly from ComfyUI to agentY and receive responses in real time.
 
@@ -25,10 +23,8 @@ An AI agent that constructs and executes [ComfyUI](https://github.com/comfyanony
 
 - **Python 3.11+**
 - A running **ComfyUI** instance (default: `http://127.0.0.1:8188`)
-- An **Anthropic API key** (for Claude) _and/or_ a local **Ollama** installation
-- **PostgreSQL** — required for the Chainlit datalayer (chat history persistence)
 - **Docker** — used to run PostgreSQL and MinIO via `docker-compose.yml` (or point to existing instances)
-- (Optional) Slack app credentials for Slack integration
+- An **Anthropic API key** (for Claude) _and/or_ a local **Ollama** installation
 
 ---
 
@@ -43,24 +39,9 @@ cd agentY
 
 ### 2. Run the install script (recommended)
 
-`install_agent.ps1` is a cross-platform PowerShell 7 script that handles the full setup in one step. It works on both Windows and macOS (`pwsh`).
-
 ```powershell
 .\install_agent.ps1
 ```
-
-What it does, in order:
-
-1. Preflight checks - verifies `uv`, Docker (CLI + daemon), Node.js, and `docker-compose.yml` are present
-2. Creates a `.venv` with `uv venv` if one does not already exist, then activates it
-3. Installs Python dependencies from `requirements.txt` plus `asyncpg` and `boto3`
-4. Copies `.env_example` to `.env` if no `.env` exists yet
-5. Prompts for a Chainlit username and password (masked input), generates a `CHAINLIT_AUTH_SECRET` via `chainlit create-secret`, and writes all three into `.env`
-6. Runs `docker compose up -d` and waits for MinIO and PostgreSQL to be healthy (up to 30 s each)
-7. Runs `npx prisma migrate deploy` to apply database migrations
-8. Prints a final summary with next steps
-
-Requirements: [uv](https://docs.astral.sh/uv/getting-started/installation/), Docker Desktop, Node.js, PowerShell 7+.
 
 ---
 
@@ -170,11 +151,6 @@ CHAINLIT_AUTH_SECRET="your-generated-secret"
 # MINIO_ACCESS_KEY=minioadmin
 # MINIO_SECRET_KEY=minioadmin
 # MINIO_BUCKET=chainlit
-
-# Slack integration (optional)
-SLACK_APP_TOKEN=xapp-...
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_SIGNING_SECRET=
 ```
 
 Generate the Chainlit auth secret (run once):
@@ -239,51 +215,7 @@ The script creates the virtual environment and installs dependencies automatical
 .\run_agent.ps1 -Help
 ```
 
-### Python (any OS)
-
-```bash
-# Default
-python -m src.main
-
-# Override LLMs via CLI flags
-python -m src.main --researcher-llm ollama --researcher-ollama-model qwen3-coder:32b
-python -m src.main --brain-llm claude --brain-anthropic-model claude-sonnet-4-5
-
-# Skip the Brain stage
-python -m src.main --skip-brain
-```
-
-Type messages at the `You:` prompt. Type `quit` or `exit` to stop.
-
 ---
-
-## Architecture
-
-### Multi-stage pipeline
-
-```
-User request
-    │
-    ▼
-┌────────┐   intent   ┌────────────┐   BrainBriefing JSON   ┌───────┐   workflow   ┌─────────┐
-│ Triage ├───────────►│ Researcher ├────────────────────────►│ Brain ├─────────────►│ ComfyUI │
-└────────┘            └────────────┘                         └───┬───┘              └────┬────┘
- Ollama (default)      Ollama (default)                          │ Claude (default)      │
- • classify intent     • resolve template                        │ • assemble workflow   │
- • route to handler    • resolve model paths                     │ • patch & validate    │
-                       • resolve sampler settings                │ • submit & poll       │
-                       • produce BrainBriefing                   │ • vision QA           │
-                                                                 │ • deliver via Chainlit│
-                                                                 ▼                      ▼
-                                                              output_images/    Chainlit GUI
-                                                              (+ PostgreSQL history)
-```
-
-1. **Triage** classifies the incoming message and routes it — to the image generation pipeline, a direct skill, or a general assistant response.
-2. **Researcher** receives the user request and produces a validated **BrainBriefing** JSON (template, input images, model paths, prompts, resolution).
-3. **Brain** receives the BrainBriefing, loads the selected workflow template, patches node values, submits the prompt to ComfyUI, waits for completion, runs vision QA on the output, and delivers the result.
-
-The `--skip-brain` flag returns the Researcher's BrainBriefing directly, useful for debugging or inspection.
 
 ### Memory
 
@@ -312,22 +244,6 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser. Log in
 
 You can attach images directly in the chat — they are forwarded to ComfyUI as input assets.
 
-### Custom theme and UI
-
-The Chainlit UI ships with a custom dark/light theme and a global CSS override:
-
-- `public/theme.json` - defines the color palette (near-black backgrounds, blue accent) and sets **JetBrains Mono** as the UI font for both dark and light modes.
-- `public/stylesheet.css` - flattens all heading sizes to match body text (bold only, no size jump) and locks the entire UI to JetBrains Mono at 13 px.
-- `.chainlit/config.toml` - loads the stylesheet via `custom_css = "/public/stylesheet.css"` and the JS slash-commands helper via `custom_js = "/public/slash_commands.js"`.
-
-To change the theme, edit `public/theme.json`. The color values follow CSS HSL notation without the `hsl()` wrapper.
-
-### Datalayer (chat persistence)
-
-When `DATABASE_URL` is set, Chainlit persists all conversation threads and messages to PostgreSQL via `SQLAlchemyDataLayer`. Uploaded files (images, etc.) are stored in **MinIO** via an S3-compatible storage client — both services are started automatically by `run_agent.ps1` when Docker is available.
-
-Previous conversations are accessible from the sidebar. Without `DATABASE_URL` the app still works but history is not retained between restarts. Without MinIO, file attachments are not persisted across sessions.
-
 ---
 
 ## Adding Custom Workflow Templates
@@ -343,80 +259,6 @@ Use the helper scripts to register a workflow JSON and make it available to the 
 ```
 
 `scripts/add_workflow.ps1` parses the workflow, extracts node metadata, adds an entry to `config/workflow_templates.json`, and calls `scripts/build_skill.py` to generate a `SKILL.md` in the matching `skills/` directory. Custom templates live in `comfyui_workflow_templates_custom/templates/`.
-
----
-
-## Project Structure
-
-```
-agentY/
-├── src/
-│   ├── main.py                 Entry point and CLI
-│   ├── agent.py                Agent factories, LLM config, system prompt loading
-│   ├── chainlit_app.py         Chainlit GUI entry point; datalayer init
-│   ├── executor.py             Skill executor
-│   ├── pipeline.py             Triage → Researcher → Brain pipeline and BrainBriefing schema
-│   ├── tools/
-│   │   ├── agent_control.py    Restart/stop commands intercepted by the agent loop
-│   │   ├── comfyui.py          Workflow template loading/patching, node inspection, prompt submission
-│   │   ├── file_tools.py       Plain-text file reader/writer
-│   │   ├── huggingface.py      HF Hub: model search, info, local check, download
-│   │   ├── image_handling.py   Image upload/download, resolution detection, visual analysis
-│   │   ├── iterate.py          Iterative generation helpers
-│   │   ├── memory_tools.py     Agent-facing FAISS memory read/write tools
-│   │   └── shell.py            Cross-platform shell execution for skill scripts
-│   └── utils/
-│       ├── agentY_server.py    Lightweight Flask bridge for ComfyUI extension callbacks
-│       ├── chat_summary.py     Conversation summarisation utilities
-│       ├── comfyui_client.py   Singleton HTTP client for the ComfyUI REST API
-│       ├── comfyui_interrupt_hook.py  Halts agent loop after submit_prompt for async polling
-│       ├── comfyui_progress.py WebSocket streamer for ComfyUI job progress / completion
-│       ├── costs.py            Token-cost computation helpers
-│       ├── learnings.py        Brain-learnings extraction and storage
-│       ├── llm_functions.py    Structured LLM call helpers (non-agent)
-│       ├── memory.py           FAISS / mem0 memory initialisation and access
-│       ├── models.py           Model registry helpers
-│       ├── secrets.py          Reads .env via dotenv_values (never injects into os.environ)
-│       ├── triage.py           Intent classification and request routing
-│       ├── workflow_parser.py  Workflow JSON analysis and template registration
-│       └── workflow_signal.py  Signal/event bus for async workflow events
-├── config/
-│   ├── settings.json           ComfyUI URL, LLM defaults, polling intervals
-│   ├── models.json             Model shortname → path table (injected into system prompts)
-│   ├── workflow_templates.json Workflow template metadata
-│   ├── brainbrief_example.json Example BrainBriefing for prompt injection
-│   └── system_prompts/
-│       ├── system_prompt.brain.md
-│       ├── system_prompt.researcher.md
-│       ├── system_prompt.triage.md
-│       ├── system_prompt.planner.md
-│       ├── system_prompt.learnings.md
-│       ├── system_prompt.qaChecker.md
-│       └── system_prompt.info.md
-├── comfyui_workflow_templates_custom/     Your custom workflow templates
-├── skills/                     Drop-in skill scripts (shell/Python)
-├── memory/                     FAISS index for long-term agent memory
-├── output_images/              Generated outputs
-├── output_workflows/           Archived workflow JSON files
-├── public/
-│   ├── theme.json              Custom Chainlit dark/light theme (JetBrains Mono, blue accent)
-│   ├── stylesheet.css          Global CSS overrides (flattened headings, monospace UI)
-│   └── slash_commands.js       Slash-command definitions for the chat composer
-├── chainlit.md                 Chainlit welcome screen content
-├── .env_example                Template for .env secrets
-├── requirements.txt
-├── install_agent.ps1           Cross-platform automated install script (pwsh 7+)
-├── run_agent.ps1               Windows launcher (starts Chainlit GUI)
-├── scripts/
-│   ├── add_workflow.ps1        Register a custom workflow template + build its SKILL.md
-│   ├── build_skill.py          Generate a SKILL.md from a ComfyUI API workflow JSON
-│   ├── refresh_models.py       Refresh ComfyUI model caches
-│   ├── remove_workflow.ps1     Remove a registered workflow template + its skill directory
-│   └── update_all_workflows.ps1  Re-register every template in comfyui_workflow_templates_custom/
-```
-
-> The ComfyUI custom node lives in its own repo: **[agentY-comfyui-extension](https://github.com/szprivate/agentY-comfyui-extension)**.
-> Clone it into `ComfyUI/custom_nodes/agentY_bridge` to get the Send to agentY node.
 
 ---
 

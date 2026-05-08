@@ -45,6 +45,24 @@ function Exit-WithError {
     exit $Code
 }
 
+# Test whether the Docker daemon is reachable without triggering NativeCommandError.
+# PS 5.1 turns native-command stderr into a NativeCommandError object even when
+# all streams are redirected to $null, because $ErrorActionPreference='Stop'
+# intercepts it before the redirection takes effect. Wrapping in a try/catch
+# with a local Continue preference is the reliable cross-version workaround.
+function Test-DockerRunning {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        docker info *> $null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 # Replace or append a KEY=VALUE line in a file.
 function Set-EnvKey {
     param(
@@ -122,12 +140,56 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 Write-Success "Docker CLI found"
 
-# Docker daemon running. Don't use 2>&1: PowerShell wraps native-command stderr
-# as NativeCommandError, which $ErrorActionPreference='Stop' would escalate even
-# when the exe exits 0. Send all streams to $null and rely on $LASTEXITCODE.
-docker info *> $null
-if ($LASTEXITCODE -ne 0) {
-    Exit-WithError "Docker daemon is not running. Start Docker Desktop (or the Docker service) and try again."
+# Docker daemon running.
+if (-not (Test-DockerRunning)) {
+    Write-Info "Docker daemon is not running. Attempting to start it..."
+    if ($Script:OnWindows) {
+        # Try to launch Docker Desktop on Windows
+        $dockerDesktopPaths = @(
+            "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+            "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe"
+        )
+        $launched = $false
+        foreach ($path in $dockerDesktopPaths) {
+            if (Test-Path $path) {
+                Start-Process $path
+                $launched = $true
+                Write-Info "Docker Desktop launched from: $path"
+                break
+            }
+        }
+        if (-not $launched) {
+            Exit-WithError "Could not find Docker Desktop to launch. Start it manually and try again."
+        }
+    } else {
+        # On Linux/macOS, try to start the Docker service
+        $startResult = $null
+        if (Get-Command systemctl -ErrorAction SilentlyContinue) {
+            $startResult = & sudo systemctl start docker 2>&1
+        } elseif (Get-Command service -ErrorAction SilentlyContinue) {
+            $startResult = & sudo service docker start 2>&1
+        } else {
+            Exit-WithError "Cannot start Docker automatically on this system. Start the Docker daemon manually and try again."
+        }
+    }
+
+    # Wait for the daemon to become responsive (up to 60 seconds)
+    Write-Info "Waiting for Docker daemon to become ready..."
+    $maxWait = 60
+    $waited = 0
+    $ready = $false
+    while ($waited -lt $maxWait) {
+        Start-Sleep -Seconds 3
+        $waited += 3
+        if (Test-DockerRunning) {
+            $ready = $true
+            break
+        }
+        Write-Info "  ...still waiting ($waited s / $maxWait s)"
+    }
+    if (-not $ready) {
+        Exit-WithError "Docker daemon did not become ready within $maxWait seconds. Start it manually and try again."
+    }
 }
 Write-Success "Docker daemon is running"
 
