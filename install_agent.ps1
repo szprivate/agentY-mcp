@@ -254,7 +254,7 @@ Write-Header "5 / 9  Chainlit auth setup"
 
 # Username
 Write-Host ""
-$ChainlitUsername = Read-Host "  Enter Chainlit username"
+$ChainlitUsername = Read-Host "  Enter Chainlit username (used to login into the agent UI)"
 if ([string]::IsNullOrWhiteSpace($ChainlitUsername)) {
     Exit-WithError "Username cannot be empty."
 }
@@ -523,12 +523,10 @@ Write-Host "  1. Fill in remaining API keys in .env before the first run" -Foreg
 Write-Host "     (HF_TOKEN, ANTHROPIC_API_KEY, COMFYUI_API_KEY, etc.)" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  2. Start the agent:" -ForegroundColor Yellow
-Write-Host "     chainlit run src/chainlit_app.py" -ForegroundColor White
+Write-Host "     ./run_agent.ps1" -ForegroundColor White
 Write-Host ""
 Write-Host "  3. MinIO console:  http://localhost:9001" -ForegroundColor Yellow
 Write-Host "     Credentials:    minioadmin / minioadmin" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  4. Prisma Studio:  npx prisma studio" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
