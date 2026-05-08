@@ -24,6 +24,16 @@
 Click the attachment button to upload images directly into the chat.
 agentY will automatically detect them and wire them into the correct ComfyUI nodes.
 
+## Tips
+
+- Be descriptive - more detail produces better results
+- Mention aspect ratio, lighting mood, or style references when relevant
+- If you want a specific workflow / template: let the agent know! (eg "Use NanoBanana2 for this.")
+- If you want to use a local workflow: let the agent know (eg "Prefer to use a local workflow for this request")
+- Follow up naturally: "Make it warmer", "Try a higher contrast version". It helps to add "Feedback:" to your request, to make sure the Triage agent fully understands your intent is a follow-up.
+- For multi-step jobs, describe the full pipeline: "Generate, upscale, then animate", or "First, scale this image up, then make it 16:9, then animate it using Kling 3.0"
+
+
 ## Slash commands
 
 Type `/` in the chat input to see available commands:
@@ -41,13 +51,6 @@ Type `/` in the chat input to see available commands:
 | `/resend` | Resend the first user message of the current thread |
 
 Use the **up/down arrow keys** in the chat input to browse your message history (up to 200 messages, persisted across reloads).
-
-## Tips
-
-- Be descriptive - more detail produces better results
-- Mention aspect ratio, lighting mood, or style references when relevant
-- Follow up naturally: "Make it warmer", "Try a higher contrast version". It helps to add "Feedback:" in your answer, to make sure the Triage agent fully understand your intent is a follow-up.
-- For multi-step jobs, describe the full pipeline: "Generate, upscale, then animate"
 
 ---
 
