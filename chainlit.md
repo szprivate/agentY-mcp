@@ -8,6 +8,7 @@
 - **Video generation** - "Animate this image as a slow zoom-in"
 - **Image-to-video** - attach an image and request motion: "Make this pan slowly to the right"
 - **Upscaling** - "Upscale this image with Topaz" or "Creative upscale with Magnific"
+- **Prompt generation** - "Describe this image as a prompt for a video model", "Describe the motion in this video"
 
 ## Attaching images
 
@@ -19,7 +20,7 @@ agentY will automatically detect them and wire them into the correct ComfyUI nod
 - Be descriptive - more detail produces better results
 - Mention aspect ratio, lighting mood, or style references when relevant
 - If you want a specific workflow / template: let the agent know! (eg "Use NanoBanana2 for this.")
-- If you want to use a local workflow: let the agent know (eg "Prefer to use a local workflow for this request")
+- If you want to use a local workflow: let the agent know! (eg "Prefer to use a local workflow for this request")
 - Follow up naturally: "Make it warmer", "Try a higher contrast version". It helps to add "Feedback:" to your request, to make sure the Triage agent fully understands your intent is a follow-up.
 - For multi-step jobs, describe the full pipeline: "Generate, upscale, then animate", or "First, scale this image up, then make it 16:9, then animate it using Kling 3.0"
 
