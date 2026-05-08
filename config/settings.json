@@ -39,7 +39,7 @@
     },
 
     "ollama": {
-      "host": "http://10.10.11.27:11434"
+      "host": "http://localhost:11434"
     },
 
     "anthropic": {
