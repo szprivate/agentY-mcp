@@ -1,13 +1,3 @@
-**agentY** is a ComfyUI AI agent powered by a multi-stage pipeline:
-
-- **Triage** - classifies your request and routes it to the right handler
-- **Planner** - breaks complex multi-step requests into an ordered execution plan
-- **Researcher** - resolves each step into a structured workflow specification
-- **Brain** - assembles, executes, and quality-checks the ComfyUI workflow
-- **QA Checker** - validates output before returning results
-
----
-
 ## What you can do
 
 - **Generate images** - "Generate a cinematic wide-shot of Tokyo neon streets at night"
