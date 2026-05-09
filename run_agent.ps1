@@ -227,6 +227,11 @@ try {
     $env:COMFYUI_MODELS_REFRESHED = "1"  # prevent re-runs in child processes
     Write-Host ""
 
+    # ── Check and install missing custom nodes ───────────────────────────────
+    Write-Host "[run_agent] Checking for missing custom node dependencies..." -ForegroundColor Cyan
+    python scripts/check_missing_custom_nodes.py
+    Write-Host ""
+
     # Build chainlit arguments
     $ChainlitArgs = @("run", "src/chainlit_app.py", "--port", $Port)
     if ($Watch) { $ChainlitArgs += "-w" }

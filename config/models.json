@@ -9,6 +9,8 @@
       "LTX2\\AutoencoderKLLTX2Video.safetensors",
       "LTX2\\ltx-2-19b-dev.safetensors",
       "LTX2\\ltx-2-19b-distilled.safetensors",
+      "LTX2\\ltx-2-3-22b-audio_vae.safetensors",
+      "LTX2\\ltx-2.3-22b-dev.safetensors",
       "LTXV\\ltx-video-2b-v0.9.safetensors",
       "LTXV\\ltxv-13b-0.9.7-dev.safetensors",
       "LTXV\\ltxv-13b-0.9.7-distilled-fp8.safetensors",
@@ -67,6 +69,9 @@
       "LTX2\\ltx-2-19b-lora-camera-control-jib-down.safetensors",
       "LTX2\\ltx-2-19b-lora-camera-control-jib-up.safetensors",
       "LTX2\\ltx-2-19b-lora-camera-control-static.safetensors",
+      "LTX2\\ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "LTX2\\ltx-2.3-22b-ic-lora-hdr-0.9.safetensors",
+      "LTX2\\ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors",
       "MISC\\360DegreeTrackingE25.safetensors",
       "MISC\\360_epoch20.safetensors",
       "MISC\\PanRightToLeft.safetensors",
@@ -179,6 +184,7 @@
       "FLUX2\\flux2_klein_vae.safetensors",
       "HIDREAM\\hidreaam_vae.safetensors",
       "HUNYUAN\\hunyuan_video_vae_bf16.safetensors",
+      "LTX2\\ltx-2-3-22b-VAE.safetensors",
       "QWEN\\qwen_image_vae.safetensors",
       "SD15\\vae-ft-mse-840000-ema-pruned.safetensors",
       "SDXL\\sdxl_vae.safetensors",
@@ -206,6 +212,7 @@
       "LLAMA\\Meta-Llama-3.1-8B-Instruct-FP8.safetensors",
       "LTX2\\gemma_3_12B_it.safetensors",
       "LTX2\\ltx-2-19b-embeddings_connector_dev_bf16.safetensors",
+      "LTX2\\ltx-2-3-22b-text_encoder.safetensors",
       "QWEN\\qwen_2.5_vl_7b_fp8_scaled.safetensors",
       "QWEN\\qwen_2511_text_encoder.safetensors",
       "SDXL\\SDXL_textEncoder.safetensors",
@@ -232,6 +239,8 @@
       "ICLight\\iclight_sd15_fbc.safetensors",
       "ICLight\\iclight_sd15_fc.safetensors",
       "ICLight\\iclight_sd15_fcon.safetensors",
+      "LTX2\\ltx-2-3-22b-dev-model.safetensors",
+      "LTX2\\ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors",
       "MelBandRoformer\\MelBandRoformer_fp16.safetensors",
       "MelBandRoformer\\MelBandRoformer_fp32.safetensors",
       "QWEN\\qwen_image_edit_2509_fp8_e4m3fn.safetensors",
@@ -375,6 +384,7 @@
     "facerestore_models": [
       "GFPGANv1.3.pth",
       "GFPGANv1.4.pth",
+      "GPEN-BFR-512.onnx",
       "codeformer-v0.1.0.pth"
     ],
     "hyperswap": [
@@ -429,8 +439,7 @@
       "sam2_hiera_small.safetensors"
     ],
     "sam3": [
-      "sam3.pt",
-      "sam3.safetensors"
+      "sam3.pt"
     ],
     "sams": [
       "sam_vit_b_01ec64.pth"
@@ -442,54 +451,6 @@
     "wav2vec": [
       "wav2vec2-chinese-base_fp32.safetensors"
     ],
-    "xlabs": [],
-    "ultralytics_bbox": [],
-    "ultralytics_segm": [],
-    "mmdets_bbox": [],
-    "mmdets_segm": [],
-    "mmdets": [],
-    "instantid": [],
-    "pulid": [],
-    "layer_model": [],
-    "rembg": [],
-    "dynamicrafter_models": [],
-    "mediapipe": [],
-    "inpaint": [],
-    "prompt_generator": [],
-    "t5": [],
-    "unet_gguf": [
-      "FLUX1\\flux1-dev-Q8_0.gguf",
-      "FLUXDEVGGUF\\flux1-dev-Q8_0.gguf",
-      "WAN2.1\\Wan2.1-VACE-1.3B-F16.gguf",
-      "WAN2.1\\Wan2.1-VACE-1.3B-Q4_K_M.gguf",
-      "WAN2.1\\Wan2.1-VACE-14B-BF16.gguf",
-      "WAN2.1\\Wan2.1-VACE-14B-Q4_K_M.gguf",
-      "WAN2.1\\Wan2.1_T2V_14B_FusionX_VACE-F16.gguf",
-      "WAN21GGUF\\wan2.1-i2v-14b-480p-Q4_0.gguf",
-      "WAN22GGUF\\Wan2.2-T2V-A14B-LowNoise-Q8_0.gguf",
-      "WAN22GGUF\\wan2.2_i2v_high_noise_14B_Q4_K_M.gguf",
-      "WAN22GGUF\\wan2.2_i2v_low_noise_14B_Q4_K_M.gguf"
-    ],
-    "clip_gguf": [
-      "FLUXDEVGGUF\\t5-v1_1-xxl-encoder-Q8_0.gguf",
-      "t5-v1_1-xxl-encoder-Q8_0.gguf"
-    ],
-    "kjnodes_fonts": [],
-    "intrinsic_loras": [
-      "intrinsic_lora_sd15_albedo.safetensors",
-      "intrinsic_lora_sd15_depth.safetensors",
-      "intrinsic_lora_sd15_normal.safetensors",
-      "intrinsic_lora_sd15_shading.safetensors"
-    ],
-    "rmbg": [
-      "INSPYRENET\\inspyrenet.safetensors",
-      "RMBG-2.0\\model.safetensors"
-    ],
-    "LLM": [],
-    "VHS_video_formats": [],
-    "wav2vec2": [],
-    "nlf": [],
-    "mmaudio": [],
-    "luts": []
+    "xlabs": []
   }
 }
