@@ -102,3 +102,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-06 | update_workflow fails for LoadVideo nodes when using 'video' as input name | Use 'file' as the input_name for LoadVideo. Check get_node_schema to verify correct input keys when encountering validation errors.
 
 2026-05-06 | update_workflow fails when the patch input_name key is incorrect | Use get_node_schema to verify the exact input_name required, such as 'file' instead of 'video'.
+
+2026-05-11 | CLIPLoader fails to recognize models present in the directory | Use the full path including the folder prefix, such as FLUX2\\, as identified in the node schema's dropdown options.
