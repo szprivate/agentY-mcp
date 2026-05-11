@@ -11,18 +11,14 @@
     "qa_checker": "system_prompt.qaChecker.md",
     "vision_agent": "system_prompt.vision_agent.md"
   },
-  "comfyui_workflows_dir": "./comfyui_workflows/",
-  "comfyui_models_dir ": "L:\\software\\comfyui\\Models",
+  "comfyui_models_dir": "L:\\software\\comfyui\\Models",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
   "output_dir": "./output_images/",
   "output_workflows_dir": "./output_workflows/",
-  "input_archive_subdir": "agentIn",
   "comfyui_user_dir": "D:\\ai\\ComfyUI\\user\\default",
   "chainlit_datalayer_dir": "D:\\AI\\agentY\\chainlit-datalayer",
   "message_history_log": "./.logs/message_history.log",
   "tokens_usage_log": "./.logs/tokens_usage.log",
-  "comfyui_poll_interval_s": 1,
-  "comfyui_poll_timeout_s": 1800,
 
   "llm": {
     
