@@ -12,6 +12,7 @@
     "vision_agent": "system_prompt.vision_agent.md"
   },
   "comfyui_workflows_dir": "./comfyui_workflows/",
+  "comfyui_models_dir ": "L:\\software\\comfyui\\Models",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
   "output_dir": "./output_images/",
   "output_workflows_dir": "./output_workflows/",
