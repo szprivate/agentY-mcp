@@ -650,28 +650,8 @@ async def on_message(message: cl.Message) -> None:
             else:
                 _tpl_msg = f" `{_stem}` already present in `config/workflow_templates.json`."
             _idx = _custom_index_path()
-            
-            # ─ Build SKILL.md for the newly registered workflow ──────────────
-            _skill_msg = ""
-            try:
-                await cl.Message(content="⏳ Building SKILL.md (loading LLM, this may take a moment)…", author="system").send()
-                import importlib.util as _ilu
-                import sys as _sys
-                _bs_path = str(_project_root / "scripts" / "build_skill.py")
-                _mod = _sys.modules.get("_agenty_build_skill")
-                if _mod is None:
-                    _spec = _ilu.spec_from_file_location("_agenty_build_skill", _bs_path)
-                    _mod = _ilu.module_from_spec(_spec)
-                    _sys.modules["_agenty_build_skill"] = _mod
-                    _spec.loader.exec_module(_mod)
-                _build_skill = _mod.build_skill_from_workflow
-                _skill_path = _build_skill(str(_wf_path))
-                _skill_rel = Path(_skill_path).relative_to(_project_root)
-                _skill_msg = f" SKILL.md written to `{_skill_rel}`."
-            except Exception as _skill_exc:
-                _skill_msg = f" ⚠️ Skill build failed: {_skill_exc}"
             await cl.Message(
-                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_desc_msg}{_skill_msg}",
+                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_desc_msg}",
                 author="system",
             ).send()
         except Exception as _exc:

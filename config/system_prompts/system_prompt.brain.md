@@ -27,8 +27,6 @@ Call `get_workflow_template(brainbriefing.template.name)` and record the returne
 **Constraints:**
 - You MUST NOT proceed if the template fails to load — report with `task_id` and stop.
 - If the template is `"Kling3_multiShot"`: activate the `kling-multishot` skill and follow its **Brain — Template patching** section. Do NOT continue with steps 1.2 – 1.3 for this template.
-- If the template is a **Nano Banana** variant: activate the `nano-banana` skill.
-- If the template is a **z-Image** variant: activate the `zimage-turbo` skill.
 
 ---
 

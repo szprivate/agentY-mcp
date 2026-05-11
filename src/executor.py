@@ -259,24 +259,24 @@ def _free_vram_for_comfyui() -> None:
 
 
 def _extract_output_files(history: dict) -> list[dict]:
-    """Return a flat list of ``{"filename", "subfolder", "type"}`` dicts from a
-    stripped history response.
+    """Return a flat list of ``{"filename", "subfolder", "type", "node_id"}`` dicts
+    from a stripped history response.
 
     Handles the ``_strip_history`` output format where outputs are nested under
-    ``{prompt_id: {"outputs": {node_id: {"images": [...], "gifs": [...], ...}}}}``.
+    ``{prompt_id: {"outputs": {node_id: {"images": [...], "gifs": [...], ...}}}}`.
     """
     files: list[dict] = []
     for _prompt_id, entry in history.items():
         if not isinstance(entry, dict):
             continue
-        for _node_id, node_out in entry.get("outputs", {}).items():
+        for node_id, node_out in entry.get("outputs", {}).items():
             if not isinstance(node_out, dict):
                 continue
             # ComfyUI may use different keys depending on the output node type
             for key in ("images", "gifs", "videos", "audio"):
                 for item in node_out.get(key, []):
                     if isinstance(item, dict) and "filename" in item:
-                        files.append(item)
+                        files.append({**item, "node_id": str(node_id)})
     return files
 
 
@@ -284,6 +284,7 @@ def _resolve_output_path(
     filename: str,
     subfolder: str = "",
     image_type: str = "output",
+    fallback_dir: "Path | None" = None,
 ) -> Path:
     """Return the authoritative on-disk path for a ComfyUI output file.
 
@@ -292,8 +293,9 @@ def _resolve_output_path(
     1. ComfyUI's configured ``--output-directory`` (queried via ``/system_stats``).
        If the file exists there it is returned as-is so that ``collected_paths``
        always reflects the real server location.
-    2. Falls back to downloading via ``/view`` into the agent's ``output_dir``
-       (from settings.json) when ComfyUI is remote or the file is not on disk.
+    2. Falls back to downloading via ``/view`` into *fallback_dir* when supplied
+       (taken from ``output_nodes[].output_path`` in the brainbriefing), or into
+       the agent's ``output_dir`` (from settings.json) as a last resort.
 
     This means ``OUTPUT_PATHS`` in the compressed summary are always real,
     accessible paths that the next session's Researcher can pass directly to
@@ -313,7 +315,8 @@ def _resolve_output_path(
     # --- fallback: download via /view to local output_dir ---------------------
     from src.utils.comfyui_client import get_client
 
-    fallback_dir = _output_dir()
+    if fallback_dir is None:
+        fallback_dir = _output_dir()
     fallback_dir.mkdir(parents=True, exist_ok=True)
     dest = fallback_dir / filename
 
@@ -496,6 +499,24 @@ async def _process_completed_job(
         logger.warning("executor: no output files in history for prompt_id=%s", prompt_id)
         return
 
+    # Build a node_id → fallback_dir map from the brainbriefing output_nodes so
+    # that downloaded outputs land in the task-specific directory the Researcher
+    # chose, rather than the generic agent output_dir.
+    _bb_output_dirs: dict[str, Path] = {}
+    try:
+        for on in brainbriefing.get("output_nodes", []):
+            if not isinstance(on, dict):
+                continue
+            nid = str(on.get("node_id", ""))
+            op = on.get("output_path", "")
+            if nid and op:
+                p = Path(op)
+                if not p.is_absolute():
+                    p = _output_dir() / p
+                _bb_output_dirs[nid] = p
+    except Exception as exc:
+        logger.debug("executor: could not parse output_nodes from brainbriefing — %s", exc)
+
     # Resolve each output file's authoritative on-disk path (no copying).
     # Each path is appended to ``collected_paths`` immediately so the caller
     # (chainlit) can flush the image to the UI as soon as the "💾 Output:" line
@@ -505,10 +526,12 @@ async def _process_completed_job(
         filename = item.get("filename", "")
         subfolder = item.get("subfolder", "")
         file_type = item.get("type", "output")
+        node_id = item.get("node_id", "")
         if not filename:
             continue
+        fallback_dir = _bb_output_dirs.get(node_id)
         try:
-            output_path = _resolve_output_path(filename, subfolder, file_type)
+            output_path = _resolve_output_path(filename, subfolder, file_type, fallback_dir=fallback_dir)
             saved_paths.append(output_path)
             if collected_paths is not None:
                 collected_paths.append(str(output_path))
