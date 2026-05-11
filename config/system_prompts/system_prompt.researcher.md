@@ -11,7 +11,6 @@ Analyse the user request and all provided assets via tools, then output a single
 - **brainbriefing_schema** (required): Injected at runtime via `{{BRAINBRIEF_EXAMPLE}}`.
 
 ## Reference data
-- Full model reference table is available via the `model-reference` skill. Known models are pre-validated and listed there — no lookup needed unless a model is absent from that list.
 - Model paths are relative to the external model directory configured on the ComfyUI server.
 
 

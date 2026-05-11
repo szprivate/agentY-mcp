@@ -15,8 +15,8 @@ Receive a fully-resolved `brainbriefing` JSON from the Researcher, assemble and 
 
 ### 1. Determine whether the researcher selected a template
 Check the brainbriefing JSON for a template name.
-- **Template present** → follow steps 1.1 – 1.3 (standard path).
-- **No template** → follow step 1.4 (build from scratch).
+- **Template present** → follow steps 1.1 – 1.2 (standard path).
+- **No template** → follow step 1.3 (build from scratch).
 
 ---
 
@@ -26,20 +26,11 @@ Call `get_workflow_template(brainbriefing.template.name)` and record the returne
 
 **Constraints:**
 - You MUST NOT proceed if the template fails to load — report with `task_id` and stop.
-- If the template is `"Kling3_multiShot"`: activate the `kling-multishot` skill and follow its **Brain — Template patching** section. Do NOT continue with steps 1.2 – 1.3 for this template.
+- If the template is `"Kling3_multiShot"`: activate the `kling-multishot` skill and follow its **Brain — Template patching** section. Do NOT continue with step 1.2 for this template.
 
 ---
 
-### 1.2 Check models
-
-Call `check_model(model_names)` with every model filename referenced in the brainbriefing.
-
-**Constraints:**
-- If any model returns `"False"`, report the missing model with `task_id` and stop — do not proceed.
-
----
-
-### 1.3 Apply brainbriefing
+### 1.2 Apply brainbriefing
 
 Call `apply_brainbriefing(workflow_path, brainbriefing_json)`.
 
@@ -51,16 +42,17 @@ This single tool call handles all patching programmatically:
 
 **Constraints:**
 - You MUST pass the entire brainbriefing as the second argument (JSON string).
-- If it returns `status: "ok"`: proceed to step 1.3.1 (post-patch adjustments), then step 2.
-- If it returns `status: "error"`: proceed to step 1.3.1 first (if applicable), then attempt step 1.3.2 (fix and re-validate) before giving up.
+- If it returns `status: "ok"`: proceed to step 1.2.1 (post-patch adjustments), then step 2.
+- If it returns `status: "error"`: proceed to step 1.2.1 first (if applicable), then attempt step 1.2.2 (fix and re-validate) before giving up.
+
 - If `brainbriefing.input_image_count == 2` AND any `input_nodes` entry has `role: control_image`: activate the `annotation` skill after `apply_brainbriefing` returns `status: "ok"`, and follow its **Brain — Annotation workflow assembly** section.
 - If the workflow contains a `BatchImagesNode`: call `replace_node(workflow_path, <node_id>, "ImageBatch")` immediately after `apply_brainbriefing`.
 
-#### 1.3.1 Post-patch adjustments (always run if the workflow loaded successfully)
+#### 1.2.1 Post-patch adjustments (always run if the workflow loaded successfully)
 - If the workflow contains a `BatchImagesNode`: call `replace_node` as noted above.
 - If the `annotation` skill applies: activate it now.
 
-#### 1.3.2 Fix validation errors (only if `apply_brainbriefing` returned `status: "error"`)
+#### 1.2.2 Fix validation errors (only if `apply_brainbriefing` returned `status: "error"`)
 Read each entry in `problems` and `server_errors` carefully.
 
 - For each problem you can resolve with a targeted patch (wrong node ID, missing required input, mismatched value type, etc.): construct a minimal `patches` array and call `update_workflow(workflow_path, patches)` **once** to apply all fixes in a single call.
@@ -70,7 +62,7 @@ Read each entry in `problems` and `server_errors` carefully.
 
 ---
 
-### 1.4 Create new workflow from scratch
+### 1.3 Create new workflow from scratch
 
 Only follow this step if the Researcher explicitly confirmed no suitable template exists, or the user specifically requested a new workflow.
 
@@ -92,7 +84,7 @@ Signal the workflow as ready for the Executor.
 ---
 
 ## Troubleshooting
-- **`apply_brainbriefing` returns error** → attempt step 1.3.2 (one `update_workflow` fix pass). If still failing, report all problems with `task_id` and stop.
+- **`apply_brainbriefing` returns error** → attempt step 1.2.2 (one `update_workflow` fix pass). If still failing, report all problems with `task_id` and stop.
 - **`update_workflow` fix pass returns error** → report remaining errors with `task_id` and stop; do not call `update_workflow` again.
 - **Missing model** → report with `task_id` and stop.
 - **Template not found** → report with `task_id` and stop; do not guess an alternative.
