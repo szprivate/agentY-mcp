@@ -1538,6 +1538,247 @@ def update_workflow(
 
 
 @tool
+def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
+    """Apply a brainbriefing to a loaded workflow template in one atomic step.
+
+    Performs all standard template patching programmatically without requiring
+    the agent to construct individual patch objects:
+
+    1. Replaces filenames in input nodes  (brainbriefing ``input_nodes``).
+    2. Replaces positive / negative prompts (brainbriefing ``prompt`` +
+       ``positive_prompt_node_id``).
+    3. Updates output node ``filename_prefix`` values (brainbriefing
+       ``output_nodes``).
+    4. Sets resolution width / height where literal inputs exist (brainbriefing
+       ``resolution_width`` / ``resolution_height``).
+    5. Validates the result locally and via the ComfyUI server.
+
+    Returns ``status: "ok"`` with the saved ``workflow_path`` on success, or
+    ``status: "error"`` with a ``problems`` list describing every issue found.
+
+    Args:
+        workflow_path: File path to the workflow JSON (from
+            ``get_workflow_template``).
+        brainbriefing_json: The full brainbriefing JSON string (or dict).
+    """
+    # ── Load workflow ─────────────────────────────────────────────────────────
+    try:
+        workflow = _load_workflow(workflow_path)
+    except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
+        return json.dumps({"status": "error", "problems": [f"Cannot load workflow: {e}"]})
+
+    # ── Parse brainbriefing ───────────────────────────────────────────────────
+    try:
+        bb = json.loads(brainbriefing_json) if isinstance(brainbriefing_json, str) else brainbriefing_json
+    except json.JSONDecodeError as e:
+        return json.dumps({"status": "error", "problems": [f"Invalid brainbriefing JSON: {e}"]})
+
+    applied: list[str] = []
+    problems: list[str] = []
+
+    # ── 1. Input nodes: replace filenames ─────────────────────────────────────
+    for inp in bb.get("input_nodes", []):
+        nid = str(inp.get("node_id", ""))
+        filename = inp.get("filename") or inp.get("path", "")
+        slot = inp.get("slot", "image")
+        if not nid:
+            problems.append("input_nodes entry missing node_id")
+            continue
+        if nid not in workflow:
+            problems.append(f"input_nodes: node '{nid}' not found in workflow")
+            continue
+        if not filename:
+            problems.append(f"input_nodes: node '{nid}' has no filename/path")
+            continue
+        node = workflow[nid]
+        if "inputs" not in node:
+            node["inputs"] = {}
+        node["inputs"][slot] = filename
+        applied.append(f"Node {nid}.inputs.{slot} → {filename!r}")
+
+    # ── 2. Prompts ────────────────────────────────────────────────────────────
+    prompt_block = bb.get("prompt", {})
+    positive_text = prompt_block.get("positive", "")
+    negative_text = prompt_block.get("negative", "")
+
+    # Positive prompt
+    pos_nid = str(bb.get("positive_prompt_node_id", ""))
+    if positive_text and pos_nid:
+        if pos_nid not in workflow:
+            problems.append(f"positive_prompt_node_id '{pos_nid}' not found in workflow")
+        else:
+            node = workflow[pos_nid]
+            if "inputs" not in node:
+                node["inputs"] = {}
+            node["inputs"]["text"] = positive_text
+            applied.append(f"Node {pos_nid}.inputs.text → (positive prompt, {len(positive_text)} chars)")
+
+    # Negative prompt: find a node with "negative" in its title that has a text input
+    if negative_text:
+        neg_nid: str | None = None
+        for nid, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+            title = (node.get("_meta") or {}).get("title", "").lower()
+            cls = node.get("class_type", "").lower()
+            # Match nodes that look like text-conditioning nodes with "negative" in title
+            if "negative" in title and (
+                "clip" in cls or "text" in cls or "prompt" in cls or "condition" in cls
+            ):
+                neg_nid = nid
+                break
+        if neg_nid:
+            node = workflow[neg_nid]
+            if "inputs" not in node:
+                node["inputs"] = {}
+            node["inputs"]["text"] = negative_text
+            applied.append(f"Node {neg_nid}.inputs.text → (negative prompt, {len(negative_text)} chars)")
+        else:
+            # Non-fatal: many modern pipelines have no negative prompt node
+            applied.append("negative prompt: no matching node found (skipped)")
+
+    # ── 3. Output nodes: update filename_prefix ───────────────────────────────
+    for out in bb.get("output_nodes", []):
+        nid = str(out.get("node_id", ""))
+        output_path = out.get("output_path", "")
+        if not nid:
+            problems.append("output_nodes entry missing node_id")
+            continue
+        if nid not in workflow:
+            problems.append(f"output_nodes: node '{nid}' not found in workflow")
+            continue
+        if not output_path:
+            continue
+        # Use the output_path string directly as filename_prefix so ComfyUI
+        # saves into the right subfolder (e.g. "./agentOut/image_generation").
+        node = workflow[nid]
+        if "inputs" not in node:
+            node["inputs"] = {}
+        node["inputs"]["filename_prefix"] = output_path
+        applied.append(f"Node {nid}.inputs.filename_prefix → {output_path!r}")
+
+    # ── 4. Resolution ─────────────────────────────────────────────────────────
+    res_w = bb.get("resolution_width")
+    res_h = bb.get("resolution_height")
+    if res_w or res_h:
+        for nid, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+            inputs = node.get("inputs", {})
+            changed = False
+            if res_w and "width" in inputs and not isinstance(inputs["width"], list):
+                inputs["width"] = int(res_w)
+                changed = True
+            if res_h and "height" in inputs and not isinstance(inputs["height"], list):
+                inputs["height"] = int(res_h)
+                changed = True
+            if changed:
+                applied.append(
+                    f"Node {nid}: resolution → {res_w or '(unchanged)'}×{res_h or '(unchanged)'}"
+                )
+
+    # ── 5. ModelSamplingFlux: auto-inject required inputs ─────────────────────
+    # This node fails ComfyUI validation if any of the four inputs are missing.
+    # Defaults match the flux-sampling skill; width/height come from brainbriefing.
+    _MSF_DEFAULTS = {"max_shift": 1.15, "base_shift": 0.5, "width": 1024, "height": 1024}
+    for nid, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        if node.get("class_type") != "ModelSamplingFlux":
+            continue
+        if "inputs" not in node:
+            node["inputs"] = {}
+        msf_inputs = node["inputs"]
+        injected: list[str] = []
+        for key, default in _MSF_DEFAULTS.items():
+            if key not in msf_inputs or isinstance(msf_inputs[key], list):
+                # Use brainbriefing resolution if available, otherwise default
+                if key == "width" and res_w:
+                    msf_inputs[key] = int(res_w)
+                elif key == "height" and res_h:
+                    msf_inputs[key] = int(res_h)
+                else:
+                    msf_inputs[key] = default
+                injected.append(key)
+        if injected:
+            applied.append(f"Node {nid} (ModelSamplingFlux): auto-injected {injected}")
+
+    # ── Save ──────────────────────────────────────────────────────────────────
+    path = _save_workflow(workflow, name=Path(workflow_path).stem)
+
+    # ── Validate ──────────────────────────────────────────────────────────────
+    local_errors: list[str] = []
+    server_errors: dict = {}
+
+    try:
+        all_nodes = _get_object_info()
+    except Exception:
+        all_nodes = {}
+
+    node_ids = set(workflow.keys())
+
+    for nid, node in workflow.items():
+        cls = node.get("class_type", "")
+        if not cls:
+            local_errors.append(f"Node {nid}: missing 'class_type'.")
+            continue
+        if all_nodes and cls not in all_nodes:
+            local_errors.append(f"Node {nid}: unknown class_type '{cls}'.")
+            continue
+        node_info = all_nodes.get(cls, {})
+        required = node_info.get("input", {}).get("required", {})
+        node_inputs = node.get("inputs", {})
+        for req_name in required:
+            if req_name not in node_inputs:
+                local_errors.append(f"Node {nid} ({cls}): missing required input '{req_name}'.")
+        for inp_name, inp_val in node_inputs.items():
+            if isinstance(inp_val, list) and len(inp_val) == 2:
+                src_id = str(inp_val[0])
+                if src_id not in node_ids:
+                    local_errors.append(
+                        f"Node {nid} ({cls}): input '{inp_name}' references "
+                        f"non-existent node '{src_id}'."
+                    )
+
+    try:
+        result = get_client().post("/prompt", json_data={"prompt": workflow})
+        if isinstance(result, dict):
+            if "error" in result:
+                server_errors = {
+                    "error": result.get("error"),
+                    "node_errors": result.get("node_errors", {}),
+                }
+            elif "prompt_id" in result:
+                try:
+                    get_client().post("/interrupt", json_data={})
+                    get_client().post("/queue", json_data={"clear": True})
+                except Exception:
+                    pass
+    except Exception as e:
+        err_str = str(e)
+        if hasattr(e, "response"):
+            try:
+                server_errors = e.response.json()
+            except Exception:
+                server_errors = {"error": err_str}
+        else:
+            server_errors = {"error": err_str}
+
+    all_problems = problems + local_errors
+    is_valid = len(all_problems) == 0 and len(server_errors) == 0
+
+    return json.dumps({
+        "status": "ok" if is_valid else "error",
+        "workflow_path": path,
+        "applied": applied,
+        "problems": all_problems,
+        "valid": is_valid,
+        "local_errors": local_errors,
+        "server_errors": server_errors,
+    })
+
+
+@tool
 def replace_node(workflow_path: str, old_node_id: str, new_class_type: str, new_node_id: str = "", meta_title: str = "") -> str:
     """Replace a node with a different class_type while preserving all connections.
 

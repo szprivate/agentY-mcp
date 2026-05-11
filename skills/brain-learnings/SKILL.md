@@ -104,3 +104,10 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-06 | update_workflow fails when the patch input_name key is incorrect | Use get_node_schema to verify the exact input_name required, such as 'file' instead of 'video'.
 
 2026-05-11 | CLIPLoader fails to recognize models present in the directory | Use the full path including the folder prefix, such as FLUX2\\, as identified in the node schema's dropdown options.
+
+2026-05-11 | apply_brainbriefing fails when positive_prompt_node_id is null | Identify the prompt node using get_workflow_node_info and apply the prompt via update_workflow.
+
+2026-05-11 | applying brainbriefing to certain templates causes disconnected inpainting nodes | Use update_workflow to manually patch missing inputs for pixels, vae, and conditioning.
+2026-05-11 | CLIPLoader fails when the model name lacks the subdirectory prefix | Use get_node_schema for the CLIPLoader node to find the correct path string.
+
+2026-05-11 | apply_brainbriefing fails for VAE/CLIP nodes if model names lack folder prefixes | Use the complete path including the directory prefix (e.g., FLUX1\\ae.safetensors) as found in the node schema.

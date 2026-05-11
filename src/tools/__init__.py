@@ -38,6 +38,8 @@ from src.tools.comfyui import (  # noqa: F401
     add_workflow_node,
     remove_workflow_node,
     update_workflow,
+    replace_node,
+    apply_brainbriefing,
     # Workflow validation
     validate_workflow,
     # Public helpers
@@ -152,7 +154,9 @@ BRAIN_TOOLS: list = [
     get_image_resolution,
     # Workflow assembly, modification & validation
     get_workflow_template,
+    apply_brainbriefing,
     update_workflow,
+    replace_node,
     save_workflow,
     search_nodes,
     check_model,

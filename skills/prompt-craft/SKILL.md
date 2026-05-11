@@ -136,7 +136,7 @@ Label shots explicitly: `Shot 1: … Shot 2: …` up to 6 shots per generation.
 
 ---
 
-### Qwen Image Edit (2511 / fp8)
+### Qwen Image Edit (2511 / fp8) / Flux Klein Image Edit
 This model takes an **instruction** rather than a descriptive prompt. It uses dual encoding (Qwen2.5-VL semantic + VAE appearance), so it understands both high-level meaning and low-level pixel appearance.
 
 **Instruction patterns that work:**

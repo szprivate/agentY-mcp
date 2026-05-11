@@ -296,7 +296,8 @@
       "WAN22\\wan2.2_t2v_low_noise_14B_fp16.safetensors",
       "WAN22\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
       "flux-2-klein-9b-fp8.safetensors",
-      "lotusDepth\\lotus-depth-d-v1-1.safetensors"
+      "lotusDepth\\lotus-depth-d-v1-1.safetensors",
+      "z_image_turbo_bf16.safetensors"
     ],
     "clip_vision": [
       "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
@@ -354,7 +355,8 @@
     "classifiers": [],
     "model_patches": [
       "Wan2_1-InfiniTetalk-Single_fp16.safetensors",
-      "Wan2_1-InfiniteTalk-Multi_fp16.safetensors"
+      "Wan2_1-InfiniteTalk-Multi_fp16.safetensors",
+      "Z-Image-Turbo-Fun-Controlnet-Union.safetensors"
     ],
     "audio_encoders": [
       "wav2vec2-chinese-base_fp16.safetensors",
