@@ -1746,11 +1746,11 @@ class Pipeline:
         if not messages:
             return
 
-        # ── Self-learning check (fire-and-forget background thread) ─────────
+        # ── Self-learning check — started AFTER summarisation to avoid ────────
+        # competing for the same Ollama model concurrently.
         tool_call_count = count_tool_calls(messages)
         if self._verbose:
             print(f"pipeline: Brain used {tool_call_count} tool call(s) in this session.")
-        maybe_run_learnings(messages, session_id=self._session.session_id)
 
         if self._verbose:
             msg_count = len(messages)
@@ -1770,6 +1770,9 @@ class Pipeline:
             # Sanitize to avoid orphaned toolResult blocks at the start.
             self._brain.messages[:] = self._sanitize_messages(messages[-4:])
             return
+
+        # ── Fire learnings now that summarisation is done ────────────────────
+        maybe_run_learnings(messages, session_id=self._session.session_id)
 
         if not summary:
             if self._verbose:

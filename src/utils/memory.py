@@ -184,7 +184,7 @@ def memory_search(query: str, session_id: str = "default", limit: int = 5) -> li
         return []
     try:
         client = mem0_client()
-        results = client.search(query, user_id=session_id, limit=limit)
+        results = client.search(query, filters={"user_id": session_id}, limit=limit)
         # mem0 may return a dict {"results": [...]} or a plain list
         if isinstance(results, dict):
             return results.get("results", [])

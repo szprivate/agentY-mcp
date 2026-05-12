@@ -296,6 +296,7 @@
       "WAN22\\wan2.2_t2v_low_noise_14B_fp16.safetensors",
       "WAN22\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
       "flux-2-klein-9b-fp8.safetensors",
+      "flux-2-klein-base-4b.safetensors",
       "lotusDepth\\lotus-depth-d-v1-1.safetensors",
       "z_image_turbo_bf16.safetensors"
     ],

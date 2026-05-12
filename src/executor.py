@@ -521,6 +521,13 @@ async def _process_completed_job(
     # Each path is appended to ``collected_paths`` immediately so the caller
     # (chainlit) can flush the image to the UI as soon as the "💾 Output:" line
     # is yielded, instead of waiting for the whole batch to finish.
+    #
+    # Primary resolution (no network call): because apply_brainbriefing sets
+    # filename_prefix = output_path (e.g. "W:/.../output/image_generation"),
+    # ComfyUI saves files as output_path + "_00001_.png", i.e. at
+    # Path(output_path).parent / filename.  We check that location first and
+    # only fall back to _resolve_output_path (which hits /system_stats) when
+    # the file is not found there.
     saved_paths: list[Path] = []
     for item in output_files:
         filename = item.get("filename", "")
@@ -531,11 +538,23 @@ async def _process_completed_job(
             continue
         fallback_dir = _bb_output_dirs.get(node_id)
         try:
-            output_path = _resolve_output_path(filename, subfolder, file_type, fallback_dir=fallback_dir)
-            saved_paths.append(output_path)
+            resolved: Path | None = None
+            # Primary: derive path directly from the brainbriefing output_path.
+            if fallback_dir is not None:
+                bb_candidate = fallback_dir.parent / filename
+                if bb_candidate.exists():
+                    logger.info(
+                        "executor: output at brainbriefing path %s (%d bytes)",
+                        bb_candidate, bb_candidate.stat().st_size,
+                    )
+                    resolved = bb_candidate
+            # Fallback: query ComfyUI /system_stats or download via /view.
+            if resolved is None:
+                resolved = _resolve_output_path(filename, subfolder, file_type, fallback_dir=fallback_dir)
+            saved_paths.append(resolved)
             if collected_paths is not None:
-                collected_paths.append(str(output_path))
-            yield f"{pfx}💾 Output: `{output_path}`"
+                collected_paths.append(str(resolved))
+            yield f"{pfx}💾 Output: `{resolved}`"
         except Exception as exc:
             yield f"{pfx}⚠️ Could not resolve `{filename}`: {exc}"
             logger.warning("executor: resolve failed for %s — %s", filename, exc)
@@ -559,9 +578,16 @@ async def _process_completed_job(
             if "FAIL" in verdict.upper():
                 qa_failures.append({"path": str(path), "verdict": verdict})
 
-    # Copy the finished workflow to the ComfyUI user directory for easy reuse.
+    # Copy the finished workflow to the ComfyUI user directory — run in a
+    # background thread so a slow UNC/network share doesn't stall the pipeline.
     if workflow_path:
-        _copy_workflow_to_user_dir(workflow_path)
+        import threading as _threading
+        _threading.Thread(
+            target=_copy_workflow_to_user_dir,
+            args=(workflow_path,),
+            daemon=True,
+            name="copy-workflow-to-user-dir",
+        ).start()
 
     if qa_failures:
         # Signal the pipeline layer to pause and ask the user.
@@ -634,14 +660,18 @@ async def execute_workflow(
     node_titles = _load_node_titles(workflow_path)
     history: dict | None = None
     error_result: dict | None = None
-    async for event in stream_comfyui_job(prompt_id, client_id, node_titles=node_titles):
-        if isinstance(event, dict):
-            if "history" in event:
-                history = event["history"]
-            else:
-                error_result = event
-            break
-        yield event
+    _gen = stream_comfyui_job(prompt_id, client_id, node_titles=node_titles)
+    try:
+        async for event in _gen:
+            if isinstance(event, dict):
+                if "history" in event:
+                    history = event["history"]
+                else:
+                    error_result = event
+                break
+            yield event
+    finally:
+        await _gen.aclose()
 
     if error_result is not None:
         error_msg = f"❌ ComfyUI execution error: {error_result.get('error')}"
@@ -744,14 +774,18 @@ async def execute_workflows_batch(
         history: dict | None = None
         error_result: dict | None = None
         _node_titles = _load_node_titles(_wf_path)
-        async for event in stream_comfyui_job(prompt_id, cid, node_titles=_node_titles):
-            if isinstance(event, dict):
-                if "history" in event:
-                    history = event["history"]
-                else:
-                    error_result = event
-                break
-            yield f"{label}{event}"
+        _gen = stream_comfyui_job(prompt_id, cid, node_titles=_node_titles)
+        try:
+            async for event in _gen:
+                if isinstance(event, dict):
+                    if "history" in event:
+                        history = event["history"]
+                    else:
+                        error_result = event
+                    break
+                yield f"{label}{event}"
+        finally:
+            await _gen.aclose()
 
         if error_result is not None:
             error_msg = f"{label}❌ ComfyUI execution error: {error_result.get('error')}"

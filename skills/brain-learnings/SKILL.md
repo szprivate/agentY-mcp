@@ -26,3 +26,6 @@ If a matching entry exists, **apply the documented solution directly** instead o
 
 <!-- The learnings agent automatically appends new entries below this line. -->
 <!-- Format: date | problem summary | solution (1–2 sentences) -->
+2026-05-12 | CLIPLoader validation fails with incorrect clip_name or missing type | Use get_node_schema to identify the exact clip_name string and the required type value.
+
+2026-05-12 | CLIPLoader validation fails when clip_name lacks subfolder prefix | Use the full path including the subfolder prefix, such as FLUX2\\, to match the server's expected model name list.
