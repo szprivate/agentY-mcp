@@ -11,6 +11,8 @@ Consolidates all image-related @tool functions:
 import io
 import json
 import os
+import re
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional
 
@@ -163,7 +165,7 @@ def _downsize(data: bytes, img_fmt: str) -> tuple[bytes, str]:
 @tool
 def upload_image(
     file_path: str,
-    subfolder: str = "",
+    subfolder: str = "agent",
     image_type: str = "input",
     overwrite: bool = False,
 ) -> dict:
@@ -171,7 +173,10 @@ def upload_image(
 
     Args:
         file_path: Local path to the image file.
-        subfolder: Optional subfolder inside the target directory.
+        subfolder: Subfolder inside the target directory. Defaults to ``agent``
+                   so agent-staged inputs are grouped under ``input/agent/``
+                   instead of cluttering the input root. ``apply_brainbriefing``
+                   qualifies bare LoadImage references with this same subfolder.
         image_type: 'input', 'output', or 'temp' (default 'input').
         overwrite: Overwrite existing file with the same name.
     """
@@ -188,6 +193,121 @@ def upload_image(
             return json.dumps(get_client().post("/upload/image", data=data, files=files))
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+@tool
+def download_image(image_url: str, subfolder: str = "agent/references", downsize: bool = True) -> str:
+    """Download a web image straight into ComfyUI's input folder so a workflow can load it.
+
+    Use this right after ``web_search_images`` to fetch a reference image you
+    found (pass the result's ``image_url``).  The image is uploaded into ComfyUI's
+    input directory under ``agent/references`` and can then be referenced directly
+    by a ``LoadImage`` node using the returned ``name`` and ``subfolder`` — no
+    separate ``upload_image`` call is needed.
+
+    A browser User-Agent is sent so hosts that block hot-linking still serve the
+    file.
+
+    Args:
+        image_url: Direct http/https URL of the image (the ``image_url`` field
+                   returned by ``web_search_images``).
+        subfolder: Input-dir subfolder to store the image in. Defaults to
+                   ``agent/references``.
+        downsize:  When True (default), oversized images are downscaled to the
+                   pipeline's 5 MB / 1568 px limit so they stay usable everywhere
+                   (matches how user-uploaded images are handled).  Set False to
+                   keep the original full-resolution file.
+
+    Returns:
+        JSON ``{"name", "subfolder", "type", "saved_to", "width", "height",
+        "size_bytes", "source_url"}`` on success, or ``{"error": "<message>"}``.
+        ``name`` + ``subfolder`` are what a ``LoadImage`` node references;
+        ``saved_to`` is the resolved on-disk path (for ``analyze_image`` etc.).
+    """
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            ),
+            "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+        }
+        resp = requests.get(image_url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        data = resp.content
+        mime = resp.headers.get("content-type", "")
+
+        # Resolve image format from content-type / URL extension, then magic bytes.
+        img_fmt = _detect_format(image_url.split("?")[0], mime)
+        if img_fmt is None:
+            if data[:4] == b"\x89PNG":
+                img_fmt = "png"
+            elif data[:3] == b"\xff\xd8\xff":
+                img_fmt = "jpeg"
+            elif data[:6] in (b"GIF87a", b"GIF89a"):
+                img_fmt = "gif"
+            elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+                img_fmt = "webp"
+        if img_fmt is None:
+            return json.dumps(
+                {"error": f"URL did not return a recognised image (content-type={mime!r})."}
+            )
+
+        # Optionally normalise to the pipeline's size/edge limits. _downsize only
+        # targets png/jpeg; gif/webp are uploaded as-is.
+        ext = img_fmt
+        if downsize and img_fmt in ("png", "jpeg"):
+            try:
+                data, ext = _downsize(data, img_fmt)
+            except Exception:
+                ext = img_fmt  # keep original bytes if downsizing fails
+
+        suffix = "jpg" if ext == "jpeg" else ext
+        base = image_url.split("?")[0].rstrip("/").rsplit("/", 1)[-1]
+        stem = re.sub(r"[^A-Za-z0-9._-]", "_", Path(base).stem)[:48] or "reference"
+        filename = f"{stem}_{uuid.uuid4().hex[:8]}.{suffix}"
+
+        # Upload into ComfyUI's input dir via the API (filesystem-agnostic; works
+        # whether ComfyUI is local or remote).  ComfyUI creates the subfolder and
+        # returns the authoritative {name, subfolder, type}.
+        files = {"image": (filename, io.BytesIO(data), f"image/{ext}")}
+        form: dict = {"type": "input", "overwrite": "false"}
+        if subfolder:
+            form["subfolder"] = subfolder
+        up = get_client().post("/upload/image", data=form, files=files)
+        if not isinstance(up, dict) or "name" not in up:
+            return json.dumps({"error": f"Unexpected /upload/image response: {up!r}"})
+
+        # Best-effort resolve the on-disk path for analyze_image/get_image_resolution.
+        saved_to = ""
+        try:
+            from src.tools.comfyui import get_comfyui_dirs  # lazy: avoid import cycle
+            input_dir = json.loads(get_comfyui_dirs()).get("input_dir", "")
+            if input_dir and input_dir != "unknown":
+                saved_to = str(Path(input_dir) / up.get("subfolder", "") / up["name"])
+        except Exception:
+            pass
+
+        try:
+            with Image.open(io.BytesIO(data)) as im:
+                width, height = im.size
+        except Exception:
+            width = height = None
+
+        return json.dumps(
+            {
+                "name": up.get("name"),
+                "subfolder": up.get("subfolder", subfolder),
+                "type": up.get("type", "input"),
+                "saved_to": saved_to,
+                "width": width,
+                "height": height,
+                "size_bytes": len(data),
+                "source_url": image_url,
+            }
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @tool

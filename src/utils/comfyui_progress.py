@@ -33,8 +33,27 @@ def _bar(value: int, max_value: int, width: int = 20) -> str:
     return f"[{'█' * filled}{'░' * (width - filled)}] {value}/{max_value} ({pct}%)"
 
 
+def _has_outputs(entry) -> bool:
+    """True if a /history entry has at least one saved output file."""
+    if not isinstance(entry, dict):
+        return False
+    for node_out in (entry.get("outputs") or {}).values():
+        if isinstance(node_out, dict) and any(
+            node_out.get(k) for k in ("images", "gifs", "videos", "audio")
+        ):
+            return True
+    return False
+
+
 def _check_history(client, prompt_id: str):
-    """Inline check of /history/{prompt_id}.  Returns terminal dict or None."""
+    """Inline check of /history/{prompt_id}.  Returns terminal dict or None.
+
+    A ``completed`` status is only treated as terminal once the prompt's output
+    files have actually been written into ``/history`` — ComfyUI marks the job
+    completed a moment before the outputs land, so returning early here would
+    yield a history with empty ``outputs`` ("no output files found").  Returning
+    None keeps the caller polling until the outputs appear.
+    """
     from src.tools.comfyui import _strip_history
 
     try:
@@ -46,11 +65,45 @@ def _check_history(client, prompt_id: str):
         return None
     entry = raw[prompt_id]
     status_info = entry.get("status", {})
-    if status_info.get("completed"):
-        return {"history": _strip_history(raw)}
     if status_info.get("status_str") == "error":
         return {"error": "ComfyUI job failed", "details": _strip_history(raw)}
+    if status_info.get("completed") and _has_outputs(entry):
+        return {"history": _strip_history(raw)}
     return None
+
+
+async def _fetch_history_with_outputs(client, prompt_id: str, *, attempts: int = 10, delay: float = 0.4):
+    """Fetch /history for a finished prompt, retrying until its outputs appear.
+
+    ComfyUI emits ``execution_success`` a beat before the prompt's output files
+    are written into ``/history``; a single immediate fetch then returns an entry
+    with empty ``outputs`` — the intermittent "no output files found" bug.  Retry
+    a handful of times (cheap, no LLM tokens) until outputs are present, then
+    return the stripped history.  Falls back to whatever was last fetched after
+    the final attempt so a genuinely output-less workflow still terminates.
+    """
+    from src.tools.comfyui import _strip_history
+
+    raw = None
+    for attempt in range(1, attempts + 1):
+        try:
+            raw = client.get(f"/history/{prompt_id}")
+        except Exception as exc:
+            logger.debug("history fetch failed (attempt %d/%d): %s", attempt, attempts, exc)
+            raw = None
+        if isinstance(raw, dict) and _has_outputs(raw.get(prompt_id, {})):
+            if attempt > 1:
+                logger.info(
+                    "executor: outputs appeared in /history after %d attempt(s)", attempt
+                )
+            return _strip_history(raw)
+        if attempt < attempts:
+            await asyncio.sleep(delay)
+    logger.warning(
+        "executor: /history for %s still has no outputs after %d attempts (%.1fs)",
+        prompt_id, attempts, attempts * delay,
+    )
+    return _strip_history(raw) if isinstance(raw, dict) else {}
 
 
 async def stream_comfyui_job(
@@ -189,14 +242,9 @@ async def stream_comfyui_job(
                             last_emit_loop_t = loop_t
 
                 elif msg_type == "execution_success":
-                    raw_hist = None
-                    try:
-                        raw_hist = client.get(f"/history/{prompt_id}")
-                    except Exception as exc:
-                        yield {"error": f"Could not fetch history: {exc}"}
-                        return
-                    from src.tools.comfyui import _strip_history
-                    yield {"history": _strip_history(raw_hist)}
+                    # Outputs can lag this event by a moment — retry /history
+                    # until they appear instead of fetching once.
+                    yield {"history": await _fetch_history_with_outputs(client, prompt_id)}
                     return
 
                 elif msg_type == "execution_error":

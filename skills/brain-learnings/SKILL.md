@@ -31,3 +31,6 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-12 | CLIPLoader validation fails when clip_name lacks subfolder prefix | Use the full path including the subfolder prefix, such as FLUX2\\, to match the server's expected model name list.
 
 2026-06-07 | update_workflow fails when resolution values are not in a node's predefined list | Check node schema for allowed enum values and select the nearest option (e.g., '2K') when specifically requested dimensions are not supported by the system.
+
+2026-06-07 | apply_brainbriefing fails when positive_prompt_node_id is null in brainbriefing | Identify the prompt node via get_workflow_node_info, then use update_workflow to patch the prompt input directly to that node.
+2026-06-07 | batch variations require multiprompt.json before batch-handoff execution | Generate distinct prompts using write_text_file to output_workflows/multiprompt.json with keys prompt1..promptN before duplicating workflows.
