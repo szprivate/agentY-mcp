@@ -682,20 +682,8 @@ class Pipeline:
         if handler == "story":
             if self._verbose:
                 print("pipeline: story → Story agent (streamed)")
-            _story_snap = self._usage_snapshot(self._story_agent)
-            _story_chunks: list[str] = []
-            _trace("pipeline.story: story_agent.stream_async begin")
-            async for event in self._story_agent.stream_async(user_text):
-                if isinstance(event, dict):
-                    _chunk = event.get("data", "")
-                    if _chunk:
-                        _story_chunks.append(_chunk)
+            async for event in self._stream_story(user_text, triage_result):
                 yield event
-            _trace("pipeline.story: story stream done; bookkeeping")
-            self._record_agent_usage(self._story_agent, _story_snap)
-            log_agent_exchange("STORY", user_text, "".join(_story_chunks))
-            self._session.last_agent = "story"
-            self._record_chat_summary(user_text, triage_result, status="completed")
             _trace("pipeline.story: return")
             return
 
@@ -736,18 +724,8 @@ class Pipeline:
             if triage_result.intent == MessageIntent.feedback and self._session.last_agent == "story":
                 if self._verbose:
                     print("pipeline: feedback on Story-agent output → routing back to Story agent")
-                _story_snap = self._usage_snapshot(self._story_agent)
-                _story_fb_chunks: list[str] = []
-                async for event in self._story_agent.stream_async(user_text):
-                    if isinstance(event, dict):
-                        _chunk = event.get("data", "")
-                        if _chunk:
-                            _story_fb_chunks.append(_chunk)
+                async for event in self._stream_story(user_text, triage_result):
                     yield event
-                self._record_agent_usage(self._story_agent, _story_snap)
-                log_agent_exchange("STORY", user_text, "".join(_story_fb_chunks))
-                self._session.last_agent = "story"
-                self._record_chat_summary(user_text, triage_result, status="completed")
                 return
             # Follow-up: skip Researcher, send directly to Brain (streamed)
             self._ensure_clean_history()
@@ -1667,6 +1645,76 @@ class Pipeline:
         """Prefix *text* with the generated-image gallery block when non-empty."""
         gallery = self._format_image_gallery()
         return f"{gallery}\n\n{text}" if gallery else text
+
+    # ── Story-agent helpers (stateless, explicit-continuity) ─────────────── #
+
+    # Hard cap on the previously-produced story text injected into the next turn.
+    # A synopsis is tiny; scene descriptions are larger but bounded — this is a
+    # safety valve against pathological growth, not an expected truncation point.
+    _STORY_CONTEXT_CHAR_CAP = 6000
+
+    def _clear_story_history(self) -> None:
+        """Reset the Story agent's conversation history.
+
+        The Story agent is driven *statelessly* across turns: continuity (the
+        Mode A synopsis → Mode B scenes hand-off, and later refinements) is
+        provided explicitly via ``AgentSession.last_story_response`` injection.
+        Clearing its history each turn means we don't carry the prior turn's
+        skill-tool transcript (the full activated SKILL.md, ~hundreds of tokens)
+        forward — keeping token usage low — and also prevents any cross-thread
+        bleed from the shared agent singleton.
+        """
+        try:
+            self._story_agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _build_story_input(self, user_text: str) -> str:
+        """Prepend the Story agent's most recent output so it can be expanded.
+
+        This is what lets "now turn that into scenes" (Mode B) or "make it
+        darker" (refinement) see the prior synopsis/scenes without relying on
+        conversation history. Returns *user_text* unchanged when there is no
+        cached story output yet.
+        """
+        prev = (self._session.last_story_response or "")[: self._STORY_CONTEXT_CHAR_CAP]
+        if not prev:
+            return user_text
+        return (
+            "[Earlier in this conversation you produced the story text below. When the "
+            "user asks to turn it into scene descriptions, expand it, or refine it, use "
+            "this as the source/synopsis. If this is an unrelated new request, ignore it.]\n"
+            f"{prev}\n\n---\n\nUser request: {user_text}"
+        )
+
+    async def _stream_story(self, user_text: str, triage_result: TriageResult):
+        """Run the Story agent statelessly and stream its events.
+
+        Clears the agent's history, injects the cached prior story output, streams
+        the response, then caches the new output and records bookkeeping. Shared
+        by the ``story`` handler and the feedback-on-story follow-up path.
+        """
+        self._clear_story_history()
+        _story_input = self._build_story_input(user_text)
+        _story_snap = self._usage_snapshot(self._story_agent)
+        _story_chunks: list[str] = []
+        _trace("pipeline.story: story_agent.stream_async begin")
+        async for event in self._story_agent.stream_async(_story_input):
+            if isinstance(event, dict):
+                _chunk = event.get("data", "")
+                if _chunk:
+                    _story_chunks.append(_chunk)
+            yield event
+        _trace("pipeline.story: story stream done; bookkeeping")
+        self._record_agent_usage(self._story_agent, _story_snap)
+        _story_full = "".join(_story_chunks)
+        log_agent_exchange("STORY", user_text, _story_full)
+        # Cache the new output so the *next* story turn can build on it, then drop
+        # the agent's own (skill-heavy) history.
+        self._session.last_story_response = _story_full or None
+        self._clear_story_history()
+        self._session.last_agent = "story"
+        self._record_chat_summary(user_text, triage_result, status="completed")
 
     def _record_chat_summary(
         self,
