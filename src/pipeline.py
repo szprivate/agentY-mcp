@@ -658,7 +658,11 @@ class Pipeline:
             _info_chunks: list[str] = []
             _trace("pipeline.answer: info_agent.stream_async begin")
             _info_n = 0
-            async for event in self._info_agent.stream_async(user_text):
+            # Surface the thread's generated-image gallery so requests like
+            # "analyse the second image" resolve to a real file the Info agent
+            # can pass to analyze_image().
+            _info_input = self._prepend_gallery(user_text)
+            async for event in self._info_agent.stream_async(_info_input):
                 _info_n += 1
                 if isinstance(event, dict):
                     _chunk = event.get("data", "")
@@ -715,7 +719,7 @@ class Pipeline:
                     print("pipeline: feedback on Info-agent output → routing back to Info agent")
                 _info_snap = self._usage_snapshot(self._info_agent)
                 _info_fb_chunks: list[str] = []
-                async for event in self._info_agent.stream_async(user_text):
+                async for event in self._info_agent.stream_async(self._prepend_gallery(user_text)):
                     if isinstance(event, dict):
                         _chunk = event.get("data", "")
                         if _chunk:
@@ -1653,10 +1657,16 @@ class Pipeline:
             "number (\"image 2\"), recency (\"the last image\"), or description "
             "(\"the lighthouse one\"). Image numbers are 1-based and ordered oldest→newest:\n"
             + "\n".join(lines)
-            + "\n[When the user refers to one of these generated images, treat the matching "
-            "path above as the input: upload it via upload_image() and use the returned "
-            "filename as the workflow input.]"
+            + "\n[When the user refers to one of these generated images, use the matching "
+            "path above as the file to act on — to analyse/describe it call "
+            "analyze_image(path); to use it as a workflow input upload it via "
+            "upload_image(path). These are real files; never claim no image is available.]"
         )
+
+    def _prepend_gallery(self, text: str) -> str:
+        """Prefix *text* with the generated-image gallery block when non-empty."""
+        gallery = self._format_image_gallery()
+        return f"{gallery}\n\n{text}" if gallery else text
 
     def _record_chat_summary(
         self,
