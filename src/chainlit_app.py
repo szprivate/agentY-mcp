@@ -1218,30 +1218,24 @@ async def _process_message(message: cl.Message) -> None:
     # ── Persist thread state so on_chat_resume can restore it ────────────
     _save_thread_state(pipeline)
 
-    # ── Token / cost summary ──────────────────────────────────────────────
+    # ── Whole-generation cost summary (shown once, at the very end) ───────
+    # Accumulated across every agent that ran this turn (triage + researcher +
+    # brain + error-checker …), each delta priced at its own model's rate.
     try:
-        usage = pipeline.event_loop_metrics.accumulated_usage
-        in_tok = usage.get("inputTokens", 0)
-        out_tok = usage.get("outputTokens", 0)
-        cache_read = usage.get("cacheReadInputTokens", 0)
-        cache_write = usage.get("cacheWriteInputTokens", 0)
-
-        parts = [f"{in_tok:,} in", f"{out_tok:,} out"]
-        if cache_read:
-            parts.append(f"{cache_read:,} cache hit")
-        if cache_write:
-            parts.append(f"{cache_write:,} cache write")
-        summary = f"🪙 Tokens: {' | '.join(parts)}"
-
-        try:
-            if hasattr(pipeline, "compute_turn_cost"):
-                cost_val, total_tokens = pipeline.compute_turn_cost()
-            else:
-                cost_val, total_tokens = compute_cost_from_usage(usage, pipeline)
-            summary += f"  —  💵 ${cost_val:.4f}  ({total_tokens:,} total)"
-        except Exception:
-            pass
-
-        await cl.Message(content=summary, author="system").send()
+        if hasattr(pipeline, "compute_turn_cost"):
+            cost_val, total_tokens = pipeline.compute_turn_cost()
+        else:
+            _usage = pipeline.event_loop_metrics.accumulated_usage
+            cost_val, total_tokens = compute_cost_from_usage(_usage, pipeline)
+        _usage = pipeline.event_loop_metrics.accumulated_usage
+        _in = _usage.get("inputTokens", 0)
+        _out = _usage.get("outputTokens", 0)
+        await cl.Message(
+            content=(
+                f"💵 **${cost_val:.4f}**  ·  🪙 {total_tokens:,} tokens "
+                f"({_in:,} in / {_out:,} out)"
+            ),
+            author="system",
+        ).send()
     except Exception:
         pass
