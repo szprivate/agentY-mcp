@@ -13,6 +13,9 @@ param(
     [int]$Port = 8000,
     [switch]$Watch,
 
+    # Enable verbose hang/stall tracing (sets AGENTY_DEBUG=1 → .logs/debug.log)
+    [switch]$Debug,
+
     # Pipeline – Researcher  e.g. -LlmResearcher "ollama,qwen3:9b"  or  -LlmResearcher "claude,claude-haiku-4-5"
     [string]$LlmResearcher = "",
 
@@ -56,6 +59,11 @@ if ($Help) {
 
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Push-Location $ProjectRoot
+
+if ($Debug) {
+    $env:AGENTY_DEBUG = "1"
+    Write-Host "[run_agent] AGENTY_DEBUG enabled - tracing hangs/stalls to .logs/debug.log" -ForegroundColor Yellow
+}
 
 try {
     # Activate the virtual environment (create it if missing)

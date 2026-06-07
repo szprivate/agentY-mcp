@@ -518,18 +518,6 @@
   {
     "templates": [
       {
-        "name": "image_flux2_klein_image_edit_9b_distilled",
-        "models": [],
-        "io": {
-          "inputs": [],
-          "outputs": []
-        }
-      }
-    ]
-  },
-  {
-    "templates": [
-      {
         "name": "image_flux2_klein_text_to_image",
         "models": [],
         "io": {
@@ -1072,6 +1060,36 @@
             }
           ],
           "outputs": []
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "image_flux2_klein_image_edit_9b_distilled",
+        "models": [
+          "flux-2-klein-9b-fp8",
+          "qwen_3_8b_fp8mixed",
+          "flux2-vae"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 76,
+              "nodeType": "LoadImage",
+              "file": "bold_outfit_woman.jpeg",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 9,
+              "nodeType": "SaveImage",
+              "file": "",
+              "mediaType": "image"
+            }
+          ]
         }
       }
     ]

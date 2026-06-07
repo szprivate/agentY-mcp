@@ -136,7 +136,7 @@ Label shots explicitly: `Shot 1: … Shot 2: …` up to 6 shots per generation.
 
 ---
 
-### Qwen Image Edit (2511 / fp8)
+### Qwen Image Edit (2511 / fp8) / Flux Klein Image Edit
 This model takes an **instruction** rather than a descriptive prompt. It uses dual encoding (Qwen2.5-VL semantic + VAE appearance), so it understands both high-level meaning and low-level pixel appearance.
 
 **Instruction patterns that work:**
@@ -160,7 +160,7 @@ This model takes an **instruction** rather than a descriptive prompt. It uses du
 ### Nano Banana 2 / Nano Banana Pro (Gemini Image)
 **Nano Banana 2** — best for editing, style transfer, iteration. **Nano Banana Pro** — best for complex layouts, infographics, text rendering, brand consistency. Both support up to 14 reference images (10 objects + 4 characters).
 
-**Both models:** Natural language only — no tag soups, no quality keywords like `masterpiece`. They reason through prompts before generating.
+**Both models:** Natural language only — no tag soups, no quality keywords like `masterpiece`. They reason through prompts before generating. ALWAYS refer to the input images as @img1 for the first image, @img2 for the second, etc.
 
 **Prompt formula:** `Subject + Action + Location/Context + Composition + Lighting/Atmosphere + Style + [optional: text/constraint]`  
 Example: `"A stoic robot barista with glowing blue optics preparing espresso in a rain-soaked Tokyo alley at night. Low-angle tracking shot. Neon reflections on wet pavement. Cinematic, desaturated teal-orange grade."`

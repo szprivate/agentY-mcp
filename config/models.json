@@ -52,6 +52,7 @@
       "Characters_People\\TravisNobody_Flux.safetensors",
       "Characters_People\\kirdunstfluxmini.safetensors",
       "Characters_People\\mastermerlin_flux_911T4rga.safetensors",
+      "FLUX2\\Flux2TurboComfyv2.safetensors",
       "LTX2\\ltx-2-19b-distilled-lora-384.safetensors",
       "LTX2\\ltx-2-19b-ic-lora-canny-control.safetensors",
       "LTX2\\ltx-2-19b-ic-lora-depth-control.safetensors",
@@ -189,12 +190,12 @@
       "WAN21\\Wan2_1_VAE_fp32.safetensors",
       "WAN21\\wan_2.1_vae.safetensors",
       "WAN22\\wan2.2_vae.safetensors",
-      "flux2-vae.safetensors",
       "lotusDepth\\lotus-depth-g-v1-0_VAE.safetensors",
       "taeltx_2.safetensors"
     ],
     "text_encoders": [
       "FLUX2\\FLUX.2-klein-9B-text_encoder-8bit.safetensors",
+      "FLUX2\\mistral_3_small_flux2_fp8.safetensors",
       "FLUX2\\qwen_3_4b.safetensors",
       "FLUX2\\qwen_3_8b_fp8mixed.safetensors",
       "FLUXDEVGGUF\\clip_l.safetensors",
@@ -228,6 +229,7 @@
       "FLUX1\\project0PJ0Krea_v20FP16.safetensors",
       "FLUX2\\flux-2-klein-9b.safetensors",
       "FLUX2\\flux2-dev.safetensors",
+      "FLUX2\\flux2_dev_fp8mixed.safetensors",
       "HIDREAME11\\HiDream-E1-1.safetensors",
       "HIDREAME11\\HiDream-I1-Full.safetensors",
       "HIDREAME11\\hidream_e1_1_bf16.safetensors",
@@ -295,6 +297,7 @@
       "WAN22\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
       "WAN22\\wan2.2_t2v_low_noise_14B_fp16.safetensors",
       "WAN22\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+      "flux-2-klein-9b-fp8.safetensors",
       "lotusDepth\\lotus-depth-d-v1-1.safetensors"
     ],
     "clip_vision": [
@@ -361,6 +364,7 @@
     ],
     "background_removal": [],
     "frame_interpolation": [],
+    "geometry_estimation": [],
     "optical_flow": [],
     ".cache": [],
     "Hunyuan": [
@@ -376,11 +380,7 @@
       "abcd\\rdn_abcd.pth",
       "abcd\\swinir_abcd.pth"
     ],
-    "facerestore_models": [
-      "GFPGANv1.3.pth",
-      "GFPGANv1.4.pth",
-      "codeformer-v0.1.0.pth"
-    ],
+    "facerestore_models": [],
     "hyperswap": [
       "hyperswap_1a_256.onnx",
       "hyperswap_1b_256.onnx",
@@ -478,14 +478,9 @@
       "t5-v1_1-xxl-encoder-Q8_0.gguf"
     ],
     "kjnodes_fonts": [],
-    "intrinsic_loras": [
-      "intrinsic_lora_sd15_albedo.safetensors",
-      "intrinsic_lora_sd15_depth.safetensors",
-      "intrinsic_lora_sd15_normal.safetensors",
-      "intrinsic_lora_sd15_shading.safetensors"
-    ],
     "rmbg": [],
     "LLM": [],
+    "seedvr2": [],
     "VHS_video_formats": [],
     "wav2vec2": [],
     "nlf": [],

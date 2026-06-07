@@ -35,6 +35,7 @@ from src.pipeline import create_pipeline
 from src.utils.costs import compute_cost_from_usage
 from src.utils.models import AgentSession
 from src.utils.triage import triage as _run_triage, route as _route_intent
+from src.utils.debug_log import trace as _trace, debug_enabled as _debug_enabled
 
 # Agent factories imported lazily inside the switch_model handler to avoid
 # circular-import issues at module load time.
@@ -92,11 +93,29 @@ _unload_ollama_models()
 
 
 # ── Module-level pipeline singleton ──────────────────────────────────────────
+_pipeline_exc: Exception | None = None
 try:
     _pipeline = create_pipeline()
-except Exception as _pipeline_exc:
+except Exception as _exc:
+    _pipeline_exc = _exc  # saved explicitly – Python 3 deletes the except-clause variable after the block
     print(f"[chainlit] Failed to create pipeline at startup: {_pipeline_exc}")
     _pipeline = None
+
+
+# Serializes on_message so rapid-fire ("chatty") messages queue instead of
+# racing on the shared pipeline singleton. Must be module-global (not
+# per-session) because _pipeline itself — including the single stateful Brain
+# agent and AgentSession — is shared across every Chainlit session/thread.
+_PIPELINE_LOCK = asyncio.Lock()
+
+
+# Announce hang/stall trace state at startup so it's never ambiguous whether
+# tracing is active. Toggle with the -Debug flag (AGENTY_DEBUG=1) or by
+# creating/removing the .logs/agenty_debug.on sentinel file (live, no restart).
+print(
+    f"[agentY] debug tracing: {'ON → .logs/debug.log' if _debug_enabled() else 'OFF'}"
+    f"  (enable: run_agent.ps1 -Debug, or  New-Item .logs/agenty_debug.on)"
+)
 
 
 # Simple password auth callback for Chainlit (adjust as needed)
@@ -330,23 +349,55 @@ async def on_chat_resume(thread) -> None:  # noqa: ARG001
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
+    """Serialize turns so a chatty user can't race the shared pipeline.
+
+    Chainlit dispatches every incoming message as its own fire-and-forget
+    asyncio task (chainlit/socket.py: ``asyncio.create_task(process_message)``)
+    with no per-session serialization. Because the whole app shares one
+    stateful ``_pipeline`` singleton (one Strands Brain agent, one
+    AgentSession), two overlapping turns interleave writes to
+    ``brain.messages`` and corrupt it — which then crashes every later turn
+    until the process is restarted. A global lock makes rapid-fire messages
+    queue and run one at a time.
+
+    Emergency controls (stop / restart) bypass the lock so they still work
+    while a long generation is holding it.
+    """
+    _cmd = (message.content or "").strip().lower()
+    if _cmd in {"restart", "/restart", "stop", "/stop", "!stop", "shutdown", "/shutdown"}:
+        await _process_message(message)
+        return
+    if _PIPELINE_LOCK.locked():
+        await cl.Message(
+            content="⏳ Still finishing your previous message — I'll handle this one next.",
+            author="system",
+        ).send()
+    async with _PIPELINE_LOCK:
+        await _process_message(message)
+
+
+async def _process_message(message: cl.Message) -> None:
     """Handle an incoming user message, optionally with image attachments."""
     # ── Built-in commands ─────────────────────────────────────────────────
     _text = (message.content or "").strip()
     if _text.lower() in {"restart", "/restart"}:
-        await cl.Message(content="🔄 Restarting agent…", author="system").send()
-        try:
-            new_pipeline = create_pipeline()
-        except Exception as _exc:
-            await cl.Message(
-                content=f"❌ Failed to restart pipeline:\n```\n{_exc}\n```",
-                author="system",
-            ).send()
-            return
-        cl.user_session.set("pipeline", new_pipeline)
-        cl.user_session.set("awaiting_answer", False)
-        _reset_pipeline_state(new_pipeline)
-        await cl.Message(content="✅ Agent restarted successfully.", author="system").send()
+        await cl.Message(
+            content="🔄 Restarting agent process… the page will reconnect automatically.",
+            author="system",
+        ).send()
+        # Spawn a fresh process with identical argv (reloads all code + settings),
+        # then hard-exit the current one.  Using python -m chainlit so we stay
+        # interpreter-agnostic regardless of whether chainlit was launched via
+        # the .exe entry-point or a .cmd wrapper on Windows.
+        import subprocess
+        argv_tail = sys.argv[1:]  # e.g. ['run', 'src/chainlit_app.py', '--port', '8000']
+        subprocess.Popen(
+            [sys.executable, "-m", "chainlit"] + argv_tail,
+            cwd=_project_root,
+        )
+        # Give Chainlit a moment to flush the message before the process dies
+        await asyncio.sleep(1)
+        os._exit(0)
         return
 
     if _text.lower() in {"stop", "/stop", "!stop", "shutdown", "/shutdown"}:
@@ -650,28 +701,8 @@ async def on_message(message: cl.Message) -> None:
             else:
                 _tpl_msg = f" `{_stem}` already present in `config/workflow_templates.json`."
             _idx = _custom_index_path()
-            
-            # ─ Build SKILL.md for the newly registered workflow ──────────────
-            _skill_msg = ""
-            try:
-                await cl.Message(content="⏳ Building SKILL.md (loading LLM, this may take a moment)…", author="system").send()
-                import importlib.util as _ilu
-                import sys as _sys
-                _bs_path = str(_project_root / "scripts" / "build_skill.py")
-                _mod = _sys.modules.get("_agenty_build_skill")
-                if _mod is None:
-                    _spec = _ilu.spec_from_file_location("_agenty_build_skill", _bs_path)
-                    _mod = _ilu.module_from_spec(_spec)
-                    _sys.modules["_agenty_build_skill"] = _mod
-                    _spec.loader.exec_module(_mod)
-                _build_skill = _mod.build_skill_from_workflow
-                _skill_path = _build_skill(str(_wf_path))
-                _skill_rel = Path(_skill_path).relative_to(_project_root)
-                _skill_msg = f" SKILL.md written to `{_skill_rel}`."
-            except Exception as _skill_exc:
-                _skill_msg = f" ⚠️ Skill build failed: {_skill_exc}"
             await cl.Message(
-                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_desc_msg}{_skill_msg}",
+                content=f"✅ Workflow `{_stem}` added to `{_idx}`.{_tpl_msg}{_desc_msg}",
                 author="system",
             ).send()
         except Exception as _exc:
@@ -948,8 +979,11 @@ async def on_message(message: cl.Message) -> None:
     full_response_parts: list[str] = []
     qa_reply_queue: asyncio.Queue = asyncio.Queue()
 
+    _trace("chainlit: stream loop begin")
+    _event_count = 0
     try:
         async for event in pipeline.stream_async(content, qa_reply_queue=qa_reply_queue):
+            _event_count += 1
             if not isinstance(event, dict):
                 continue
 
@@ -1160,6 +1194,7 @@ async def on_message(message: cl.Message) -> None:
                 if any(kw in normal_text for kw in ("💾", "Saved", "executor")):
                     await _flush_new_outputs()
 
+        _trace(f"chainlit: stream loop exited after {_event_count} events; finalising steps")
         # Finalise any still-open steps.
         if researcher_step is not None:
             await researcher_step.update()
@@ -1180,9 +1215,11 @@ async def on_message(message: cl.Message) -> None:
             await task_list.send()
 
     except Exception as exc:
+        _trace(f"chainlit: pipeline error: {exc!r}")
         msg = await _ensure_response_msg()
         await msg.stream_token(f"\n\n❌ Pipeline error: {exc}")
 
+    _trace("chainlit: post-stream — response_msg.update()")
     if response_msg is not None:
         await response_msg.update()
 
@@ -1192,35 +1229,33 @@ async def on_message(message: cl.Message) -> None:
     cl.user_session.set("awaiting_answer", "?" in tail)
 
     # Final flush — catches any outputs that arrived with the last event.
+    _trace("chainlit: post-stream — _flush_new_outputs()")
     await _flush_new_outputs()
 
     # ── Persist thread state so on_chat_resume can restore it ────────────
+    _trace("chainlit: post-stream — _save_thread_state()")
     _save_thread_state(pipeline)
+    _trace("chainlit: post-stream — cost summary send")
 
-    # ── Token / cost summary ──────────────────────────────────────────────
+    # ── Whole-generation cost summary (shown once, at the very end) ───────
+    # Accumulated across every agent that ran this turn (triage + researcher +
+    # brain + error-checker …), each delta priced at its own model's rate.
     try:
-        usage = pipeline.event_loop_metrics.accumulated_usage
-        in_tok = usage.get("inputTokens", 0)
-        out_tok = usage.get("outputTokens", 0)
-        cache_read = usage.get("cacheReadInputTokens", 0)
-        cache_write = usage.get("cacheWriteInputTokens", 0)
-
-        parts = [f"{in_tok:,} in", f"{out_tok:,} out"]
-        if cache_read:
-            parts.append(f"{cache_read:,} cache hit")
-        if cache_write:
-            parts.append(f"{cache_write:,} cache write")
-        summary = f"🪙 Tokens: {' | '.join(parts)}"
-
-        try:
-            if hasattr(pipeline, "compute_turn_cost"):
-                cost_val, total_tokens = pipeline.compute_turn_cost()
-            else:
-                cost_val, total_tokens = compute_cost_from_usage(usage, pipeline)
-            summary += f"  —  💵 ${cost_val:.4f}  ({total_tokens:,} total)"
-        except Exception:
-            pass
-
-        await cl.Message(content=summary, author="system").send()
+        if hasattr(pipeline, "compute_turn_cost"):
+            cost_val, total_tokens = pipeline.compute_turn_cost()
+        else:
+            _usage = pipeline.event_loop_metrics.accumulated_usage
+            cost_val, total_tokens = compute_cost_from_usage(_usage, pipeline)
+        _usage = pipeline.event_loop_metrics.accumulated_usage
+        _in = _usage.get("inputTokens", 0)
+        _out = _usage.get("outputTokens", 0)
+        await cl.Message(
+            content=(
+                f"💵 **${cost_val:.4f}**  ·  🪙 {total_tokens:,} tokens "
+                f"({_in:,} in / {_out:,} out)"
+            ),
+            author="system",
+        ).send()
     except Exception:
         pass
+    _trace("chainlit: turn complete")

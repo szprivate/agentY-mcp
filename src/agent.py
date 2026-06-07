@@ -365,20 +365,15 @@ class TokenUsageHookProvider:
             if cache_write:
                 total_parts.append(f"{cache_write:,} cache write")
 
-            # Compute delta cost for this tool call
-            cost_display = ""
-            if not self._is_ollama:
-                try:
-                    _delta_usage = {"inputTokens": d_in, "outputTokens": d_out}
-                    _dcost, _ = compute_cost_from_usage(_delta_usage, event.agent)
-                    cost_display = f"  💵 +${_dcost:.2f}"
-                except Exception:
-                    pass
-
+            # Per-tool token deltas are printed to the console for live
+            # debugging only.  Cost is intentionally NOT shown here — the
+            # single whole-generation cost is reported once at the end of the
+            # turn (see chainlit_app / main.py).  Full per-call cost still goes
+            # to the tokens_usage.log file below for offline analysis.
             summary_line = (
                 f"\U0001fa99 [{self._role}] after {tool_display}: "
                 f"{' / '.join(delta_parts)}  "
-                f"(total: {' / '.join(total_parts)}){cost_display}"
+                f"(total: {' / '.join(total_parts)})"
             )
             print(f"\n{summary_line}")
 
@@ -471,6 +466,14 @@ def _make_agent(
         "tools": tools,
         "conversation_manager": SlidingWindowConversationManager(window_size=window_size),
         "hooks": [TokenUsageHookProvider(role=role, is_ollama=(llm == "ollama"))],
+        # Disable Strands' default PrintingCallbackHandler.  Both entry points
+        # consume agents via stream_async — Chainlit renders the yielded events
+        # in the web UI, and the CLI (Pipeline.run) collects them into the
+        # printed response — so the built-in console echo only duplicates that
+        # output.  Per-tool token usage is still logged via the hook above, and
+        # triage/planner/etc. output is still written to message_history.log.
+        # A caller may re-enable it by passing callback_handler=... in kwargs.
+        "callback_handler": None,
     }
     if plugins:
         agent_kwargs["plugins"] = plugins

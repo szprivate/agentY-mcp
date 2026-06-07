@@ -259,24 +259,24 @@ def _free_vram_for_comfyui() -> None:
 
 
 def _extract_output_files(history: dict) -> list[dict]:
-    """Return a flat list of ``{"filename", "subfolder", "type"}`` dicts from a
-    stripped history response.
+    """Return a flat list of ``{"filename", "subfolder", "type", "node_id"}`` dicts
+    from a stripped history response.
 
     Handles the ``_strip_history`` output format where outputs are nested under
-    ``{prompt_id: {"outputs": {node_id: {"images": [...], "gifs": [...], ...}}}}``.
+    ``{prompt_id: {"outputs": {node_id: {"images": [...], "gifs": [...], ...}}}}`.
     """
     files: list[dict] = []
     for _prompt_id, entry in history.items():
         if not isinstance(entry, dict):
             continue
-        for _node_id, node_out in entry.get("outputs", {}).items():
+        for node_id, node_out in entry.get("outputs", {}).items():
             if not isinstance(node_out, dict):
                 continue
             # ComfyUI may use different keys depending on the output node type
             for key in ("images", "gifs", "videos", "audio"):
                 for item in node_out.get(key, []):
                     if isinstance(item, dict) and "filename" in item:
-                        files.append(item)
+                        files.append({**item, "node_id": str(node_id)})
     return files
 
 
@@ -284,6 +284,7 @@ def _resolve_output_path(
     filename: str,
     subfolder: str = "",
     image_type: str = "output",
+    fallback_dir: "Path | None" = None,
 ) -> Path:
     """Return the authoritative on-disk path for a ComfyUI output file.
 
@@ -292,8 +293,9 @@ def _resolve_output_path(
     1. ComfyUI's configured ``--output-directory`` (queried via ``/system_stats``).
        If the file exists there it is returned as-is so that ``collected_paths``
        always reflects the real server location.
-    2. Falls back to downloading via ``/view`` into the agent's ``output_dir``
-       (from settings.json) when ComfyUI is remote or the file is not on disk.
+    2. Falls back to downloading via ``/view`` into *fallback_dir* when supplied
+       (taken from ``output_nodes[].output_path`` in the brainbriefing), or into
+       the agent's ``output_dir`` (from settings.json) as a last resort.
 
     This means ``OUTPUT_PATHS`` in the compressed summary are always real,
     accessible paths that the next session's Researcher can pass directly to
@@ -313,7 +315,8 @@ def _resolve_output_path(
     # --- fallback: download via /view to local output_dir ---------------------
     from src.utils.comfyui_client import get_client
 
-    fallback_dir = _output_dir()
+    if fallback_dir is None:
+        fallback_dir = _output_dir()
     fallback_dir.mkdir(parents=True, exist_ok=True)
     dest = fallback_dir / filename
 
@@ -496,23 +499,62 @@ async def _process_completed_job(
         logger.warning("executor: no output files in history for prompt_id=%s", prompt_id)
         return
 
+    # Build a node_id → fallback_dir map from the brainbriefing output_nodes so
+    # that downloaded outputs land in the task-specific directory the Researcher
+    # chose, rather than the generic agent output_dir.
+    _bb_output_dirs: dict[str, Path] = {}
+    try:
+        for on in brainbriefing.get("output_nodes", []):
+            if not isinstance(on, dict):
+                continue
+            nid = str(on.get("node_id", ""))
+            op = on.get("output_path", "")
+            if nid and op:
+                p = Path(op)
+                if not p.is_absolute():
+                    p = _output_dir() / p
+                _bb_output_dirs[nid] = p
+    except Exception as exc:
+        logger.debug("executor: could not parse output_nodes from brainbriefing — %s", exc)
+
     # Resolve each output file's authoritative on-disk path (no copying).
     # Each path is appended to ``collected_paths`` immediately so the caller
     # (chainlit) can flush the image to the UI as soon as the "💾 Output:" line
     # is yielded, instead of waiting for the whole batch to finish.
+    #
+    # Primary resolution (no network call): because apply_brainbriefing sets
+    # filename_prefix = output_path (e.g. "W:/.../output/image_generation"),
+    # ComfyUI saves files as output_path + "_00001_.png", i.e. at
+    # Path(output_path).parent / filename.  We check that location first and
+    # only fall back to _resolve_output_path (which hits /system_stats) when
+    # the file is not found there.
     saved_paths: list[Path] = []
     for item in output_files:
         filename = item.get("filename", "")
         subfolder = item.get("subfolder", "")
         file_type = item.get("type", "output")
+        node_id = item.get("node_id", "")
         if not filename:
             continue
+        fallback_dir = _bb_output_dirs.get(node_id)
         try:
-            output_path = _resolve_output_path(filename, subfolder, file_type)
-            saved_paths.append(output_path)
+            resolved: Path | None = None
+            # Primary: derive path directly from the brainbriefing output_path.
+            if fallback_dir is not None:
+                bb_candidate = fallback_dir.parent / filename
+                if bb_candidate.exists():
+                    logger.info(
+                        "executor: output at brainbriefing path %s (%d bytes)",
+                        bb_candidate, bb_candidate.stat().st_size,
+                    )
+                    resolved = bb_candidate
+            # Fallback: query ComfyUI /system_stats or download via /view.
+            if resolved is None:
+                resolved = _resolve_output_path(filename, subfolder, file_type, fallback_dir=fallback_dir)
+            saved_paths.append(resolved)
             if collected_paths is not None:
-                collected_paths.append(str(output_path))
-            yield f"{pfx}💾 Output: `{output_path}`"
+                collected_paths.append(str(resolved))
+            yield f"{pfx}💾 Output: `{resolved}`"
         except Exception as exc:
             yield f"{pfx}⚠️ Could not resolve `{filename}`: {exc}"
             logger.warning("executor: resolve failed for %s — %s", filename, exc)
@@ -536,9 +578,16 @@ async def _process_completed_job(
             if "FAIL" in verdict.upper():
                 qa_failures.append({"path": str(path), "verdict": verdict})
 
-    # Copy the finished workflow to the ComfyUI user directory for easy reuse.
+    # Copy the finished workflow to the ComfyUI user directory — run in a
+    # background thread so a slow UNC/network share doesn't stall the pipeline.
     if workflow_path:
-        _copy_workflow_to_user_dir(workflow_path)
+        import threading as _threading
+        _threading.Thread(
+            target=_copy_workflow_to_user_dir,
+            args=(workflow_path,),
+            daemon=True,
+            name="copy-workflow-to-user-dir",
+        ).start()
 
     if qa_failures:
         # Signal the pipeline layer to pause and ask the user.
@@ -611,14 +660,18 @@ async def execute_workflow(
     node_titles = _load_node_titles(workflow_path)
     history: dict | None = None
     error_result: dict | None = None
-    async for event in stream_comfyui_job(prompt_id, client_id, node_titles=node_titles):
-        if isinstance(event, dict):
-            if "history" in event:
-                history = event["history"]
-            else:
-                error_result = event
-            break
-        yield event
+    _gen = stream_comfyui_job(prompt_id, client_id, node_titles=node_titles)
+    try:
+        async for event in _gen:
+            if isinstance(event, dict):
+                if "history" in event:
+                    history = event["history"]
+                else:
+                    error_result = event
+                break
+            yield event
+    finally:
+        await _gen.aclose()
 
     if error_result is not None:
         error_msg = f"❌ ComfyUI execution error: {error_result.get('error')}"
@@ -721,14 +774,18 @@ async def execute_workflows_batch(
         history: dict | None = None
         error_result: dict | None = None
         _node_titles = _load_node_titles(_wf_path)
-        async for event in stream_comfyui_job(prompt_id, cid, node_titles=_node_titles):
-            if isinstance(event, dict):
-                if "history" in event:
-                    history = event["history"]
-                else:
-                    error_result = event
-                break
-            yield f"{label}{event}"
+        _gen = stream_comfyui_job(prompt_id, cid, node_titles=_node_titles)
+        try:
+            async for event in _gen:
+                if isinstance(event, dict):
+                    if "history" in event:
+                        history = event["history"]
+                    else:
+                        error_result = event
+                    break
+                yield f"{label}{event}"
+        finally:
+            await _gen.aclose()
 
         if error_result is not None:
             error_msg = f"{label}❌ ComfyUI execution error: {error_result.get('error')}"

@@ -119,8 +119,18 @@ async def triage(
     else:
         classify_input = f"{session_hint}{user_message}"
 
-    # Call the triage agent — returns the full response string.
-    raw: str = str(agent(classify_input))
+    # Call the triage agent asynchronously — returns the full response string.
+    #
+    # IMPORTANT: use ``invoke_async``, NOT the sync ``agent(...)``.  The sync
+    # ``__call__`` routes through Strands' ``run_async()``, which executes the
+    # agent in a throwaway worker thread + fresh ``asyncio.run`` event loop on
+    # *every* call.  Because the triage agent is persistent (reused each turn),
+    # its loop-bound async HTTP client is created on the first call's worker loop
+    # and then hangs on the second call's new loop — the classic "info query
+    # turn 1 works, turn 2 wedges in triage" deadlock.  ``invoke_async`` runs the
+    # agent natively on the caller's event loop, exactly like the Brain / Info /
+    # Researcher agents do via ``stream_async`` (which is why they never hang).
+    raw: str = str(await agent.invoke_async(classify_input))
 
     # Log triage input/output before messages are cleared.
     log_agent_exchange("TRIAGE", classify_input, raw)
@@ -139,11 +149,19 @@ async def triage(
     try:
         json_str = _extract_json(raw) or raw
         parsed   = json.loads(json_str)
-        intent   = MessageIntent(parsed["intent"])
+        # Parse confidence and run_qa first — these must not be lost if the
+        # intent string is unrecognised (a bad intent value used to abort the
+        # entire block, leaving confidence=0.0 and triggering a spurious
+        # low-confidence fallback that misfired the full researcher pipeline).
         confidence = float(parsed.get("confidence", 0.5))
-        run_qa   = bool(parsed.get("run_qa", False))
-    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        run_qa     = bool(parsed.get("run_qa", False))
+        intent     = MessageIntent(parsed["intent"])
+    except (json.JSONDecodeError, KeyError) as exc:
         logger.warning("Intent parse failed (%s); raw=%r — defaulting to new_request", exc, raw)
+    except ValueError as exc:
+        # Unknown intent string — keep the parsed confidence so the gate works
+        # correctly; only the intent itself falls back.
+        logger.warning("Unknown intent value (%s); raw=%r — defaulting to new_request", exc, raw)
 
     # Chain guard — downgrade to new_request when there is no prior session output.
     # This is the authoritative server-side enforcement of the prompt rule:
@@ -196,13 +214,13 @@ def route(result: TriageResult) -> str:
         return "log_warning"
 
     match result.intent:
-        case MessageIntent.info_query:
+        case MessageIntent.info_query | MessageIntent.chat:
             return "answer"
         case MessageIntent.needs_image:
             return "needs_image"
         case MessageIntent.param_tweak | MessageIntent.feedback:
             return "brain"
-        case MessageIntent.chain:
+        case MessageIntent.chain | MessageIntent.batch_request:
             return "researcher"
         case MessageIntent.new_planned_request:
             return "planner"

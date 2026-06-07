@@ -47,16 +47,4 @@ if (-not ($obj.PSObject.Properties.Name -contains $stem)) {
     Write-Host "Entry '$stem' already exists in config/workflow_templates.json"
 }
 
-# ── Step 3: build SKILL.md ────────────────────────────────────────────────────
-$buildSkillScript = Join-Path $ScriptDir "build_skill.py"
-if (Test-Path $buildSkillScript) {
-    Write-Host "Building SKILL.md for '$stem' ..."
-    & python $buildSkillScript $WorkflowFile
-    if (-not $?) {
-        Write-Warning "build_skill.py failed for '$stem' — skill NOT created, but workflow was registered."
-    }
-} else {
-    Write-Warning "build_skill.py not found at '$buildSkillScript' — skill NOT created."
-}
-
 exit 0

@@ -28,7 +28,7 @@ from strands import Agent
 
 from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_triage_agent, create_vision_agent, _settings
 from src.tools.image_handling import set_vision_agent as _set_vision_agent
-from src.utils.chat_summary import summarize_conversation, log_agent_messages
+from src.utils.chat_summary import summarize_conversation, log_agent_messages, log_agent_exchange
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
 from src.utils.comfyui_progress import stream_comfyui_job as _stream_comfyui_job
 from src.utils.progress_signal import drain as _drain_progress
@@ -41,6 +41,7 @@ from src.utils.memory import format_memories, memory_add, memory_search
 from src.tools.memory_tools import set_session_id as _set_memory_session_id
 from src.tools.comfyui import clear_tool_caches as _clear_tool_caches
 from src.utils.learnings import count_tool_calls, maybe_run_learnings
+from src.utils.debug_log import trace as _trace
 
 
 # ---------------------------------------------------------------------------
@@ -360,14 +361,35 @@ class Pipeline:
         # awaits it so the brain never sees uncompressed history.
         self._pending_compression: asyncio.Task | None = None
 
+    # Max seconds the next turn will wait for the previous turn's deferred
+    # history compression. Compression is a background optimisation (a cheap
+    # Ollama summary) and must never hold the next user turn hostage — e.g. if
+    # Ollama is slow swapping the summariser model into VRAM that a prior
+    # generation just filled. On timeout the task is cancelled and the turn
+    # proceeds with the brain's recent (sanitised) history instead.
+    _COMPRESSION_WAIT_TIMEOUT = 30.0
+
     async def _await_pending_compression(self) -> None:
-        """Block until any deferred brain-history compression has finished."""
+        """Block until any deferred brain-history compression has finished.
+
+        Bounded by ``_COMPRESSION_WAIT_TIMEOUT`` so a stuck or slow background
+        summary can never hang the next turn indefinitely.
+        """
         task = self._pending_compression
         if task is None:
             return
         self._pending_compression = None
         try:
-            await task
+            await asyncio.wait_for(task, timeout=self._COMPRESSION_WAIT_TIMEOUT)
+        except asyncio.TimeoutError:
+            # wait_for has already cancelled the task; cancelling at the LLM
+            # await point means brain.messages was not yet replaced, so the
+            # history is simply left uncompressed for this turn (the brain
+            # paths sanitise it before use). Better a bigger prompt than a hang.
+            print(
+                f"pipeline: deferred compression exceeded {self._COMPRESSION_WAIT_TIMEOUT:.0f}s — "
+                "cancelled; continuing with recent history."
+            )
         except Exception as exc:  # noqa: BLE001
             if self._verbose:
                 print(f"pipeline: deferred compression failed — {exc}")
@@ -459,224 +481,68 @@ class Pipeline:
         return total_cost, total_tokens
 
     def run(self, user_input, **_: Any) -> str:
-        """Run the full pipeline for *user_input* and return the Brain's response.
+        """Run the full pipeline for *user_input* and return the assembled response.
 
-        Triage runs first to classify intent, then routes to:
-        - ``researcher`` (new_request / chain / low-confidence): full Researcher → Brain flow
-        - ``brain`` (param_tweak / feedback): direct Brain follow-up
-        - ``answer`` (info_query): return the triage answer directly
-        - ``log_warning`` (low-confidence fallback): treat as new_request
+        Thin synchronous wrapper over :meth:`stream_async` — the single source of
+        truth for triage, routing, and execution.  It drives the async event
+        stream to completion on a private event loop, collecting the same
+        user-facing text Chainlit shows in its main message (everything except
+        the Researcher's internal token stream), and bridges the interactive
+        QA / brain-assembly prompts to the console via ``input()``.
+
+        Used by the CLI entry point (``src/main.py``).
         """
-        # Block until any deferred brain-history compression from the prior
-        # turn has finished, otherwise this turn would see uncompressed history.
-        if self._pending_compression is not None:
-            asyncio.run(self._await_pending_compression())
-        self._last_turn_usages = []
-        user_text = self._extract_text(user_input)
-        user_text = self._annotate_attachments(user_input, user_text)
-        _triage_snap = self._usage_snapshot(self._triage_agent)
-        _triage_input = (
-            user_input
-            if (
-                isinstance(user_input, list)
-                and any("image" in b for b in user_input)
-                and getattr(self._triage_agent, "_is_claude", False)
-            )
-            else user_text
-        )
-        triage_result = asyncio.run(_triage(_triage_input, self._session, self._info_context, self._triage_agent))
-        self._record_agent_usage(self._triage_agent, _triage_snap)
-        self._run_qa = triage_result.run_qa
-        handler = _route(triage_result)
+        async def _consume() -> str:
+            parts: list[str] = []
+            in_researcher = False
+            qa_q: asyncio.Queue = asyncio.Queue()
+            async for event in self.stream_async(user_input, qa_reply_queue=qa_q):
+                if not isinstance(event, dict):
+                    continue
 
-        if self._verbose:
-            print(f"pipeline: Triage → intent={triage_result.intent.value},"
-                  f" confidence={triage_result.confidence:.2f}, handler={handler}")
+                # Interactive prompts: stream_async yields the request, then
+                # blocks on the queue for the answer.  Bridge them to the console.
+                if event.get("brain_assembly_fail_ask"):
+                    _latest = event.get("latest_workflow_path", "")
+                    if _latest:
+                        print(f"\n⚠️  Brain failed to assemble a workflow. Latest JSON: {_latest}")
+                    try:
+                        _advice = input("Advice for the Brain (blank to abort): ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        _advice = ""
+                    await qa_q.put(_advice)
+                    continue
+                if event.get("qa_fail_ask"):
+                    print("\n⚠️  QA check failed.")
+                    for _d in event.get("fail_details", []):
+                        print(f"   • {Path(_d['path']).name}: {_d['verdict']}")
+                    try:
+                        _answer = input("🔁 Retry this step? [y/n]: ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        _answer = "n"
+                    await qa_q.put(_answer)
+                    continue
 
-        # Context-dependent routing: researcher was previously blocked waiting for user input.
-        # Re-run the researcher with the original request + user's clarification before
-        # normal triage dispatch — regardless of how triage classified this message.
-        if self._session.last_agent == "researcher" and self._session.last_researcher_request:
-            if self._verbose:
-                print("pipeline: Researcher was blocked — re-running with user clarification")
-            _bls = self._session.last_researcher_blockers
-            _blockers_ctx = (
-                "\n\nYou previously identified these blockers:\n" + "\n".join(f"- {b}" for b in _bls)
-                if _bls else ""
-            )
-            _enriched = (
-                f"{self._session.last_researcher_request}"
-                f"{_blockers_ctx}\n\n"
-                f"The user provided this clarification: {user_text}"
-            )
-            self._session.last_researcher_request = None
-            self._session.last_researcher_blockers = []
-            _r_json, _r_err, _ = self._run_researcher(_enriched)
-            if _r_err:
-                self._record_chat_summary(user_text, triage_result, status="error")
-                return _r_err
-            _question = self._researcher_blocked_question(_r_json)
-            if _question:
-                # Still blocked — store enriched context so the next reply continues the chain.
-                self._session.last_researcher_request = _enriched
-                try:
-                    self._session.last_researcher_blockers = json.loads(_r_json).get("blockers", [])
-                except Exception:
-                    pass
-                self._session.last_agent = "researcher"
-                self._record_chat_summary(user_text, triage_result, status="blocked")
-                return _question
-            # Researcher now ready — hand off to Brain.
-            self._last_brainbriefing_json = _r_json
-            self._brain.messages.clear()
-            self._ensure_clean_history()
-            _snap_b = self._usage_snapshot(self._brain)
-            _b_resp = str(self._brain(self._build_brain_prompt(_r_json)))
-            self._record_agent_usage(self._brain, _snap_b)
-            _wf = _get_workflow_signal()
-            _wf = self._expand_variations(_wf, _r_json)
-            _ex_paths: list[str] = []
-            if _wf:
-                _ex_lines, _ex_paths, _ = asyncio.run(
-                    self._drain_executor_batch(_wf, _r_json, user_message=user_text)
-                )
-                if _ex_paths:
-                    self._session.current_output_paths[:] = _ex_paths
-                if _ex_lines:
-                    _b_resp += "\n\n" + "\n".join(_ex_lines)
-            self._record_chat_summary(user_text, triage_result, status="completed", raw_json=_r_json)
-            asyncio.run(self._compress_brain_history(extra_output_paths=_ex_paths))
-            self._session.last_agent = "brain"
-            return _b_resp
+                # The Researcher's internal stream (its brainbriefing JSON) is
+                # bracketed by these markers and excluded from the response,
+                # mirroring how Chainlit hides it inside a collapsible step.
+                if event.get("_researcher_start"):
+                    in_researcher = True
+                    continue
+                if event.get("_researcher_done"):
+                    in_researcher = False
+                    continue
 
-        if handler == "answer":
-            if self._verbose:
-                print("pipeline: info_query → Info agent")
-            _info_snap = self._usage_snapshot(self._info_agent)
-            response = str(self._info_agent(user_text))
-            self._record_agent_usage(self._info_agent, _info_snap)
-            self._session.last_agent = "info"
-            self._session.last_info_response = response
-            self._record_chat_summary(user_text, triage_result, status="completed")
-            return response
+                _data = event.get("data")
+                if _data and not in_researcher:
+                    parts.append(_data)
 
-        if handler == "needs_image":
-            if self._verbose:
-                print("pipeline: needs_image → handoff to user (missing image)")
-            self._record_chat_summary(user_text, triage_result, status="needs_image")
-            return triage_result.response or (
-                "It looks like your request requires an input image, but I don't see one attached. "
-                "Please share the image you'd like me to work with and I'll get started!"
-            )
+            # The CLI has no persistent event loop to await deferred compression
+            # on the next turn, so finish it here before this loop is torn down.
+            await self._await_pending_compression()
+            return "".join(parts)
 
-        if handler == "brain":
-            # Context-dependent feedback routing: if the previous turn was handled by
-            # the Info agent (e.g. it created/refined a prompt), route feedback back to
-            # Info instead of the Brain, which has no knowledge of the prior prompt.
-            if triage_result.intent == MessageIntent.feedback and self._session.last_agent == "info":
-                if self._verbose:
-                    print("pipeline: feedback on Info-agent output → routing back to Info agent")
-                _info_snap = self._usage_snapshot(self._info_agent)
-                response = str(self._info_agent(user_text))
-                self._record_agent_usage(self._info_agent, _info_snap)
-                self._session.last_agent = "info"
-                self._record_chat_summary(user_text, triage_result, status="completed")
-                return response
-            # Follow-up: skip Researcher, send directly to Brain
-            self._ensure_clean_history()
-            brain_prompt = self._build_followup_prompt(user_text, triage_result)
-            _brain_snap = self._usage_snapshot(self._brain)
-            brain_response = str(self._brain(brain_prompt))
-            self._record_agent_usage(self._brain, _brain_snap)
-            self._session.follow_up_count += 1
-            # Executor handoff: Brain signals a (re-)assembled workflow is ready
-            workflow_paths = _get_workflow_signal()
-            workflow_paths = self._expand_variations(workflow_paths, self._last_brainbriefing_json or "")
-            executor_paths: list[str] = []
-            if workflow_paths:
-                count = len(workflow_paths)
-                if self._verbose:
-                    tag = f"{count} workflows (batch)" if count > 1 else workflow_paths[0]
-                    print(f"pipeline: Brain (follow-up) signaled {tag} ready.")
-                executor_lines, executor_paths, _ = asyncio.run(
-                    self._drain_executor_batch(
-                        workflow_paths,
-                        self._last_brainbriefing_json or "",
-                        user_message=user_text,
-                    )
-                )
-                if executor_paths:
-                    self._session.current_output_paths[:] = executor_paths
-                if executor_lines:
-                    brain_response = brain_response + "\n\n" + "\n".join(executor_lines)
-            self._record_chat_summary(user_text, triage_result, status="completed")
-            asyncio.run(self._compress_brain_history(extra_output_paths=executor_paths))
-            self._session.last_agent = "brain"
-            if self._verbose:
-                print("pipeline: Brain (follow-up) finished.")
-            return brain_response
-
-        if handler == "planner":
-            return self._run_planned_request(user_text, triage_result)
-
-        # handler == "researcher" or "log_warning" → full Researcher → Brain flow
-        raw_json, error, researcher_output = self._run_researcher(user_input)
-        if error:
-            self._record_chat_summary(user_text, triage_result, status="error")
-            return error
-
-        # Check if the researcher needs user clarification before it can proceed.
-        question = self._researcher_blocked_question(raw_json)
-        if question:
-            self._session.last_researcher_request = user_text
-            try:
-                self._session.last_researcher_blockers = json.loads(raw_json).get("blockers", [])
-            except Exception:
-                self._session.last_researcher_blockers = []
-            self._session.last_agent = "researcher"
-            self._record_chat_summary(user_text, triage_result, status="blocked")
-            return question
-
-        if self._should_skip_brain():
-            if self._verbose:
-                print("pipeline: Skipping Brain stage; returning Researcher output.")
-            return researcher_output
-
-        self._last_brainbriefing_json = raw_json
-        brain_prompt = self._build_brain_prompt(raw_json)
-        # New request → discard prior history entirely to save tokens.
-        self._brain.messages.clear()
-        self._ensure_clean_history()
-        _brain_snap = self._usage_snapshot(self._brain)
-        brain_response = str(self._brain(brain_prompt))
-        self._record_agent_usage(self._brain, _brain_snap)
-        # Executor handoff: Brain signals the assembled workflow(s) are ready
-        workflow_paths_r = _get_workflow_signal()
-        # Expand variation prompts from multiprompt.json if applicable
-        workflow_paths_r = self._expand_variations(workflow_paths_r, raw_json)
-        executor_paths_r: list[str] = []
-        if workflow_paths_r:
-            count = len(workflow_paths_r)
-            if self._verbose:
-                tag = f"{count} workflows (batch)" if count > 1 else workflow_paths_r[0]
-                print(f"pipeline: Brain signaled {tag} ready.")
-            executor_lines_r, executor_paths_r, _ = asyncio.run(
-                self._drain_executor_batch(
-                    workflow_paths_r,
-                    raw_json,
-                    user_message=user_text,
-                )
-            )
-            if executor_paths_r:
-                self._session.current_output_paths[:] = executor_paths_r
-            if executor_lines_r:
-                brain_response = brain_response + "\n\n" + "\n".join(executor_lines_r)
-        self._record_chat_summary(user_text, triage_result, status="completed", raw_json=raw_json)
-        asyncio.run(self._compress_brain_history(extra_output_paths=executor_paths_r))
-        self._session.last_agent = "brain"
-        if self._verbose:
-            print("pipeline: Brain finished.")
-        return brain_response
+        return asyncio.run(_consume())
 
     async def stream_async(self, user_input, *, qa_reply_queue: asyncio.Queue | None = None):  # noqa: ANN201
         """Async generator compatible with Chainlit's streaming loop.
@@ -698,8 +564,10 @@ class Pipeline:
         """
         # Block until any deferred brain-history compression from the prior
         # turn has finished, otherwise this turn would see uncompressed history.
+        _trace("pipeline.stream_async: await pending compression")
         await self._await_pending_compression()
         # Stage 0 – Triage (classify intent before any agent is called)
+        _trace("pipeline.stream_async: triage begin")
         self._last_turn_usages = []
         user_text = self._extract_text(user_input)
         user_text = self._annotate_attachments(user_input, user_text)
@@ -719,16 +587,14 @@ class Pipeline:
         handler = _route(triage_result)
 
         if self._verbose:
-            _msg = (f"pipeline: Triage → intent={triage_result.intent.value},"
-                    f" confidence={triage_result.confidence:.2f}, handler={handler}")
-            print(_msg)
-            yield {"data": f"\n_{_msg}_"}
+            print(f"pipeline: Triage → intent={triage_result.intent.value},"
+                  f" confidence={triage_result.confidence:.2f}, handler={handler}")
+        _trace(f"pipeline.stream_async: triage done → handler={handler}")
 
         # Context-dependent routing: researcher was previously blocked waiting for user input.
         if self._session.last_agent == "researcher" and self._session.last_researcher_request:
             if self._verbose:
                 print("pipeline: Researcher was blocked — re-running with user clarification")
-                yield {"data": "\n_pipeline: Researcher was blocked — re-running with user clarification_"}
             _bls_s = self._session.last_researcher_blockers
             _blockers_ctx_s = (
                 "\n\nYou previously identified these blockers:\n" + "\n".join(f"- {b}" for b in _bls_s)
@@ -769,7 +635,6 @@ class Pipeline:
             # Researcher now ready — stream Brain stage.
             if self._verbose:
                 print("pipeline: Researcher (retry) resolved — handing off to Brain …")
-                yield {"data": "\n_pipeline: Researcher (retry) resolved — handing off to Brain …_"}
             async for event in self._astream_brain_stage(
                 _r_json_s, user_text, triage_result, qa_reply_queue=qa_reply_queue
             ):
@@ -779,25 +644,30 @@ class Pipeline:
         if handler == "answer":
             if self._verbose:
                 print("pipeline: info_query → Info agent (streamed)")
-                yield {"data": "\n_pipeline: info_query → Info agent (streamed)_"}
             _info_snap = self._usage_snapshot(self._info_agent)
             _info_chunks: list[str] = []
+            _trace("pipeline.answer: info_agent.stream_async begin")
+            _info_n = 0
             async for event in self._info_agent.stream_async(user_text):
+                _info_n += 1
                 if isinstance(event, dict):
                     _chunk = event.get("data", "")
                     if _chunk:
                         _info_chunks.append(_chunk)
                 yield event
+            _trace(f"pipeline.answer: info stream done ({_info_n} events); bookkeeping")
             self._record_agent_usage(self._info_agent, _info_snap)
+            _info_full_response = "".join(_info_chunks)
+            log_agent_exchange("INFO", user_text, _info_full_response)
             self._session.last_agent = "info"
-            self._session.last_info_response = "".join(_info_chunks) or None
+            self._session.last_info_response = _info_full_response or None
             self._record_chat_summary(user_text, triage_result, status="completed")
+            _trace("pipeline.answer: return")
             return
 
         if handler == "needs_image":
             if self._verbose:
                 print("pipeline: needs_image → handoff to user (missing image)")
-                yield {"data": "\n_pipeline: needs_image → handoff to user (missing image)_"}
             self._record_chat_summary(user_text, triage_result, status="needs_image")
             message = triage_result.response or (
                 "It looks like your request requires an input image, but I don't see one attached. "
@@ -813,11 +683,16 @@ class Pipeline:
             if triage_result.intent == MessageIntent.feedback and self._session.last_agent == "info":
                 if self._verbose:
                     print("pipeline: feedback on Info-agent output → routing back to Info agent")
-                    yield {"data": "\n_pipeline: feedback on Info-agent output → routing back to Info agent_"}
                 _info_snap = self._usage_snapshot(self._info_agent)
+                _info_fb_chunks: list[str] = []
                 async for event in self._info_agent.stream_async(user_text):
+                    if isinstance(event, dict):
+                        _chunk = event.get("data", "")
+                        if _chunk:
+                            _info_fb_chunks.append(_chunk)
                     yield event
                 self._record_agent_usage(self._info_agent, _info_snap)
+                log_agent_exchange("INFO", user_text, "".join(_info_fb_chunks))
                 self._session.last_agent = "info"
                 self._record_chat_summary(user_text, triage_result, status="completed")
                 return
@@ -844,9 +719,6 @@ class Pipeline:
                 if self._verbose:
                     tag = f"{count} workflows (batch)" if count > 1 else workflow_paths_fu[0]
                     print(f"pipeline: Brain (follow-up) signaled {tag} ready.")
-                    yield {"data": f"\n_pipeline: Brain (follow-up) signaled {tag} ready._"}
-                hdr = f"batch of {count} workflows" if count > 1 else "workflow"
-                yield {"data": f"\n\n_⚙️ Handing off to executor ({hdr})…_"}
                 async for line in _execute_workflows_batch(
                     workflow_paths_fu,
                     self._last_brainbriefing_json or "",
@@ -871,7 +743,6 @@ class Pipeline:
         # Stage 1 – Researcher (streamed)
         if self._verbose:
             print("pipeline: Stage 1 – Researcher resolving spec …")
-            yield {"data": "\n_pipeline: Stage 1 – Researcher resolving spec …_"}
         raw_json: str | None = None
         error: str | None = None
         researcher_output: str = ""
@@ -907,14 +778,12 @@ class Pipeline:
         if self._should_skip_brain():
             if self._verbose:
                 print("pipeline: Skipping Brain stage; returning Researcher output.")
-                yield {"data": "\n_pipeline: Skipping Brain stage; returning Researcher output._"}
             yield {"data": researcher_output}
             return
 
         # Stage 2 – Brain (streamed, with optional ComfyUI interrupt handling)
         if self._verbose:
             print("pipeline: Stage 2 – Brain streaming …")
-            yield {"data": "\n_pipeline: Stage 2 – Brain streaming …_"}
         async for event in self._astream_brain_stage(
             raw_json, user_text, triage_result, qa_reply_queue=qa_reply_queue
         ):
@@ -924,16 +793,21 @@ class Pipeline:
 
     # ── Planner helpers ──────────────────────────────────────────────── #
 
-    def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
+    async def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
         """Call the Planner agent to decompose *user_text* into ordered steps.
 
         Returns a tuple of:
           - list of ``{"request": str, "description": str}`` dicts (empty on failure)
           - the raw agent response string (for display in the UI thinking block)
+
+        Uses ``invoke_async`` (not the sync ``agent(...)``) so the persistent
+        Planner agent runs on the caller's event loop instead of a throwaway
+        per-call worker loop — see the triage note for why the sync path hangs
+        on the second invocation.
         """
         raw: str
         _planner_snap = self._usage_snapshot(self._planner_agent)
-        raw = str(self._planner_agent(user_text))
+        raw = str(await self._planner_agent.invoke_async(user_text))
         self._record_agent_usage(self._planner_agent, _planner_snap)
         # Reset single-turn history immediately.
         try:
@@ -1035,7 +909,7 @@ class Pipeline:
             "`signal_workflow_ready(workflow_path)` with the corrected workflow once it is ready."
         )
 
-    def _run_error_check(self, task_description: str) -> dict:
+    async def _run_error_check(self, task_description: str) -> dict:
         """Invoke the error-checker agent and return a parsed verdict dict.
 
         The agent reads ComfyUI logs and returns JSON with keys:
@@ -1044,11 +918,15 @@ class Pipeline:
 
         On any failure the method returns ``{"status": "ok", ...}``
         (fail-open) so a transient error doesn't abort the plan.
+
+        Uses ``invoke_async`` (not the sync ``agent(...)``) for the same reason
+        as triage/planner: the persistent agent must run on the caller's event
+        loop, not a throwaway per-call worker loop.
         """
         _snap = self._usage_snapshot(self._error_checker_agent)
         raw = ""
         try:
-            raw = str(self._error_checker_agent(task_description))
+            raw = str(await self._error_checker_agent.invoke_async(task_description))
             self._record_agent_usage(self._error_checker_agent, _snap)
         except Exception as exc:
             if self._verbose:
@@ -1071,206 +949,6 @@ class Pipeline:
                 print("[error_checker] WARNING: could not parse verdict JSON — treating as ok.")
             return {"status": "ok", "errors": [], "fix_plan": "", "user_message": ""}
 
-    def _run_planned_request(self, user_text: str, triage_result: TriageResult) -> str:
-        """Execute a multi-step plan synchronously; return a combined summary string."""
-        if self._verbose:
-            print("pipeline: Planner — decomposing multi-step request …")
-        steps, _planner_raw = self._run_planner(user_text)
-
-        # Fallback: treat as a plain new_request when planning fails.
-        if not steps:
-            if self._verbose:
-                print("pipeline: Planner fallback → researcher path")
-            raw_json, error, researcher_output = self._run_researcher(user_text)
-            if error:
-                self._record_chat_summary(user_text, triage_result, status="error")
-                return error
-            self._last_brainbriefing_json = raw_json
-            if self._should_skip_brain():
-                return researcher_output
-            self._ensure_clean_history()
-            _brain_snap_pfb = self._usage_snapshot(self._brain)
-            brain_response = str(self._brain(self._build_brain_prompt(raw_json)))
-            self._record_agent_usage(self._brain, _brain_snap_pfb)
-            wf = _get_workflow_signal()
-            wf = self._expand_variations(wf, raw_json)
-            ep: list[str] = []
-            if wf:
-                _, ep, _ = asyncio.run(
-                    self._drain_executor_batch(wf, raw_json, user_message=user_text)
-                )
-                if ep:
-                    self._session.current_output_paths[:] = ep
-            self._record_chat_summary(user_text, triage_result, status="completed", raw_json=raw_json)
-            asyncio.run(self._compress_brain_history(extra_output_paths=ep))
-            return brain_response
-
-        total = len(steps)
-        if self._verbose:
-            print(f"pipeline: Plan has {total} step(s):")
-            for i, s in enumerate(steps, 1):
-                print(f"  {i}. {s['description']}")
-
-        step_results: list[str] = []
-        prev_brainbriefing: dict | None = None  # compact context forwarded step-to-step
-
-        for idx, step in enumerate(steps):
-            description = step["description"]
-            step_req = self._inject_context_into_step(step["request"], idx, prev_brainbriefing)
-
-            if self._verbose:
-                print(f"\npipeline: ── Plan step {idx + 1}/{total}: {description} ──")
-
-            raw_json, error, researcher_output = self._run_researcher(step_req)
-            if error:
-                msg = f"Step {idx + 1} ({description}) failed: {error}"
-                if self._verbose:
-                    print(f"pipeline: {msg}")
-                step_results.append(msg)
-                # Abort remaining steps when the researcher fails.
-                break
-
-            # Check for a soft blocker (researcher status=blocked) — stop the plan.
-            blocked_question = self._researcher_blocked_question(raw_json)
-            if blocked_question:
-                msg = (
-                    f"🚫 Plan stopped at step {idx + 1}/{total} — **{description}** — "
-                    f"the researcher needs more information before it can continue:\n\n"
-                    f"{blocked_question}"
-                )
-                if self._verbose:
-                    print(f"pipeline: Researcher blocked at step {idx + 1}: {blocked_question}")
-                step_results.append(msg)
-                break
-
-            self._last_brainbriefing_json = raw_json
-            # Stash brainbriefing for the next step's context injection.
-            try:
-                prev_brainbriefing = json.loads(raw_json) if raw_json else None
-            except (json.JSONDecodeError, TypeError):
-                prev_brainbriefing = None
-
-            if self._should_skip_brain():
-                step_results.append(f"Step {idx + 1}: {researcher_output}")
-                continue
-
-            qa_step_failed = False
-            while True:  # ── QA retry loop ──────────────────────────────── #
-                self._ensure_clean_history()
-                _brain_snap_ps = self._usage_snapshot(self._brain)
-                brain_response = str(self._brain(self._build_brain_prompt(raw_json)))
-                self._record_agent_usage(self._brain, _brain_snap_ps)
-                wf_paths = _get_workflow_signal()
-                wf_paths = self._expand_variations(wf_paths, raw_json)
-                exec_paths: list[str] = []
-                step_error_abort = False
-                verdict: dict = {"status": "ok", "errors": [], "fix_plan": "", "user_message": ""}
-                _qa_fail_event: dict | None = None
-                if wf_paths:
-                    count = len(wf_paths)
-                    if self._verbose:
-                        tag = f"{count} workflows (batch)" if count > 1 else wf_paths[0]
-                        print(f"pipeline: Step {idx + 1} Brain signaled {tag} ready.")
-                    exec_lines, exec_paths, _qa_fail_event = asyncio.run(
-                        self._drain_executor_batch(
-                            wf_paths, raw_json, user_message=step_req
-                        )
-                    )
-                    if exec_paths:
-                        self._session.current_output_paths[:] = exec_paths
-                    if exec_lines:
-                        brain_response = brain_response + "\n\n" + "\n".join(exec_lines)
-
-                    if not _qa_fail_event:
-                        # ── Error check + fix-retry loop ─────────────────── #
-                        _MAX_FIX_ATTEMPTS = 3
-                        for _fix_attempt in range(1, _MAX_FIX_ATTEMPTS + 1):
-                            verdict = self._run_error_check(description)
-                            if verdict["status"] == "ok":
-                                break
-                            if self._verbose:
-                                print(
-                                    f"[error_checker] Step {idx + 1} attempt {_fix_attempt}: "
-                                    f"{verdict['status']} — {verdict.get('errors', [])[:1]}"
-                                )
-                            if verdict["status"] == "error_unfixable" or _fix_attempt == _MAX_FIX_ATTEMPTS:
-                                step_error_abort = True
-                                if self._verbose:
-                                    print(
-                                        f"pipeline: Step {idx + 1} aborted after "
-                                        f"{_fix_attempt} error-check attempt(s)."
-                                    )
-                                break
-                            # Fixable error — ask Brain to fix and rerun.
-                            _brain_snap_fix = self._usage_snapshot(self._brain)
-                            fix_response = str(self._brain(self._build_fix_prompt(verdict["fix_plan"], _fix_attempt)))
-                            self._record_agent_usage(self._brain, _brain_snap_fix)
-                            wf_paths_fix = _get_workflow_signal()
-                            wf_paths_fix = self._expand_variations(wf_paths_fix, raw_json)
-                            exec_paths = []
-                            if wf_paths_fix:
-                                exec_lines_fix, exec_paths, _qa_fail_event = asyncio.run(
-                                    self._drain_executor_batch(wf_paths_fix, raw_json, user_message=step_req)
-                                )
-                                if exec_paths:
-                                    self._session.current_output_paths[:] = exec_paths
-                                if exec_lines_fix:
-                                    brain_response = fix_response + "\n\n" + "\n".join(exec_lines_fix)
-                                if _qa_fail_event:
-                                    break
-                            else:
-                                # Brain could not produce a fixed workflow.
-                                step_error_abort = True
-                                break
-                        # ── end error-check retry loop ───────────────────── #
-
-                if _qa_fail_event:
-                    # Vision QA failed — show result and ask whether to retry.
-                    _image_paths = _qa_fail_event.get("image_paths", [])
-                    _fail_details = _qa_fail_event.get("fail_details", [])
-                    print(f"\n⚠️  QA check failed for step {idx + 1}/{total} — {description}")
-                    for p in _image_paths:
-                        print(f"   📎 Output: {p}")
-                    for d in _fail_details:
-                        print(f"   • {Path(d['path']).name}: {d['verdict']}")
-                    try:
-                        _answer = input("\n🔁 Retry this step? [y/n]: ").strip()
-                    except (EOFError, KeyboardInterrupt):
-                        _answer = "n"
-                    if _is_affirmative(_answer):
-                        print("  ↩️  Retrying…\n")
-                        continue  # re-run Brain + executor
-                    qa_step_failed = True
-
-                break  # ── end QA retry loop ──────────────────────────────── #
-
-            if qa_step_failed:
-                step_results.append(f"**Step {idx + 1} — {description}**: ⚠️ QA failed, step skipped.")
-                break  # abort remaining steps
-
-            if step_error_abort:
-                err_msg = (
-                    verdict.get("user_message")
-                    or f"Step {idx + 1} failed after {_MAX_FIX_ATTEMPTS} retry attempt(s)."
-                )
-                if self._verbose:
-                    print(f"pipeline: Step {idx + 1} permanently failed: {err_msg}")
-                step_results.append(f"**Step {idx + 1} — {description}**: ❌ {err_msg}")
-                break  # abort remaining steps
-
-            self._record_chat_summary(step_req, triage_result, status="completed", raw_json=raw_json)
-            asyncio.run(self._compress_brain_history(extra_output_paths=exec_paths))
-
-            step_results.append(f"**Step {idx + 1} — {description}**\n{brain_response}")
-
-            if self._verbose:
-                print(f"pipeline: Step {idx + 1}/{total} finished.")
-
-        combined = "\n\n---\n\n".join(step_results)
-        if self._verbose:
-            print(f"pipeline: Planned execution complete ({total} step(s)).")
-        return combined
-
     async def _stream_planned_request(
         self,
         user_text: str,
@@ -1281,16 +959,14 @@ class Pipeline:
         """Stream a multi-step plan; yields Strands-compatible event dicts."""
         if self._verbose:
             print("pipeline: Planner — decomposing multi-step request …")
-            yield {"data": "\n_pipeline: Planner — decomposing multi-step request …_"}
         yield {"_planner_start": True}
-        steps, _planner_raw = self._run_planner(user_text)
+        steps, _planner_raw = await self._run_planner(user_text)
         yield {"_planner_done": True, "raw": _planner_raw}
 
         # Fallback: treat as a plain researcher path when planning fails.
         if not steps:
             if self._verbose:
                 print("pipeline: Planner fallback → researcher path")
-                yield {"data": "\n_pipeline: Planner fallback → researcher path_"}
             yield {"_researcher_start": True}
             raw_json = error = researcher_output = None
             async for _r_ev in self._arun_researcher(user_text):
@@ -1319,7 +995,6 @@ class Pipeline:
             self._session.current_output_paths.clear()
             ep = self._session.current_output_paths
             if wf:
-                yield {"data": "\n\n_⚙️ Handing off to executor…_"}
                 async for line in _execute_workflows_batch(
                     wf, raw_json,
                     user_message=user_text,
@@ -1333,13 +1008,10 @@ class Pipeline:
 
         total = len(steps)
         yield {"_plan_ready": True, "steps": [{"description": s["description"]} for s in steps]}
-        yield {"data": f"_🗂️ Plan ready — {total} step(s) to execute._\n"}
         if self._verbose:
             print(f"pipeline: Plan has {total} step(s):")
             for i, s in enumerate(steps, 1):
                 print(f"  {i}. {s['description']}")
-            _steps_list = "\n".join(f"  {i}. {s['description']}" for i, s in enumerate(steps, 1))
-            yield {"data": f"\n_pipeline: Plan has {total} step(s):_\n{_steps_list}\n"}
 
         prev_brainbriefing: dict | None = None  # compact context forwarded step-to-step
 
@@ -1351,7 +1023,6 @@ class Pipeline:
             yield {"data": f"\n\n**Step {idx + 1}/{total} — {description}**\n"}
             if self._verbose:
                 print(f"\npipeline: ── Plan step {idx + 1}/{total}: {description} ──")
-                yield {"data": f"\n_pipeline: ── Plan step {idx + 1}/{total}: {description} ──_"}
 
             yield {"_researcher_start": True}
             raw_json = error = researcher_output = None
@@ -1413,9 +1084,6 @@ class Pipeline:
                 verdict: dict = {"status": "ok", "errors": [], "fix_plan": "", "user_message": ""}
                 _qa_fail_event: dict | None = None
                 if wf_paths:
-                    count = len(wf_paths)
-                    hdr = f"batch of {count} workflows" if count > 1 else "workflow"
-                    yield {"data": f"\n\n_⚙️ Handing off to executor ({hdr})…_"}
                     async for line in _execute_workflows_batch(
                         wf_paths, raw_json,
                         user_message=step_req,
@@ -1432,7 +1100,7 @@ class Pipeline:
                     if not _qa_fail_event:
                         _MAX_FIX_ATTEMPTS = 3
                         for _fix_attempt in range(1, _MAX_FIX_ATTEMPTS + 1):
-                            verdict = self._run_error_check(description)
+                            verdict = await self._run_error_check(description)
                             if verdict["status"] == "ok":
                                 break
                             if self._verbose:
@@ -1440,10 +1108,6 @@ class Pipeline:
                                     f"[error_checker] Step {idx + 1} attempt {_fix_attempt}: "
                                     f"{verdict['status']} — {verdict.get('errors', [])[:1]}"
                                 )
-                                yield {"data": (
-                                    f"\n_[error_checker] Step {idx + 1} attempt {_fix_attempt}: "
-                                    f"{verdict['status']}_"
-                                )}
                             if verdict["status"] == "error_unfixable" or _fix_attempt == _MAX_FIX_ATTEMPTS:
                                 step_error_abort = True
                                 if self._verbose:
@@ -1451,10 +1115,6 @@ class Pipeline:
                                         f"pipeline: Step {idx + 1} aborted after "
                                         f"{_fix_attempt} error-check attempt(s)."
                                     )
-                                    yield {"data": (
-                                        f"\n_pipeline: Step {idx + 1} aborted — "
-                                        f"{verdict.get('user_message', 'workflow error')}_"
-                                    )}
                                 break
                             # Fixable error — ask Brain to fix (streamed) and rerun.
                             yield {"data": f"\n_🔧 Fixing step {idx + 1} (attempt {_fix_attempt}/{_MAX_FIX_ATTEMPTS})…_"}
@@ -1471,8 +1131,6 @@ class Pipeline:
                             self._session.current_output_paths.clear()
                             exec_paths = self._session.current_output_paths
                             if wf_paths_fix:
-                                hdr_fix = f"batch of {len(wf_paths_fix)} workflows" if len(wf_paths_fix) > 1 else "workflow"
-                                yield {"data": f"\n\n_⚙️ Re-submitting to executor ({hdr_fix})…_"}
                                 async for line in _execute_workflows_batch(
                                     wf_paths_fix, raw_json,
                                     user_message=step_req,
@@ -1500,13 +1158,7 @@ class Pipeline:
                             _qa_step_feedback_prompt = self._build_qa_feedback_prompt(
                                 self._build_brain_prompt(raw_json), step_req, _qa_fail_event
                             )
-                            yield {"data": (
-                                "\n\n---\n"
-                                "🔍 **QA feedback sent to Brain:**\n\n"
-                                + _qa_step_feedback_prompt
-                                + "\n\n---\n"
-                            )}
-                            yield {"data": "\n_🔄 Retrying step with QA feedback…_"}
+                            yield {"data": "\n\n_🔄 Retrying step with QA feedback…_"}
                             _step_brain_prompt_override = _qa_step_feedback_prompt
                             continue  # re-run Brain + executor with feedback
                     # No queue or user declined — mark failed and stop plan.
@@ -1519,7 +1171,6 @@ class Pipeline:
                 self._record_chat_summary(step_req, triage_result, status="qa_failed", raw_json=raw_json)
                 if self._verbose:
                     print(f"pipeline: Step {idx + 1}/{total} QA failed — aborting plan.")
-                    yield {"data": f"\n_pipeline: Step {idx + 1}/{total} QA failed — aborting plan._"}
                 break  # stop processing further steps
 
             if step_error_abort:
@@ -1540,11 +1191,9 @@ class Pipeline:
             yield {"_step_done": True, "idx": idx}
             if self._verbose:
                 print(f"pipeline: Step {idx + 1}/{total} finished.")
-                yield {"data": f"\n_pipeline: Step {idx + 1}/{total} finished._"}
 
         if self._verbose:
             print(f"pipeline: Planned execution complete ({total} step(s)).")
-            yield {"data": f"\n_pipeline: Planned execution complete ({total} step(s))._"}
     # ── Triage helpers ───────────────────────────────────────────────── #
 
     @staticmethod
@@ -1746,11 +1395,11 @@ class Pipeline:
         if not messages:
             return
 
-        # ── Self-learning check (fire-and-forget background thread) ─────────
+        # ── Self-learning check — started AFTER summarisation to avoid ────────
+        # competing for the same Ollama model concurrently.
         tool_call_count = count_tool_calls(messages)
         if self._verbose:
             print(f"pipeline: Brain used {tool_call_count} tool call(s) in this session.")
-        maybe_run_learnings(messages, session_id=self._session.session_id)
 
         if self._verbose:
             msg_count = len(messages)
@@ -1770,6 +1419,9 @@ class Pipeline:
             # Sanitize to avoid orphaned toolResult blocks at the start.
             self._brain.messages[:] = self._sanitize_messages(messages[-4:])
             return
+
+        # ── Fire learnings now that summarisation is done ────────────────────
+        maybe_run_learnings(messages, session_id=self._session.session_id)
 
         if not summary:
             if self._verbose:
@@ -1966,50 +1618,46 @@ class Pipeline:
 
     _MAX_RESEARCHER_RETRIES = 2  # up to 2 correction rounds after the first attempt
 
-    async def _arun_researcher(self, user_input):
-        """Async-generator variant of _run_researcher.
+    def _build_researcher_prompt(self, user_input) -> tuple[str, str]:
+        """Build the Researcher's first-attempt prompt and the extracted user text.
 
-        Streams the Researcher's token output (including tool-use events) so
-        Chainlit can display it in real time.  Yields standard Strands event
-        dicts followed by a single sentinel::
+        Injects all the context the Researcher needs: long-term memory, image
+        paths uploaded earlier in the thread, the prior-round conversation
+        summary, and any Info-agent output from the previous turn.
 
-            {"_researcher_done": True, "raw_json": str|None,
-             "error": str|None, "researcher_output": str}
-
-        Callers must consume the stream, watch for the sentinel, then act on
-        its ``raw_json`` / ``error`` fields.
+        Returns ``(prompt_text, user_text)``.
         """
         if isinstance(user_input, list):
-            text_parts = [block["text"] for block in user_input if "text" in block]
-            user_text = "\n".join(text_parts)
+            user_text = "\n".join(b["text"] for b in user_input if "text" in b)
         else:
             user_text = str(user_input)
 
-        researcher_prompt_text = textwrap.dedent(f"""
+        prompt = textwrap.dedent(f"""
             User request:
             {user_text}
 
             Resolve all fields and output the brainbriefing JSON.
         """).strip()
 
+        # Prepend relevant long-term memories (past style/template preferences).
         memory_ctx = self._get_memory_context(user_text)
         if memory_ctx:
-            researcher_prompt_text = memory_ctx + "\n\n" + researcher_prompt_text
+            prompt = memory_ctx + "\n\n" + prompt
 
-        # Inject paths from earlier uploads when the current message has no attachments.
+        # Surface images uploaded earlier in the thread when the current message
+        # carries no attachments (e.g. "now make a video from it").
         current_has_images = isinstance(user_input, list) and any("image" in b for b in user_input)
         if not current_has_images and self._session.last_user_input_images:
             _paths_hint = "\n".join(
                 f"  - {p}  [image uploaded earlier in this thread, use as input]"
                 for p in self._session.last_user_input_images
             )
-            researcher_prompt_text += f"\n\nInput image(s) from earlier in this thread:\n{_paths_hint}"
+            prompt += f"\n\nInput image(s) from earlier in this thread:\n{_paths_hint}"
 
-        # Inject the compressed summary from the previous turn so the Researcher
-        # can resolve OUTPUT_PATHS (prior generated files) as inputs for this turn.
-        # This bridges chained sessions regardless of how triage classified the intent.
+        # Bridge chained sessions: inject the prior-round summary so the
+        # Researcher can resolve OUTPUT_PATHS (prior generated files) as inputs.
         if self._last_prior_summary:
-            researcher_prompt_text += (
+            prompt += (
                 f"\n\n[CONVERSATION SUMMARY FROM PRIOR ROUND]\n\n"
                 f"{self._last_prior_summary}\n\n"
                 f"[END OF SUMMARY — if this request refers to previously generated outputs, "
@@ -2017,15 +1665,32 @@ class Pipeline:
                 f"returned filename as the workflow input.]"
             )
 
-        # If the previous turn was handled by the Info agent (e.g. it crafted a prompt),
-        # pass only the key output as a compact hint so the Researcher can reuse it.
+        # Reuse Info-agent output from the previous turn (e.g. a crafted prompt).
         if self._session.last_agent == "info" and self._session.last_info_response:
             _trimmed = self._session.last_info_response[:2000]  # hard cap — keeps tokens low
-            researcher_prompt_text += (
+            prompt += (
                 f"\n\nThe Info agent produced the following output in the previous turn "
                 f"(use any prompt text or details from it):\n{_trimmed}"
             )
             self._session.last_info_response = None  # consume once
+
+        return prompt, user_text
+
+    async def _arun_researcher(self, user_input):
+        """Run the Researcher, streaming its token output as Strands events.
+
+        Streams the Researcher's token output (including tool-use events) so
+        Chainlit can display it in real time, validating and retrying the
+        brainbriefing JSON up to ``_MAX_RESEARCHER_RETRIES`` times.  Yields
+        standard Strands event dicts followed by a single sentinel::
+
+            {"_researcher_done": True, "raw_json": str|None,
+             "error": str|None, "researcher_output": str}
+
+        Callers must consume the stream, watch for the sentinel, then act on
+        its ``raw_json`` / ``error`` fields.
+        """
+        researcher_prompt_text, _ = self._build_researcher_prompt(user_input)
 
         last_error: str | None = None
         _researcher_snap = self._usage_snapshot(self._researcher)
@@ -2036,7 +1701,6 @@ class Pipeline:
             else:
                 if self._verbose:
                     print(f"pipeline: Researcher retry {attempt}/{self._MAX_RESEARCHER_RETRIES} …")
-                    yield {"data": f"\n_pipeline: Researcher retry {attempt}/{self._MAX_RESEARCHER_RETRIES} …_"}
                 prompt = textwrap.dedent(f"""
                     Your previous brainbriefing output failed JSON/schema validation:
                     {last_error}
@@ -2101,137 +1765,6 @@ class Pipeline:
             ),
             "researcher_output": "",
         }
-
-    def _run_researcher(self, user_input) -> tuple[str | None, str | None, str]:
-        """Run the Researcher and return ``(raw_json, error_message, researcher_output)``.
-
-        Calls the Researcher as a normal text agent (preserving its tool use),
-        extracts the JSON from the response, then validates it with the
-        ``BrainBriefing`` Pydantic model.  On success the model is re-serialised
-        so the Brain always receives canonically formatted JSON.
-
-        If validation fails, the error is fed back to the Researcher for up to
-        ``_MAX_RESEARCHER_RETRIES`` correction rounds before giving up.
-
-        ``user_input`` may be a plain string *or* a list of Strands content
-        blocks (the multimodal format produced by Chainlit when the
-        user attaches images/videos).  When it is a list, the image/video
-        blocks are forwarded to the Researcher intact so it can visually
-        inspect the attachments via its ``analyze_image`` tool.
-
-        Returns ``(json_str, None, researcher_output)`` on success, ``(None, error_str, last_output)`` on failure.
-        """
-        # Build a text-only version of the user request for the preamble and
-        # for retry prompts where we can only send plain text.
-        if isinstance(user_input, list):
-            text_parts = [block["text"] for block in user_input if "text" in block]
-            user_text = "\n".join(text_parts)
-        else:
-            user_text = user_input
-
-        researcher_prompt_text = textwrap.dedent(f"""
-            User request:
-            {user_text}
-
-            Resolve all fields and output the brainbriefing JSON.
-        """).strip()
-
-        # Prepend relevant long-term memories so the Researcher can apply
-        # the user's past style preferences and template choices.
-        memory_ctx = self._get_memory_context(user_text)
-        if memory_ctx:
-            researcher_prompt_text = memory_ctx + "\n\n" + researcher_prompt_text
-
-        # If the current message has no image attachments but the user uploaded
-        # images earlier in this thread, surface those paths so the Researcher
-        # knows what input image(s) to use (e.g. "make a video from it").
-        current_has_images = isinstance(user_input, list) and any("image" in b for b in user_input)
-        if not current_has_images and self._session.last_user_input_images:
-            _paths_hint = "\n".join(
-                f"  - {p}  [image uploaded earlier in this thread, use as input]"
-                for p in self._session.last_user_input_images
-            )
-            researcher_prompt_text += f"\n\nInput image(s) from earlier in this thread:\n{_paths_hint}"
-
-        # Inject the compressed summary from the previous turn so the Researcher
-        # can resolve OUTPUT_PATHS (prior generated files) as inputs for this turn.
-        # This bridges chained sessions regardless of how triage classified the intent.
-        if self._last_prior_summary:
-            researcher_prompt_text += (
-                f"\n\n[CONVERSATION SUMMARY FROM PRIOR ROUND]\n\n"
-                f"{self._last_prior_summary}\n\n"
-                f"[END OF SUMMARY — if this request refers to previously generated outputs, "
-                f"upload the file(s) from OUTPUT_PATHS via upload_image() and use the "
-                f"returned filename as the workflow input.]"
-            )
-
-        # Always pass only the text prompt to the Researcher.
-        # When user_input is a multimodal list, the text block already contains
-        # the on-disk paths of any attached files (added by _build_content in chainlit_app.py).
-        # The Researcher can call analyze_image(file_path=...) if it needs to inspect
-        # an image — much cheaper than embedding raw bytes in every LLM call.
-        first_attempt_input: Any = researcher_prompt_text
-
-        last_error: str | None = None
-        _researcher_snap = self._usage_snapshot(self._researcher)
-
-        for attempt in range(1 + self._MAX_RESEARCHER_RETRIES):
-            if attempt == 0:
-                prompt = first_attempt_input
-            else:
-                # Feed the validation error back so the model can self-correct
-                if self._verbose:
-                    print(
-                        f"pipeline: Researcher retry {attempt}/{self._MAX_RESEARCHER_RETRIES} …"
-                    )
-                prompt = textwrap.dedent(f"""
-                    Your previous brainbriefing output failed JSON/schema validation:
-                    {last_error}
-
-                    Please output ONLY the corrected brainbriefing JSON with all
-                    required fields correctly typed. No prose, no markdown fences.
-                """).strip()
-
-            last_response = str(self._researcher(prompt))
-            label = "initial" if attempt == 0 else f"retry {attempt}"
-            if self._verbose:
-                print(f"pipeline: Researcher finished ({label}). Extracting brainbriefing …")
-
-            raw_json = _extract_json(last_response)
-            if raw_json is None:
-                last_error = "No JSON object found in the output."
-                continue
-
-            try:
-                data = json.loads(raw_json)
-                briefing = BrainBriefing.model_validate(data)
-            except (json.JSONDecodeError, ValidationError) as exc:
-                last_error = str(exc)
-                if self._verbose:
-                    print(f"pipeline: Researcher ({label}) validation failed: {last_error}")
-                continue
-
-            # Success — re-serialise from validated model so Brain always gets clean JSON
-            raw_json = briefing.model_dump_json(indent=2)
-            if self._verbose:
-                if attempt > 0:
-                    print(f"pipeline: Brainbriefing recovered after {attempt} retry(ies).")
-                print(
-                    f"pipeline: Brainbriefing OK ({label}) — "
-                    f"status={briefing.status}, task={briefing.task.description!r}, "
-                    f"template={briefing.template.name!r}"
-                )
-            log_agent_messages("RESEARCHER", list(self._researcher.messages))
-            self._record_agent_usage(self._researcher, _researcher_snap)
-            return raw_json, None, raw_json
-
-        # All attempts exhausted
-        log_agent_messages("RESEARCHER", list(self._researcher.messages))
-        self._record_agent_usage(self._researcher, _researcher_snap)
-        return None, (
-            f"Brainbriefing validation failed after {1 + self._MAX_RESEARCHER_RETRIES} attempts: "
-            f"{last_error}"
-        ), ""
 
     def _researcher_blocked_question(self, raw_json: str | None) -> str | None:
         """Return a user-facing question string if the brainbriefing status is 'blocked', else None."""
@@ -2308,9 +1841,6 @@ class Pipeline:
                     if self._verbose:
                         tag = f"{count} workflows (batch)" if count > 1 else workflow_paths_b[0]
                         print(f"pipeline: Brain signaled {tag} ready.")
-                        yield {"data": f"\n_pipeline: Brain signaled {tag} ready._"}
-                    hdr = f"batch of {count} workflows" if count > 1 else "workflow"
-                    yield {"data": f"\n\n_⚙️ Handing off to executor ({hdr})…_"}
                     async for line in _execute_workflows_batch(
                         workflow_paths_b,
                         raw_json,
@@ -2366,13 +1896,7 @@ class Pipeline:
                             _qa_feedback_prompt = self._build_qa_feedback_prompt(
                                 brain_prompt, user_text, _qa_fail_event_b
                             )
-                            yield {"data": (
-                                "\n\n---\n"
-                                "🔍 **QA feedback sent to Brain:**\n\n"
-                                + _qa_feedback_prompt
-                                + "\n\n---\n"
-                            )}
-                            yield {"data": "\n_🔄 Retrying with QA feedback…_"}
+                            yield {"data": "\n\n_🔄 Retrying with QA feedback…_"}
                             current_input = _qa_feedback_prompt
                             continue  # restart the while True loop
                     # No queue or user declined — abort.
@@ -2394,7 +1918,6 @@ class Pipeline:
                     )
                 if self._verbose:
                     print("pipeline: Brain finished.")
-                    yield {"data": "\n_pipeline: Brain finished._"}
                 break
 
             # ── ComfyUI interrupt: stream progress, then resume ────── #
@@ -2415,7 +1938,6 @@ class Pipeline:
 
             if self._verbose:
                 print(f"pipeline: ComfyUI interrupt — streaming prompt_id={prompt_id_b}")
-                yield {"data": f"\n_pipeline: ComfyUI interrupt — streaming prompt_id={prompt_id_b}_"}
             yield {"data": f"\n\n_⏳ ComfyUI job queued (`{prompt_id_b}`). Streaming progress…_"}
 
             history_result_b: dict = {}
@@ -2431,7 +1953,6 @@ class Pipeline:
             yield {"data": "\n_✅ ComfyUI job finished — resuming…_"}
             if self._verbose:
                 print(f"pipeline: ComfyUI job {prompt_id_b} finished. Resuming Brain.")
-                yield {"data": f"\n_pipeline: ComfyUI job {prompt_id_b} finished. Resuming Brain._"}
             current_input = [
                 {
                     "interruptResponse": {
@@ -2488,43 +2009,6 @@ class Pipeline:
             f"Call `signal_workflow_ready(workflow_path)` when the revised workflow is ready.\n\n"
             f"--- Original Brainbriefing ---\n\n{original_brain_prompt}"
         )
-
-    async def _drain_executor_batch(
-        self,
-        workflow_paths: list[str],
-        brainbriefing_json: str,
-        user_message: str = "",
-    ) -> tuple[list[str], list[str], dict | None]:
-        """Submit all workflows then poll + process each; return ``(status_lines, output_paths, qa_fail_event)``.
-
-        Uses ``execute_workflows_batch`` (submit-all-then-poll) for any number
-        of workflows, including a single one.
-
-        ``user_message`` is forwarded to the Vision QA agent as the ground-truth
-        reference.  It never enters any agent's context window or history.
-
-        When QA fails the generator yields a ``{"qa_fail": True, ...}`` dict.
-        That event is returned as the third element instead of being appended to
-        ``lines`` (which is always strings).
-        """
-        lines: list[str] = []
-        output_paths: list[str] = []
-        qa_fail_event: dict | None = None
-        async for line in _execute_workflows_batch(
-            workflow_paths,
-            brainbriefing_json,
-            user_message=user_message,
-            verbose=self._verbose,
-            collected_paths=output_paths,
-            run_qa=self._run_qa,
-        ):
-            if isinstance(line, dict) and line.get("qa_fail"):
-                qa_fail_event = line
-                break
-            lines.append(line if isinstance(line, str) else str(line))
-            if self._verbose:
-                print(f"[executor] {line}")
-        return lines, output_paths, qa_fail_event
 
     def _expand_variations(
         self,
