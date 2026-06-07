@@ -28,7 +28,7 @@ from strands import Agent
 
 from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_triage_agent, create_vision_agent, _settings
 from src.tools.image_handling import set_vision_agent as _set_vision_agent
-from src.utils.chat_summary import summarize_conversation, log_agent_messages
+from src.utils.chat_summary import summarize_conversation, log_agent_messages, log_agent_exchange
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
 from src.utils.comfyui_progress import stream_comfyui_job as _stream_comfyui_job
 from src.utils.progress_signal import drain as _drain_progress
@@ -555,6 +555,7 @@ class Pipeline:
             _info_snap = self._usage_snapshot(self._info_agent)
             response = str(self._info_agent(user_text))
             self._record_agent_usage(self._info_agent, _info_snap)
+            log_agent_exchange("INFO", user_text, response)
             self._session.last_agent = "info"
             self._session.last_info_response = response
             self._record_chat_summary(user_text, triage_result, status="completed")
@@ -579,6 +580,7 @@ class Pipeline:
                 _info_snap = self._usage_snapshot(self._info_agent)
                 response = str(self._info_agent(user_text))
                 self._record_agent_usage(self._info_agent, _info_snap)
+                log_agent_exchange("INFO", user_text, response)
                 self._session.last_agent = "info"
                 self._record_chat_summary(user_text, triage_result, status="completed")
                 return response
@@ -789,8 +791,10 @@ class Pipeline:
                         _info_chunks.append(_chunk)
                 yield event
             self._record_agent_usage(self._info_agent, _info_snap)
+            _info_full_response = "".join(_info_chunks)
+            log_agent_exchange("INFO", user_text, _info_full_response)
             self._session.last_agent = "info"
-            self._session.last_info_response = "".join(_info_chunks) or None
+            self._session.last_info_response = _info_full_response or None
             self._record_chat_summary(user_text, triage_result, status="completed")
             return
 
@@ -815,9 +819,15 @@ class Pipeline:
                     print("pipeline: feedback on Info-agent output → routing back to Info agent")
                     yield {"data": "\n_pipeline: feedback on Info-agent output → routing back to Info agent_"}
                 _info_snap = self._usage_snapshot(self._info_agent)
+                _info_fb_chunks: list[str] = []
                 async for event in self._info_agent.stream_async(user_text):
+                    if isinstance(event, dict):
+                        _chunk = event.get("data", "")
+                        if _chunk:
+                            _info_fb_chunks.append(_chunk)
                     yield event
                 self._record_agent_usage(self._info_agent, _info_snap)
+                log_agent_exchange("INFO", user_text, "".join(_info_fb_chunks))
                 self._session.last_agent = "info"
                 self._record_chat_summary(user_text, triage_result, status="completed")
                 return

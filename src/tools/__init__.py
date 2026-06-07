@@ -64,6 +64,7 @@ from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.iterate import iterate  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
+from src.tools.web_search import web_search, web_search_images  # noqa: F401
 from strands_tools import file_read  # noqa: F401
 from strands_tools import calculator  # noqa: F401
 from strands_tools import stop  # noqa: F401
@@ -83,6 +84,9 @@ INFO_TOOLS: list = [
     stop,
     analyze_image,
     get_image_resolution,
+    # Web search
+    web_search,
+    web_search_images,
 ]
 
 # ---------------------------------------------------------------------------
@@ -98,6 +102,9 @@ RESEARCHER_TOOLS: list = [
     analyze_image,
     upload_image,  # needed to stage prior-session outputs as new inputs
     run_script,  # needed for skills (e.g. image-downsize)
+    # Web search
+    web_search,
+    web_search_images,
     iterate,
     calculator,
     memory_read,

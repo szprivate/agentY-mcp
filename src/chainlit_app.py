@@ -92,11 +92,20 @@ _unload_ollama_models()
 
 
 # ── Module-level pipeline singleton ──────────────────────────────────────────
+_pipeline_exc: Exception | None = None
 try:
     _pipeline = create_pipeline()
-except Exception as _pipeline_exc:
+except Exception as _exc:
+    _pipeline_exc = _exc  # saved explicitly – Python 3 deletes the except-clause variable after the block
     print(f"[chainlit] Failed to create pipeline at startup: {_pipeline_exc}")
     _pipeline = None
+
+
+# Serializes on_message so rapid-fire ("chatty") messages queue instead of
+# racing on the shared pipeline singleton. Must be module-global (not
+# per-session) because _pipeline itself — including the single stateful Brain
+# agent and AgentSession — is shared across every Chainlit session/thread.
+_PIPELINE_LOCK = asyncio.Lock()
 
 
 # Simple password auth callback for Chainlit (adjust as needed)
@@ -330,23 +339,55 @@ async def on_chat_resume(thread) -> None:  # noqa: ARG001
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
+    """Serialize turns so a chatty user can't race the shared pipeline.
+
+    Chainlit dispatches every incoming message as its own fire-and-forget
+    asyncio task (chainlit/socket.py: ``asyncio.create_task(process_message)``)
+    with no per-session serialization. Because the whole app shares one
+    stateful ``_pipeline`` singleton (one Strands Brain agent, one
+    AgentSession), two overlapping turns interleave writes to
+    ``brain.messages`` and corrupt it — which then crashes every later turn
+    until the process is restarted. A global lock makes rapid-fire messages
+    queue and run one at a time.
+
+    Emergency controls (stop / restart) bypass the lock so they still work
+    while a long generation is holding it.
+    """
+    _cmd = (message.content or "").strip().lower()
+    if _cmd in {"restart", "/restart", "stop", "/stop", "!stop", "shutdown", "/shutdown"}:
+        await _process_message(message)
+        return
+    if _PIPELINE_LOCK.locked():
+        await cl.Message(
+            content="⏳ Still finishing your previous message — I'll handle this one next.",
+            author="system",
+        ).send()
+    async with _PIPELINE_LOCK:
+        await _process_message(message)
+
+
+async def _process_message(message: cl.Message) -> None:
     """Handle an incoming user message, optionally with image attachments."""
     # ── Built-in commands ─────────────────────────────────────────────────
     _text = (message.content or "").strip()
     if _text.lower() in {"restart", "/restart"}:
-        await cl.Message(content="🔄 Restarting agent…", author="system").send()
-        try:
-            new_pipeline = create_pipeline()
-        except Exception as _exc:
-            await cl.Message(
-                content=f"❌ Failed to restart pipeline:\n```\n{_exc}\n```",
-                author="system",
-            ).send()
-            return
-        cl.user_session.set("pipeline", new_pipeline)
-        cl.user_session.set("awaiting_answer", False)
-        _reset_pipeline_state(new_pipeline)
-        await cl.Message(content="✅ Agent restarted successfully.", author="system").send()
+        await cl.Message(
+            content="🔄 Restarting agent process… the page will reconnect automatically.",
+            author="system",
+        ).send()
+        # Spawn a fresh process with identical argv (reloads all code + settings),
+        # then hard-exit the current one.  Using python -m chainlit so we stay
+        # interpreter-agnostic regardless of whether chainlit was launched via
+        # the .exe entry-point or a .cmd wrapper on Windows.
+        import subprocess
+        argv_tail = sys.argv[1:]  # e.g. ['run', 'src/chainlit_app.py', '--port', '8000']
+        subprocess.Popen(
+            [sys.executable, "-m", "chainlit"] + argv_tail,
+            cwd=_project_root,
+        )
+        # Give Chainlit a moment to flush the message before the process dies
+        await asyncio.sleep(1)
+        os._exit(0)
         return
 
     if _text.lower() in {"stop", "/stop", "!stop", "shutdown", "/shutdown"}:

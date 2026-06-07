@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-Check workflow templates for custom nodes that are not installed, then install them.
+"""Check workflows from config/workflow_templates.json for missing custom nodes and install them.
 
 Steps:
-  1. Extract all ``class_type`` values from every JSON template under
+  1. Load the list of workflow templates from ./config/workflow_templates.json
+  2. Extract all ``class_type`` values from the corresponding JSON template files under
      ./comfyui_workflow_templates_custom/templates/
-  2. Identify which types belong to a custom-node package by looking them up in
+  3. Identify which types belong to a custom-node package by looking them up in
      the ComfyUI-Manager extension-node-map.json (fetched from GitHub).
-  3. Compare the required packages against the installed ones listed in
+  4. Compare the required packages against the installed ones listed in
      config/custom_nodes.json.
-  4. Install every missing package via the ComfyUI Manager REST API.
-  5. Restart the ComfyUI server (only when at least one package was installed).
+  5. Install every missing package via the ComfyUI Manager REST API.
+  6. Restart the ComfyUI server (only when at least one package was installed).
 
 Run once at startup via run_agent.ps1.  Exits silently if ComfyUI is offline
 or the Manager extension is not installed.
@@ -34,6 +34,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 # Constants
 # ---------------------------------------------------------------------------
 TEMPLATES_DIR = PROJECT_ROOT / "comfyui_workflow_templates_custom" / "templates"
+WORKFLOW_TEMPLATES_CONFIG = PROJECT_ROOT / "config" / "workflow_templates.json"
 CUSTOM_NODES_CONFIG = PROJECT_ROOT / "config" / "custom_nodes.json"
 EXTENSION_NODE_MAP_URL = (
     "https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/extension-node-map.json"
@@ -73,13 +74,30 @@ def _comfyui_headers(base_url: str) -> dict:
 
 
 def extract_node_types_from_templates() -> set[str]:
-    """Return all unique ``class_type`` values found in the custom template JSONs."""
+    """Return all unique ``class_type`` values from workflows listed in config/workflow_templates.json."""
     types: set[str] = set()
-    if not TEMPLATES_DIR.exists():
-        print(f"[check_nodes] Templates directory not found: {TEMPLATES_DIR}")
+    
+    if not WORKFLOW_TEMPLATES_CONFIG.exists():
+        print(f"[check_nodes] Workflow config not found: {WORKFLOW_TEMPLATES_CONFIG}")
         return types
-
-    for template_file in TEMPLATES_DIR.glob("*.json"):
+    
+    try:
+        with open(WORKFLOW_TEMPLATES_CONFIG, encoding="utf-8") as f:
+            workflow_ids = json.load(f)
+    except Exception as exc:
+        print(f"[check_nodes] WARNING: Could not parse {WORKFLOW_TEMPLATES_CONFIG}: {exc}")
+        return types
+    
+    if not workflow_ids:
+        print(f"[check_nodes] No workflows found in {WORKFLOW_TEMPLATES_CONFIG}")
+        return types
+    
+    for workflow_id in workflow_ids.keys():
+        template_file = TEMPLATES_DIR / f"{workflow_id}.json"
+        if not template_file.exists():
+            print(f"[check_nodes] WARNING: Workflow template not found: {template_file.name}")
+            continue
+        
         try:
             with open(template_file, encoding="utf-8") as f:
                 workflow = json.load(f)

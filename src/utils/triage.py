@@ -139,11 +139,19 @@ async def triage(
     try:
         json_str = _extract_json(raw) or raw
         parsed   = json.loads(json_str)
-        intent   = MessageIntent(parsed["intent"])
+        # Parse confidence and run_qa first — these must not be lost if the
+        # intent string is unrecognised (a bad intent value used to abort the
+        # entire block, leaving confidence=0.0 and triggering a spurious
+        # low-confidence fallback that misfired the full researcher pipeline).
         confidence = float(parsed.get("confidence", 0.5))
-        run_qa   = bool(parsed.get("run_qa", False))
-    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        run_qa     = bool(parsed.get("run_qa", False))
+        intent     = MessageIntent(parsed["intent"])
+    except (json.JSONDecodeError, KeyError) as exc:
         logger.warning("Intent parse failed (%s); raw=%r — defaulting to new_request", exc, raw)
+    except ValueError as exc:
+        # Unknown intent string — keep the parsed confidence so the gate works
+        # correctly; only the intent itself falls back.
+        logger.warning("Unknown intent value (%s); raw=%r — defaulting to new_request", exc, raw)
 
     # Chain guard — downgrade to new_request when there is no prior session output.
     # This is the authoritative server-side enforcement of the prompt rule:
@@ -196,13 +204,13 @@ def route(result: TriageResult) -> str:
         return "log_warning"
 
     match result.intent:
-        case MessageIntent.info_query:
+        case MessageIntent.info_query | MessageIntent.chat:
             return "answer"
         case MessageIntent.needs_image:
             return "needs_image"
         case MessageIntent.param_tweak | MessageIntent.feedback:
             return "brain"
-        case MessageIntent.chain:
+        case MessageIntent.chain | MessageIntent.batch_request:
             return "researcher"
         case MessageIntent.new_planned_request:
             return "planner"

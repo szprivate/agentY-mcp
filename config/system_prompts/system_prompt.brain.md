@@ -36,7 +36,7 @@ Call `apply_brainbriefing(workflow_path, brainbriefing_json)`.
 
 This single tool call handles all patching programmatically:
 - replaces filenames in input nodes
-- replaces positive / negative prompts
+- injects prompts via `prompt_nodes` (explicit per-node) with fallback to `positive_prompt_node_id` and heuristic negative-node search
 - updates output node filename prefixes
 - sets resolution
 

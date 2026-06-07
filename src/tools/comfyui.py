@@ -1601,9 +1601,34 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
     positive_text = prompt_block.get("positive", "")
     negative_text = prompt_block.get("negative", "")
 
-    # Positive prompt
+    # ── 2a. prompt_nodes: explicit per-node prompt injection (preferred path) ──
+    prompt_nodes = bb.get("prompt_nodes", [])
+    handled_nids: set[str] = set()
+    for pn in prompt_nodes:
+        pn_nid = str(pn.get("node_id", ""))
+        role = pn.get("role", "positive")  # "positive" | "negative"
+        slot = pn.get("slot", "text")
+        if not pn_nid:
+            problems.append("prompt_nodes entry missing node_id")
+            continue
+        if pn_nid not in workflow:
+            problems.append(f"prompt_nodes: node '{pn_nid}' not found in workflow")
+            continue
+        text = positive_text if role == "positive" else negative_text
+        if not text:
+            applied.append(f"prompt_nodes: node '{pn_nid}' role='{role}' — no text provided (skipped)")
+            continue
+        node = workflow[pn_nid]
+        if "inputs" not in node:
+            node["inputs"] = {}
+        node["inputs"][slot] = text
+        applied.append(f"Node {pn_nid}.inputs.{slot} → ({role} prompt, {len(text)} chars)")
+        handled_nids.add(pn_nid)
+
+    # ── 2b. Legacy fallback: positive_prompt_node_id + heuristic negative ────
+    # Only runs for nodes not already handled by prompt_nodes above.
     pos_nid = str(bb.get("positive_prompt_node_id", ""))
-    if positive_text and pos_nid:
+    if positive_text and pos_nid and pos_nid not in handled_nids:
         if pos_nid not in workflow:
             problems.append(f"positive_prompt_node_id '{pos_nid}' not found in workflow")
         else:
@@ -1612,9 +1637,13 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
                 node["inputs"] = {}
             node["inputs"]["text"] = positive_text
             applied.append(f"Node {pos_nid}.inputs.text → (positive prompt, {len(positive_text)} chars)")
+            handled_nids.add(pos_nid)
 
     # Negative prompt: find a node with "negative" in its title that has a text input
-    if negative_text:
+    if negative_text and not any(
+        str(pn.get("node_id", "")) in handled_nids and pn.get("role") == "negative"
+        for pn in prompt_nodes
+    ):
         neg_nid: str | None = None
         for nid, node in workflow.items():
             if not isinstance(node, dict):

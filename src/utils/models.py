@@ -18,8 +18,10 @@ class MessageIntent(str, Enum):
     feedback            = "feedback"             # qualitative feedback / correction on the generated output
     new_request         = "new_request"          # fresh generation request
     new_planned_request = "new_planned_request"  # multi-step generation plan (several consecutive tasks)
+    batch_request       = "batch_request"        # same workflow N times with varied parameters
     info_query          = "info_query"           # question about capabilities / workflows / models
     needs_image         = "needs_image"          # request requires an image input that the user forgot to attach
+    chat                = "chat"                 # casual/conversational message with no generation intent
 
 
 class ChatSummary(BaseModel):

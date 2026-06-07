@@ -65,7 +65,7 @@ Map user-provided image paths/filenames into the brainbriefing.
 - **Prior-session outputs as inputs**: If the conversation summary (injected as `[CONVERSATION SUMMARY FROM PRIOR ROUND]`) contains an `OUTPUT_PATHS` line, and the current task requires one of those files as input (e.g. "use the image we just generated"), you MUST:
   1. Call `upload_image(file_path=<full path from OUTPUT_PATHS>)` for each such file.
   2. Use the `name` value returned by `upload_image` as the `filename` in `input_images` and `input_nodes`.
-  3. Set `path` in `input_nodes` to the original full path from `OUTPUT_PATHS`.
+  3. Set `path` in `input_nodes` to the full path of the uploaded file: `<get_comfyui_dirs().input_dir>/<name>` (where `name` is returned by `upload_image`). Do NOT use the original path from `OUTPUT_PATHS`.
   - **Never guess or fabricate filenames** — always upload and use the returned name.
 
 ---

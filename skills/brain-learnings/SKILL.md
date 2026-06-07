@@ -29,3 +29,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-05-12 | CLIPLoader validation fails with incorrect clip_name or missing type | Use get_node_schema to identify the exact clip_name string and the required type value.
 
 2026-05-12 | CLIPLoader validation fails when clip_name lacks subfolder prefix | Use the full path including the subfolder prefix, such as FLUX2\\, to match the server's expected model name list.
+
+2026-06-07 | update_workflow fails when resolution values are not in a node's predefined list | Check node schema for allowed enum values and select the nearest option (e.g., '2K') when specifically requested dimensions are not supported by the system.

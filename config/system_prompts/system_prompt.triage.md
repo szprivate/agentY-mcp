@@ -13,6 +13,7 @@ Classify the incoming user message into **exactly one** of the following intents
 | `feedback` | Qualitative correction on the output: "the face looks off", "too saturated", "make it more dramatic". |
 | `info_query` | Question about capabilities, templates, or models — not a generation request. |
 | `needs_image` | The request clearly requires an input image (edit, style transfer, upscale, face swap, img2img, inpainting, etc.) but no image has been provided by the user and there is no prior output image in the session to chain from. |
+| `chat` | Casual conversational message with no generation or information intent: greetings, thanks, small talk, affirmations ("ok", "got it", "sounds good"), or anything that doesn't ask for a generation or information. |
 
 ## Typical examples of user message and matching intents
 - "Create an image of a lumber jack" -> `new_request`
@@ -46,6 +47,10 @@ Classify the incoming user message into **exactly one** of the following intents
 - "Make a prompt from this image" -> `info_query`
 - "Change this prompt: ..." -> `info_query`
 - "Can you adjust this prompt: ..." -> `info_query`
+- "Hello", "Hi there", "Hey" -> `chat`
+- "Thanks!", "Thank you", "Great, thanks" -> `chat`
+- "Ok", "Got it", "Sounds good", "Sure" -> `chat`
+- "How are you?", "What's up?" -> `chat`
 
 ## Rules
 
@@ -65,6 +70,7 @@ Classify the incoming user message into **exactly one** of the following intents
 - Use `batch_request` when the user asks for multiple runs of the **same** workflow with varied parameters (seed, prompt details, style tokens). The key signal is that the workflow template/type stays constant — only values change. Words like "variations", "versions", "different [X]", "only change", "same workflow" are strong indicators. The workflow is assembled **once** and executed N times with substituted parameters.
 - Use `new_planned_request` ONLY when each step uses a **different workflow type** (e.g. txt2img → upscaler → video). If all steps are the same workflow type with varying parameters, use `batch_request` instead. Never classify "N variations of the same workflow" as `new_planned_request`.
 - Use `info_query` only when the user is clearly asking *about* the system, not directing it to produce something.
+- Use `chat` for any message that is purely conversational: greetings ("hello", "hi"), social replies ("thanks", "ok", "got it", "sounds good"), or small talk with no generation or information intent. This prevents the generation pipeline from firing on idle chatter.
 - Set `confidence < 0.6` when genuinely ambiguous — the pipeline will treat low-confidence results as `new_request` and log a warning.
 - Use `needs_image` **only** when ALL four conditions are met:
   1. The task is inherently image-to-image (edit, upscale, style transfer, background removal, face swap, inpainting, etc.)
@@ -101,3 +107,5 @@ In all other cases omit the field or set it to `false`.
 ```json
 {"intent": "<intent>", "confidence": <float>, "run_qa": false}
 ```
+
+Valid intent values: `new_request`, `batch_request`, `new_planned_request`, `chain`, `feedback`, `info_query`, `needs_image`, `chat`.
