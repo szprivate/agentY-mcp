@@ -35,6 +35,7 @@ from src.pipeline import create_pipeline
 from src.utils.costs import compute_cost_from_usage
 from src.utils.models import AgentSession
 from src.utils.triage import triage as _run_triage, route as _route_intent
+from src.utils.debug_log import trace as _trace, debug_enabled as _debug_enabled
 
 # Agent factories imported lazily inside the switch_model handler to avoid
 # circular-import issues at module load time.
@@ -106,6 +107,15 @@ except Exception as _exc:
 # per-session) because _pipeline itself — including the single stateful Brain
 # agent and AgentSession — is shared across every Chainlit session/thread.
 _PIPELINE_LOCK = asyncio.Lock()
+
+
+# Announce hang/stall trace state at startup so it's never ambiguous whether
+# tracing is active. Toggle with the -Debug flag (AGENTY_DEBUG=1) or by
+# creating/removing the .logs/agenty_debug.on sentinel file (live, no restart).
+print(
+    f"[agentY] debug tracing: {'ON → .logs/debug.log' if _debug_enabled() else 'OFF'}"
+    f"  (enable: run_agent.ps1 -Debug, or  New-Item .logs/agenty_debug.on)"
+)
 
 
 # Simple password auth callback for Chainlit (adjust as needed)
@@ -969,8 +979,11 @@ async def _process_message(message: cl.Message) -> None:
     full_response_parts: list[str] = []
     qa_reply_queue: asyncio.Queue = asyncio.Queue()
 
+    _trace("chainlit: stream loop begin")
+    _event_count = 0
     try:
         async for event in pipeline.stream_async(content, qa_reply_queue=qa_reply_queue):
+            _event_count += 1
             if not isinstance(event, dict):
                 continue
 
@@ -1181,6 +1194,7 @@ async def _process_message(message: cl.Message) -> None:
                 if any(kw in normal_text for kw in ("💾", "Saved", "executor")):
                     await _flush_new_outputs()
 
+        _trace(f"chainlit: stream loop exited after {_event_count} events; finalising steps")
         # Finalise any still-open steps.
         if researcher_step is not None:
             await researcher_step.update()
@@ -1201,9 +1215,11 @@ async def _process_message(message: cl.Message) -> None:
             await task_list.send()
 
     except Exception as exc:
+        _trace(f"chainlit: pipeline error: {exc!r}")
         msg = await _ensure_response_msg()
         await msg.stream_token(f"\n\n❌ Pipeline error: {exc}")
 
+    _trace("chainlit: post-stream — response_msg.update()")
     if response_msg is not None:
         await response_msg.update()
 
@@ -1213,10 +1229,13 @@ async def _process_message(message: cl.Message) -> None:
     cl.user_session.set("awaiting_answer", "?" in tail)
 
     # Final flush — catches any outputs that arrived with the last event.
+    _trace("chainlit: post-stream — _flush_new_outputs()")
     await _flush_new_outputs()
 
     # ── Persist thread state so on_chat_resume can restore it ────────────
+    _trace("chainlit: post-stream — _save_thread_state()")
     _save_thread_state(pipeline)
+    _trace("chainlit: post-stream — cost summary send")
 
     # ── Whole-generation cost summary (shown once, at the very end) ───────
     # Accumulated across every agent that ran this turn (triage + researcher +
@@ -1239,3 +1258,4 @@ async def _process_message(message: cl.Message) -> None:
         ).send()
     except Exception:
         pass
+    _trace("chainlit: turn complete")

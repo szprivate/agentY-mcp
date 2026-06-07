@@ -119,8 +119,18 @@ async def triage(
     else:
         classify_input = f"{session_hint}{user_message}"
 
-    # Call the triage agent — returns the full response string.
-    raw: str = str(agent(classify_input))
+    # Call the triage agent asynchronously — returns the full response string.
+    #
+    # IMPORTANT: use ``invoke_async``, NOT the sync ``agent(...)``.  The sync
+    # ``__call__`` routes through Strands' ``run_async()``, which executes the
+    # agent in a throwaway worker thread + fresh ``asyncio.run`` event loop on
+    # *every* call.  Because the triage agent is persistent (reused each turn),
+    # its loop-bound async HTTP client is created on the first call's worker loop
+    # and then hangs on the second call's new loop — the classic "info query
+    # turn 1 works, turn 2 wedges in triage" deadlock.  ``invoke_async`` runs the
+    # agent natively on the caller's event loop, exactly like the Brain / Info /
+    # Researcher agents do via ``stream_async`` (which is why they never hang).
+    raw: str = str(await agent.invoke_async(classify_input))
 
     # Log triage input/output before messages are cleared.
     log_agent_exchange("TRIAGE", classify_input, raw)

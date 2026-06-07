@@ -41,6 +41,7 @@ from src.utils.memory import format_memories, memory_add, memory_search
 from src.tools.memory_tools import set_session_id as _set_memory_session_id
 from src.tools.comfyui import clear_tool_caches as _clear_tool_caches
 from src.utils.learnings import count_tool_calls, maybe_run_learnings
+from src.utils.debug_log import trace as _trace
 
 
 # ---------------------------------------------------------------------------
@@ -360,14 +361,35 @@ class Pipeline:
         # awaits it so the brain never sees uncompressed history.
         self._pending_compression: asyncio.Task | None = None
 
+    # Max seconds the next turn will wait for the previous turn's deferred
+    # history compression. Compression is a background optimisation (a cheap
+    # Ollama summary) and must never hold the next user turn hostage — e.g. if
+    # Ollama is slow swapping the summariser model into VRAM that a prior
+    # generation just filled. On timeout the task is cancelled and the turn
+    # proceeds with the brain's recent (sanitised) history instead.
+    _COMPRESSION_WAIT_TIMEOUT = 30.0
+
     async def _await_pending_compression(self) -> None:
-        """Block until any deferred brain-history compression has finished."""
+        """Block until any deferred brain-history compression has finished.
+
+        Bounded by ``_COMPRESSION_WAIT_TIMEOUT`` so a stuck or slow background
+        summary can never hang the next turn indefinitely.
+        """
         task = self._pending_compression
         if task is None:
             return
         self._pending_compression = None
         try:
-            await task
+            await asyncio.wait_for(task, timeout=self._COMPRESSION_WAIT_TIMEOUT)
+        except asyncio.TimeoutError:
+            # wait_for has already cancelled the task; cancelling at the LLM
+            # await point means brain.messages was not yet replaced, so the
+            # history is simply left uncompressed for this turn (the brain
+            # paths sanitise it before use). Better a bigger prompt than a hang.
+            print(
+                f"pipeline: deferred compression exceeded {self._COMPRESSION_WAIT_TIMEOUT:.0f}s — "
+                "cancelled; continuing with recent history."
+            )
         except Exception as exc:  # noqa: BLE001
             if self._verbose:
                 print(f"pipeline: deferred compression failed — {exc}")
@@ -542,8 +564,10 @@ class Pipeline:
         """
         # Block until any deferred brain-history compression from the prior
         # turn has finished, otherwise this turn would see uncompressed history.
+        _trace("pipeline.stream_async: await pending compression")
         await self._await_pending_compression()
         # Stage 0 – Triage (classify intent before any agent is called)
+        _trace("pipeline.stream_async: triage begin")
         self._last_turn_usages = []
         user_text = self._extract_text(user_input)
         user_text = self._annotate_attachments(user_input, user_text)
@@ -565,6 +589,7 @@ class Pipeline:
         if self._verbose:
             print(f"pipeline: Triage → intent={triage_result.intent.value},"
                   f" confidence={triage_result.confidence:.2f}, handler={handler}")
+        _trace(f"pipeline.stream_async: triage done → handler={handler}")
 
         # Context-dependent routing: researcher was previously blocked waiting for user input.
         if self._session.last_agent == "researcher" and self._session.last_researcher_request:
@@ -621,18 +646,23 @@ class Pipeline:
                 print("pipeline: info_query → Info agent (streamed)")
             _info_snap = self._usage_snapshot(self._info_agent)
             _info_chunks: list[str] = []
+            _trace("pipeline.answer: info_agent.stream_async begin")
+            _info_n = 0
             async for event in self._info_agent.stream_async(user_text):
+                _info_n += 1
                 if isinstance(event, dict):
                     _chunk = event.get("data", "")
                     if _chunk:
                         _info_chunks.append(_chunk)
                 yield event
+            _trace(f"pipeline.answer: info stream done ({_info_n} events); bookkeeping")
             self._record_agent_usage(self._info_agent, _info_snap)
             _info_full_response = "".join(_info_chunks)
             log_agent_exchange("INFO", user_text, _info_full_response)
             self._session.last_agent = "info"
             self._session.last_info_response = _info_full_response or None
             self._record_chat_summary(user_text, triage_result, status="completed")
+            _trace("pipeline.answer: return")
             return
 
         if handler == "needs_image":
@@ -763,16 +793,21 @@ class Pipeline:
 
     # ── Planner helpers ──────────────────────────────────────────────── #
 
-    def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
+    async def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
         """Call the Planner agent to decompose *user_text* into ordered steps.
 
         Returns a tuple of:
           - list of ``{"request": str, "description": str}`` dicts (empty on failure)
           - the raw agent response string (for display in the UI thinking block)
+
+        Uses ``invoke_async`` (not the sync ``agent(...)``) so the persistent
+        Planner agent runs on the caller's event loop instead of a throwaway
+        per-call worker loop — see the triage note for why the sync path hangs
+        on the second invocation.
         """
         raw: str
         _planner_snap = self._usage_snapshot(self._planner_agent)
-        raw = str(self._planner_agent(user_text))
+        raw = str(await self._planner_agent.invoke_async(user_text))
         self._record_agent_usage(self._planner_agent, _planner_snap)
         # Reset single-turn history immediately.
         try:
@@ -874,7 +909,7 @@ class Pipeline:
             "`signal_workflow_ready(workflow_path)` with the corrected workflow once it is ready."
         )
 
-    def _run_error_check(self, task_description: str) -> dict:
+    async def _run_error_check(self, task_description: str) -> dict:
         """Invoke the error-checker agent and return a parsed verdict dict.
 
         The agent reads ComfyUI logs and returns JSON with keys:
@@ -883,11 +918,15 @@ class Pipeline:
 
         On any failure the method returns ``{"status": "ok", ...}``
         (fail-open) so a transient error doesn't abort the plan.
+
+        Uses ``invoke_async`` (not the sync ``agent(...)``) for the same reason
+        as triage/planner: the persistent agent must run on the caller's event
+        loop, not a throwaway per-call worker loop.
         """
         _snap = self._usage_snapshot(self._error_checker_agent)
         raw = ""
         try:
-            raw = str(self._error_checker_agent(task_description))
+            raw = str(await self._error_checker_agent.invoke_async(task_description))
             self._record_agent_usage(self._error_checker_agent, _snap)
         except Exception as exc:
             if self._verbose:
@@ -921,7 +960,7 @@ class Pipeline:
         if self._verbose:
             print("pipeline: Planner — decomposing multi-step request …")
         yield {"_planner_start": True}
-        steps, _planner_raw = self._run_planner(user_text)
+        steps, _planner_raw = await self._run_planner(user_text)
         yield {"_planner_done": True, "raw": _planner_raw}
 
         # Fallback: treat as a plain researcher path when planning fails.
@@ -1061,7 +1100,7 @@ class Pipeline:
                     if not _qa_fail_event:
                         _MAX_FIX_ATTEMPTS = 3
                         for _fix_attempt in range(1, _MAX_FIX_ATTEMPTS + 1):
-                            verdict = self._run_error_check(description)
+                            verdict = await self._run_error_check(description)
                             if verdict["status"] == "ok":
                                 break
                             if self._verbose:
