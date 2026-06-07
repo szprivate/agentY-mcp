@@ -52,6 +52,7 @@ from src.tools.image_handling import (  # noqa: F401
     view_image,
     get_image_resolution,
     analyze_image,
+    download_image,
 )
 from src.tools.comfyui import check_model  # noqa: F401
 from src.tools.huggingface import (  # noqa: F401
@@ -87,6 +88,7 @@ INFO_TOOLS: list = [
     # Web search
     web_search,
     web_search_images,
+    download_image,   # fetch a found reference image to disk
 ]
 
 # ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ RESEARCHER_TOOLS: list = [
     get_image_resolution,
     analyze_image,
     upload_image,  # needed to stage prior-session outputs as new inputs
+    download_image,  # fetch a web reference image to disk, then stage via upload_image
     run_script,  # needed for skills (e.g. image-downsize)
     # Web search
     web_search,

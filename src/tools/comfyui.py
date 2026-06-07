@@ -1537,6 +1537,45 @@ def update_workflow(
     })
 
 
+# ---------------------------------------------------------------------------
+# Agent asset-folder routing — keep all agent-managed inputs/outputs under an
+# "agent/" subfolder of ComfyUI's input/output dirs instead of cluttering the
+# roots.  Applied deterministically when a brainbriefing is bound to a workflow.
+# ---------------------------------------------------------------------------
+
+_AGENT_SUBFOLDER = "agent"
+
+
+def _agent_input_ref(filename: str) -> str:
+    """Qualify a bare LoadImage filename with the ``agent/`` input subfolder.
+
+    ``upload_image`` / ``download_image`` place agent inputs under
+    ``input/agent[/...]``, and ComfyUI's LoadImage encodes the subfolder in the
+    image field as ``"subfolder/filename"``.  A bare ``"foo.png"`` therefore
+    becomes ``"agent/foo.png"``; names that already carry a subfolder
+    (e.g. ``"agent/references/foo.jpg"``) or look like absolute/local paths are
+    left untouched.
+    """
+    f = (filename or "").replace("\\", "/").strip()
+    if not f or "/" in f:
+        return filename
+    return f"{_AGENT_SUBFOLDER}/{f}"
+
+
+def _agent_output_prefix(path_or_prefix: str) -> str:
+    """Route a SaveImage/VHS ``filename_prefix`` under the output dir's ``agent/`` subfolder.
+
+    Keeps the trailing descriptive component and flattens any deeper structure:
+    ``"W:/.../output/image_generation"`` → ``"agent/image_generation"``.  A value
+    already under ``agent/`` is returned unchanged.
+    """
+    p = (path_or_prefix or "").replace("\\", "/").strip().strip("/")
+    if p == _AGENT_SUBFOLDER or p.startswith(_AGENT_SUBFOLDER + "/"):
+        return p or f"{_AGENT_SUBFOLDER}/output"
+    stem = p.rsplit("/", 1)[-1] if p else "output"
+    return f"{_AGENT_SUBFOLDER}/{stem or 'output'}"
+
+
 @tool
 def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
     """Apply a brainbriefing to a loaded workflow template in one atomic step.
@@ -1593,8 +1632,11 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
         node = workflow[nid]
         if "inputs" not in node:
             node["inputs"] = {}
-        node["inputs"][slot] = filename
-        applied.append(f"Node {nid}.inputs.{slot} → {filename!r}")
+        # Route the LoadImage reference under the input dir's 'agent/' subfolder
+        # (matches where upload_image / download_image stage inputs).
+        ref = _agent_input_ref(filename)
+        node["inputs"][slot] = ref
+        applied.append(f"Node {nid}.inputs.{slot} → {ref!r}")
 
     # ── 2. Prompts ────────────────────────────────────────────────────────────
     prompt_block = bb.get("prompt", {})
@@ -1666,7 +1708,7 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
             # Non-fatal: many modern pipelines have no negative prompt node
             applied.append("negative prompt: no matching node found (skipped)")
 
-    # ── 3. Output nodes: update filename_prefix ───────────────────────────────
+    # ── 3. Output nodes: route filename_prefix under the 'agent/' subfolder ────
     for out in bb.get("output_nodes", []):
         nid = str(out.get("node_id", ""))
         output_path = out.get("output_path", "")
@@ -1676,15 +1718,16 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
         if nid not in workflow:
             problems.append(f"output_nodes: node '{nid}' not found in workflow")
             continue
-        if not output_path:
-            continue
-        # Use the output_path string directly as filename_prefix so ComfyUI
-        # saves into the right subfolder (e.g. "./agentOut/image_generation").
         node = workflow[nid]
         if "inputs" not in node:
             node["inputs"] = {}
-        node["inputs"]["filename_prefix"] = output_path
-        applied.append(f"Node {nid}.inputs.filename_prefix → {output_path!r}")
+        # Keep all agent-generated outputs under <output_dir>/agent/. Use the
+        # descriptive name from output_path when given, else the node's existing
+        # filename_prefix, so files stay recognisable (e.g. agent/image_generation).
+        existing_prefix = node["inputs"].get("filename_prefix", "")
+        prefix = _agent_output_prefix(output_path or existing_prefix)
+        node["inputs"]["filename_prefix"] = prefix
+        applied.append(f"Node {nid}.inputs.filename_prefix → {prefix!r}")
 
     # ── 4. Resolution ─────────────────────────────────────────────────────────
     res_w = bb.get("resolution_width")

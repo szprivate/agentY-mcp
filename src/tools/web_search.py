@@ -45,15 +45,18 @@ def web_search(
         On error, returns a JSON object ``{"error": "<message>"}``.
     """
     try:
-        from duckduckgo_search import DDGS  # type: ignore[import]
+        from ddgs import DDGS  # type: ignore[import]
+
+        # ddgs takes the query positionally; pass only the filters that are set
+        # (it tolerates omission better than explicit None values).
+        kwargs: dict = {"max_results": max(1, min(max_results, 25))}
+        if region:
+            kwargs["region"] = region
+        if timelimit:
+            kwargs["timelimit"] = timelimit
 
         with DDGS() as ddgs:
-            raw = ddgs.text(
-                keywords=query,
-                region=region,
-                timelimit=timelimit,
-                max_results=max(1, min(max_results, 25)),
-            )
+            raw = ddgs.text(query, **kwargs)
 
         if not raw:
             return json.dumps([])
@@ -119,18 +122,24 @@ def web_search_images(
         On error, returns a JSON object ``{"error": "<message>"}``.
     """
     try:
-        from duckduckgo_search import DDGS  # type: ignore[import]
+        from ddgs import DDGS  # type: ignore[import]
+
+        # ddgs takes the query positionally; pass only the filters that are set.
+        kwargs: dict = {
+            "region": region,
+            "max_results": max(1, min(max_results, 25)),
+        }
+        if timelimit:
+            kwargs["timelimit"] = timelimit
+        if size:
+            kwargs["size"] = size
+        if type_image:
+            kwargs["type_image"] = type_image
+        if license_image:
+            kwargs["license_image"] = license_image
 
         with DDGS() as ddgs:
-            raw = ddgs.images(
-                keywords=query,
-                region=region,
-                timelimit=timelimit,
-                size=size,
-                type_image=type_image,
-                license_image=license_image,
-                max_results=max(1, min(max_results, 25)),
-            )
+            raw = ddgs.images(query, **kwargs)
 
         if not raw:
             return json.dumps([])
