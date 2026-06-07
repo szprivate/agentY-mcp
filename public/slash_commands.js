@@ -6,6 +6,7 @@
     { name: '/stop',          description: 'Stop and shut down the agent' },
     { name: '/unload',        description: 'Unload Ollama models from VRAM' },
     { name: '/clear_vram',    description: 'Clear ComfyUI GPU VRAM' },
+    { name: '/images',        description: 'Browse images generated in this thread (reference them by number)' },
     { name: '/clearhistory',  description: 'Delete all conversation history' },
     { name: '/switch_model',  description: 'Switch agent LLM — usage: /switch_model <agent> <provider,model>' },
     { name: '/add_workflow',  description: 'Add a ComfyUI workflow — usage: /add_workflow <path/to/workflow.json>' },

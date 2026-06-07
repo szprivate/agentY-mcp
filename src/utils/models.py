@@ -32,6 +32,19 @@ class ChatSummary(BaseModel):
     status: str
 
 
+class GeneratedImage(BaseModel):
+    """A single image generated earlier in the current thread.
+
+    Forms an ordered, user-referenceable gallery so the user can say
+    "image 2", "the last image", or describe it ("the lighthouse one") and
+    the agent can resolve the reference back to the real file on disk.
+    """
+    index: int                 # 1-based position in the thread gallery
+    path: str                  # resolved path of the generated file on disk
+    caption: str = ""          # short description (positive prompt / template)
+    turn: int = 0              # turn number (len(chat_summaries)+1) when produced
+
+
 class AgentSession(BaseModel):
     session_id: str
     chat_summaries: list[ChatSummary] = Field(default_factory=list)
@@ -42,6 +55,7 @@ class AgentSession(BaseModel):
     last_researcher_blockers: list[str] = Field(default_factory=list)  # blocker strings from the last blocked brainbriefing
     last_user_input_images: list[str] = Field(default_factory=list)  # paths of images uploaded by the user, persisted across turns
     last_info_response: str | None = None  # last response from the Info agent (e.g. a crafted prompt), injected into the Researcher when relevant
+    generated_images: list[GeneratedImage] = Field(default_factory=list)  # ordered gallery of images generated in this thread, referenceable by index/description
 
 
 class TriageResult(BaseModel):

@@ -33,7 +33,7 @@ from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
 from src.utils.comfyui_progress import stream_comfyui_job as _stream_comfyui_job
 from src.utils.progress_signal import drain as _drain_progress
 from src.utils.costs import compute_cost_from_usage
-from src.utils.models import AgentSession, ChatSummary, MessageIntent, TriageResult
+from src.utils.models import AgentSession, ChatSummary, GeneratedImage, MessageIntent, TriageResult
 from src.utils.triage import triage as _triage, route as _route
 from src.utils.workflow_signal import clear_and_get as _get_workflow_signal
 from src.executor import execute_workflow as _execute_workflow, execute_workflows_batch as _execute_workflows_batch
@@ -113,6 +113,14 @@ class BrainBriefing(BaseModel):
 # Canonical path where the image-batch skill writes variation prompts.
 _MULTIPROMPT_PATH = Path("output_workflows/multiprompt.json")
 _OUTPUT_WORKFLOWS_DIR = Path("output_workflows")
+
+# Image file extensions registered in the per-thread generated-image gallery.
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+
+
+def _is_image_file(path: str) -> bool:
+    """Return True when *path* points to an image file (by extension)."""
+    return Path(path).suffix.lower() in _IMAGE_SUFFIXES
 
 
 def _latest_output_workflow() -> str | None:
@@ -740,6 +748,11 @@ class Pipeline:
             # Follow-up: skip Researcher, send directly to Brain (streamed)
             self._ensure_clean_history()
             brain_prompt = self._build_followup_prompt(user_text, triage_result)
+            # Surface the thread's generated-image gallery so feedback/param_tweak
+            # follow-ups can resolve references like "image 2" / "the last image".
+            _gallery_fu = self._format_image_gallery()
+            if _gallery_fu:
+                brain_prompt = f"{_gallery_fu}\n\n{brain_prompt}"
             self._session.follow_up_count += 1
             _brain_snap_fu = self._usage_snapshot(self._brain)
             yield {"_brain_start": True}
@@ -1570,6 +1583,81 @@ class Pipeline:
                 }
             )
 
+    # ── Generated-image gallery helpers ──────────────────────────────── #
+
+    @staticmethod
+    def _caption_from_brief(raw_json: str | None) -> str:
+        """Derive a short human caption from a brainbriefing JSON string.
+
+        Prefers the positive prompt (trimmed), then the task description, then
+        the template name.  Returns an empty string when nothing usable is found.
+        """
+        if not raw_json:
+            return ""
+        try:
+            brief = json.loads(raw_json)
+        except Exception:
+            return ""
+        pos = (brief.get("prompt") or {}).get("positive") or ""
+        if pos:
+            pos = " ".join(pos.split())
+            return pos[:120] + ("…" if len(pos) > 120 else "")
+        desc = (brief.get("task") or {}).get("description") or ""
+        if desc:
+            return desc[:120]
+        return (brief.get("template") or {}).get("name") or ""
+
+    def _register_generated_images(self, raw_json: str | None) -> None:
+        """Append newly produced images to the thread gallery (dedup by path).
+
+        Called once per completed turn while ``current_output_paths`` still holds
+        that turn's outputs.  Only image files are registered; each gets a
+        1-based index, a caption derived from the brainbriefing, and the turn
+        number so the user can later reference it ("image 2", "the last image").
+        """
+        new_paths = [p for p in self._session.current_output_paths if _is_image_file(p)]
+        if not new_paths:
+            return
+        caption = self._caption_from_brief(raw_json or self._last_brainbriefing_json)
+        existing = {gi.path for gi in self._session.generated_images}
+        turn = len(self._session.chat_summaries)  # this turn's summary is already appended
+        for p in new_paths:
+            if p in existing:
+                continue
+            self._session.generated_images.append(
+                GeneratedImage(
+                    index=len(self._session.generated_images) + 1,
+                    path=p,
+                    caption=caption,
+                    turn=turn,
+                )
+            )
+            existing.add(p)
+
+    def _format_image_gallery(self) -> str:
+        """Render the thread's generated-image gallery as a compact prompt block.
+
+        Returns an empty string when no images have been generated yet.  The
+        block is injected into agent prompts so the model can resolve a user
+        reference ("image 2", "the last one", a description) to the real path.
+        """
+        gallery = self._session.generated_images
+        if not gallery:
+            return ""
+        lines = [
+            f"  {gi.index}. {gi.path}" + (f"  — {gi.caption}" if gi.caption else "")
+            for gi in gallery
+        ]
+        return (
+            "[GENERATED IMAGES IN THIS THREAD] — the user may reference these by "
+            "number (\"image 2\"), recency (\"the last image\"), or description "
+            "(\"the lighthouse one\"). Image numbers are 1-based and ordered oldest→newest:\n"
+            + "\n".join(lines)
+            + "\n[When the user refers to one of these generated images, treat the matching "
+            "path above as the input: upload it via upload_image() and use the returned "
+            "filename as the workflow input.]"
+        )
+
     def _record_chat_summary(
         self,
         user_text: str,
@@ -1595,6 +1683,11 @@ class Pipeline:
                 status=status,
             )
         )
+        # Register freshly generated images into the thread gallery so the user
+        # can browse and reference them in later turns. Only successful turns
+        # contribute referenceable outputs.
+        if status == "completed":
+            self._register_generated_images(raw_json)
         # Auto-persist a memory when a request completed with a known workflow so
         # future sessions can recall template/model preferences.
         if status == "completed" and raw_json:
@@ -1694,6 +1787,12 @@ class Pipeline:
                 for p in self._session.last_user_input_images
             )
             prompt += f"\n\nInput image(s) from earlier in this thread:\n{_paths_hint}"
+
+        # Surface the gallery of images generated earlier in this thread so the
+        # Researcher can resolve references like "image 2" / "the last image".
+        _gallery = self._format_image_gallery()
+        if _gallery:
+            prompt += f"\n\n{_gallery}"
 
         # Bridge chained sessions: inject the prior-round summary so the
         # Researcher can resolve OUTPUT_PATHS (prior generated files) as inputs.

@@ -380,7 +380,11 @@
       "abcd\\rdn_abcd.pth",
       "abcd\\swinir_abcd.pth"
     ],
-    "facerestore_models": [],
+    "facerestore_models": [
+      "GFPGANv1.3.pth",
+      "GFPGANv1.4.pth",
+      "codeformer-v0.1.0.pth"
+    ],
     "hyperswap": [
       "hyperswap_1a_256.onnx",
       "hyperswap_1b_256.onnx",

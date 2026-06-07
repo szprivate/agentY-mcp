@@ -313,6 +313,96 @@ def _restore_thread_state(pipeline) -> None:
     )
 
 
+def _resolve_element_to_path(element: dict, cache_dir: Path) -> str | None:
+    """Resolve a persisted Chainlit image *element* back to a real local file.
+
+    The data layer rewrites elements to expose a ``url`` (and ``name``) rather
+    than the original on-disk path, so on resume we recover a usable local path
+    by trying, in order:
+
+    1. The element's own ``path`` if it still exists on disk.
+    2. A previously-cached copy under *cache_dir*.
+    3. A recursive basename search under ``output_images/`` (where generated
+       files live, including the fallback-download location).
+    4. Downloading the element's ``url`` into *cache_dir* (mirrors ``/resend``).
+
+    Returns the resolved path, or ``None`` when the file cannot be recovered.
+    """
+    import urllib.request
+
+    name = element.get("name") or ""
+
+    p = element.get("path")
+    if p and os.path.isfile(p):
+        return p
+
+    if name:
+        cached = cache_dir / name
+        if cached.is_file():
+            return str(cached)
+
+        out_dir = _project_root / "output_images"
+        try:
+            for cand in out_dir.rglob(name):
+                if cand.is_file():
+                    return str(cand)
+        except Exception:
+            pass
+
+    url = element.get("url")
+    if url and name:
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            dest = cache_dir / name
+            with urllib.request.urlopen(url, timeout=20) as resp:  # noqa: S310
+                dest.write_bytes(resp.read())
+            return str(dest)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[chainlit] gallery reconstruct: fetch failed for {url}: {exc}")
+
+    return None
+
+
+def _reconstruct_gallery_from_thread(thread: dict, thread_id: str) -> list:
+    """Rebuild the generated-image gallery from a persisted thread's elements.
+
+    Scans the thread's image elements (excluding those attached to user-message
+    steps, which are the user's *uploads*, not generated outputs), resolves each
+    to a real local file, and returns an ordered list of ``GeneratedImage``.
+    Best-effort: elements that cannot be resolved to a file are skipped.
+    """
+    from src.utils.models import GeneratedImage
+
+    steps = thread.get("steps") or []
+    elements = thread.get("elements") or []
+    user_step_ids = {
+        str(s.get("id") or "") for s in steps if s.get("type") == "user_message"
+    }
+
+    img_els = [
+        e for e in elements
+        if ((e.get("mime") or "").startswith("image/") or e.get("type") == "image")
+        and str(e.get("forId") or "") not in user_step_ids
+    ]
+    img_els.sort(key=lambda e: (e.get("createdAt") or e.get("created_at") or ""))
+
+    cache_dir = _project_root / "output_images" / ".thread_gallery_cache" / thread_id
+    gallery: list = []
+    seen: set[str] = set()
+    _MAX = 50  # bound work on pathologically long threads
+    for el in img_els:
+        if len(gallery) >= _MAX:
+            break
+        path = _resolve_element_to_path(el, cache_dir)
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        gallery.append(
+            GeneratedImage(index=len(gallery) + 1, path=path, caption="", turn=0)
+        )
+    return gallery
+
+
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Store the shared pipeline in the user session and greet the user."""
@@ -343,6 +433,31 @@ async def on_chat_resume(thread) -> None:  # noqa: ARG001
         return
 
     _restore_thread_state(_pipeline)
+
+    # Rebuild the generated-image gallery from the thread's persisted images when
+    # the in-session snapshot carries none — e.g. older threads created before
+    # the gallery existed, or any thread opened in a fresh app session. This is
+    # what makes `/images` (and "use image 2"-style references) work on resume.
+    try:
+        _sess = getattr(_pipeline, "_session", None)
+        if _sess is not None and not getattr(_sess, "generated_images", None):
+            _tid = thread.get("id") if isinstance(thread, dict) else getattr(thread, "id", None)
+            _full = thread if (isinstance(thread, dict) and thread.get("elements")) else None
+            if _full is None and _tid:
+                # The resume payload may omit elements — fetch the full thread.
+                from chainlit.data import get_data_layer
+                _dl = get_data_layer()
+                if _dl is not None:
+                    _full = await _dl.get_thread(_tid)
+            if isinstance(_full, dict) and _tid:
+                _gallery = await asyncio.to_thread(
+                    _reconstruct_gallery_from_thread, _full, str(_tid)
+                )
+                if _gallery:
+                    _sess.generated_images = _gallery
+                    print(f"[chainlit] Rebuilt image gallery: {len(_gallery)} image(s) from thread {_tid}.")
+    except Exception as _exc:  # noqa: BLE001
+        print(f"[chainlit] gallery reconstruct skipped: {_exc}")
 
     cl.user_session.set("pipeline", _pipeline)
 
@@ -450,6 +565,38 @@ async def _process_message(message: cl.Message) -> None:
                 content=f"❌ Clear VRAM failed:\n```\n{_exc}\n```",
                 author="system",
             ).send()
+        return
+
+    # ── /images — browse the generated-image gallery for this thread ──────────
+    if _text.lower() in {"/images", "images", "/gallery", "gallery"}:
+        _pip = cl.user_session.get("pipeline")
+        _sess = getattr(_pip, "_session", None) if _pip else None
+        _gallery = list(getattr(_sess, "generated_images", []) or [])
+        # Only show entries whose files still exist on disk.
+        _gallery = [gi for gi in _gallery if os.path.isfile(gi.path)]
+        if not _gallery:
+            await cl.Message(
+                content="🖼️ No images have been generated in this thread yet.",
+                author="system",
+            ).send()
+            return
+        _lines = [
+            f"**{gi.index}.** `{Path(gi.path).name}`" + (f" — {gi.caption}" if gi.caption else "")
+            for gi in _gallery
+        ]
+        _elements = [
+            cl.Image(path=gi.path, name=f"{gi.index}. {Path(gi.path).name}", display="inline")
+            for gi in _gallery
+        ]
+        await cl.Message(
+            content=(
+                f"🖼️ **{len(_gallery)} image(s) generated in this thread** — "
+                "reference them by number (\"use image 2\"), recency (\"the last image\"), "
+                "or description:\n\n" + "\n".join(_lines)
+            ),
+            elements=_elements,
+            author="system",
+        ).send()
         return
 
     if _text.lower() in {"clearhistory", "/clearhistory", "clear history", "/clear history"}:
