@@ -92,6 +92,12 @@ INFO_TOOLS: list = [
 ]
 
 # ---------------------------------------------------------------------------
+# Story-agent tools – pure text generation; no tools needed.
+# The story agent writes small storylines and calls no ComfyUI tools.
+# ---------------------------------------------------------------------------
+STORY_TOOLS: list = []
+
+# ---------------------------------------------------------------------------
 # Researcher tools – template lookup, asset upload, model resolution.
 # ---------------------------------------------------------------------------
 RESEARCHER_TOOLS: list = [

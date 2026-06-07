@@ -34,3 +34,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 
 2026-06-07 | apply_brainbriefing fails when positive_prompt_node_id is null in brainbriefing | Identify the prompt node via get_workflow_node_info, then use update_workflow to patch the prompt input directly to that node.
 2026-06-07 | batch variations require multiprompt.json before batch-handoff execution | Generate distinct prompts using write_text_file to output_workflows/multiprompt.json with keys prompt1..promptN before duplicating workflows.
+
+2026-06-07 | LoadImage validation fails when filename lacks subfolder prefix | Qualify the filename with its subfolder path (e.g., 'agent/image_edit_00005_.png' instead of just 'image_edit_00005_.png') to match ComfyUI input directory structure.

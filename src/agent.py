@@ -31,6 +31,7 @@ from src.tools import (
     RESEARCHER_TOOLS,
     BRAIN_TOOLS,
     INFO_TOOLS,
+    STORY_TOOLS,
     ERROR_CHECKER_TOOLS,
     PLANNER_TOOLS,
     TRIAGE_TOOLS,
@@ -192,6 +193,7 @@ _SYSTEM_PROMPT_FILE: dict[str, str] = {
     "triage": "system_prompt.triage",
     "planner": "system_prompt.planner",
     "info": "system_prompt.info",
+    "story": "system_prompt.story",
     "learnings": "system_prompt.learnings",
     "error_checker": "system_prompt.error_checker",
     "qa_checker": "system_prompt.qaChecker",
@@ -778,6 +780,71 @@ def create_info_agent(
         llm="claude",
         system_prompt=system_prompt,
         tools=INFO_TOOLS,
+        anthropic_model=resolved_anthropic,
+        **kwargs,
+    )
+
+
+def create_story_agent(
+    llm: str | None = None,
+    ollama_model: str | None = None,
+    anthropic_model: str | None = None,
+    **kwargs,
+) -> Agent:
+    """Create the Story agent — a lightweight creative writer that produces
+    small, self-contained storylines on request.
+
+    Reads ``llm.pipeline.story`` from settings.json (format: ``'provider,model'``),
+    e.g. ``'claude,claude-haiku-4-5'`` or ``'ollama,qwen3.5:9b'``. Env var
+    ``STORY_LLM`` overrides the combined setting; ``STORY_OLLAMA_MODEL`` or
+    ``STORY_ANTHROPIC_MODEL`` override the provider-specific model.
+
+    Defaults to Claude (``claude-haiku-4-5``) when no setting is present.
+
+    Args:
+        llm: ``'claude'`` or ``'ollama'``. Falls back to ``STORY_LLM`` env/settings.
+        ollama_model: Ollama model override.
+        anthropic_model: Anthropic model override (e.g. ``'claude-haiku-4-5'``).
+        **kwargs: Forwarded to the Strands Agent constructor.
+    """
+    if ollama_model and llm is None:
+        llm = "ollama"
+
+    # Read combined 'provider,model' from settings (env var STORY_LLM still wins).
+    _raw = str(_cfg("STORY_LLM", "pipeline", "story", default="claude,claude-haiku-4-5"))
+    _settings_llm, _settings_model = _parse_llm_setting(_raw)
+    resolved_llm = llm or _settings_llm or "claude"
+
+    system_prompt = _load_system_prompt("story")
+
+    if resolved_llm == "ollama":
+        resolved_ollama = (
+            ollama_model
+            or os.environ.get("STORY_OLLAMA_MODEL")
+            or _settings_model
+            or str(_cfg("LLM_FUNCTIONS_MODEL", "pipeline", "llm_functions", default="qwen3.5:9b"))
+        )
+        return _make_agent(
+            role="story",
+            llm="ollama",
+            system_prompt=system_prompt,
+            tools=STORY_TOOLS,
+            ollama_model=resolved_ollama,
+            **kwargs,
+        )
+
+    # Otherwise use Anthropic/Claude.
+    resolved_anthropic = (
+        anthropic_model
+        or os.environ.get("STORY_ANTHROPIC_MODEL")
+        or _settings_model
+        or str(_cfg("ANTHROPIC_MODEL", "anthropic", "model", default="claude-haiku-4-5"))
+    )
+    return _make_agent(
+        role="story",
+        llm="claude",
+        system_prompt=system_prompt,
+        tools=STORY_TOOLS,
         anthropic_model=resolved_anthropic,
         **kwargs,
     )

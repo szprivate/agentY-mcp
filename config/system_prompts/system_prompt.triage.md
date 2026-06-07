@@ -12,6 +12,7 @@ Classify the incoming user message into **exactly one** of the following intents
 | `chain` | Feed the last sessions output (if no image annotated), OR the annotated image / video into a new workflow: upscale, video, 3D, audio processing, etc. |
 | `feedback` | Qualitative correction on the output: "the face looks off", "too saturated", "make it more dramatic". |
 | `info_query` | Question about capabilities, templates, or models — not a generation request. |
+| `story` | Request to **write a small storyline, tale, narrative, plot, or scene** in text — creative writing, not image/video generation. Examples: "tell me a short story about a lighthouse", "write a quick tale of a robot who learns to paint", "make up a little story". |
 | `needs_image` | The request clearly requires an input image (edit, style transfer, upscale, face swap, img2img, inpainting, etc.) but no image has been provided by the user and there is no prior output image in the session to chain from. |
 | `chat` | Casual conversational message with no generation or information intent: greetings, thanks, small talk, affirmations ("ok", "got it", "sounds good"), or anything that doesn't ask for a generation or information. |
 
@@ -42,6 +43,9 @@ Classify the incoming user message into **exactly one** of the following intents
 - "Extend this image to 16:9" -> `chain`
 - "Take this image, make it 16:9" -> `chain`
 - "What templates do you have access to?" -> `info_query`
+- "Tell me a short story about a lighthouse keeper" -> `story`
+- "Write me a little tale about a robot who learns to paint" -> `story`
+- "Make up a quick storyline for a fantasy adventure" -> `story`
 - "The face looks off" -> `feedback`
 - "Describe, analyse these images" -> `info_query`
 - "Make a prompt from this image" -> `info_query`
@@ -70,6 +74,7 @@ Classify the incoming user message into **exactly one** of the following intents
 - Use `batch_request` when the user asks for multiple runs of the **same** workflow with varied parameters (seed, prompt details, style tokens). The key signal is that the workflow template/type stays constant — only values change. Words like "variations", "versions", "different [X]", "only change", "same workflow" are strong indicators. The workflow is assembled **once** and executed N times with substituted parameters.
 - Use `new_planned_request` ONLY when each step uses a **different workflow type** (e.g. txt2img → upscaler → video). If all steps are the same workflow type with varying parameters, use `batch_request` instead. Never classify "N variations of the same workflow" as `new_planned_request`.
 - Use `info_query` only when the user is clearly asking *about* the system, not directing it to produce something.
+- Use `story` when the user asks for a **written** story, tale, narrative, plot, or scene (text creative writing). Do NOT use `story` for image/video generation requests — those remain `new_request`/`chain`/etc. A request like "make an image that tells a story" is a generation request, not `story`.
 - Use `chat` for any message that is purely conversational: greetings ("hello", "hi"), social replies ("thanks", "ok", "got it", "sounds good"), or small talk with no generation or information intent. This prevents the generation pipeline from firing on idle chatter.
 - Set `confidence < 0.6` when genuinely ambiguous — the pipeline will treat low-confidence results as `new_request` and log a warning.
 - Use `needs_image` **only** when ALL four conditions are met:
@@ -108,4 +113,4 @@ In all other cases omit the field or set it to `false`.
 {"intent": "<intent>", "confidence": <float>, "run_qa": false}
 ```
 
-Valid intent values: `new_request`, `batch_request`, `new_planned_request`, `chain`, `feedback`, `info_query`, `needs_image`, `chat`.
+Valid intent values: `new_request`, `batch_request`, `new_planned_request`, `chain`, `feedback`, `info_query`, `story`, `needs_image`, `chat`.

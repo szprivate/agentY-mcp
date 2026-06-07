@@ -764,7 +764,7 @@ async def _process_message(message: cl.Message) -> None:
     # ── /switch_model <agent> <provider,model> ────────────────────────────────
     if _text.lower().startswith("/switch_model") or _text.lower().startswith("switch_model"):
         _parts = _text.split(None, 2)  # [cmd, agent_name, provider,model]
-        _AGENTS = {"researcher", "brain", "info", "triage", "planner", "error_checker"}
+        _AGENTS = {"researcher", "brain", "info", "story", "triage", "planner", "error_checker"}
         _SETTINGS_KEYS = {"build_skill", "llm_functions", "executor_vision_model"}
         _ALL_SWITCHABLE = _AGENTS | _SETTINGS_KEYS
         if len(_parts) < 3:
@@ -819,6 +819,7 @@ async def _process_message(message: cl.Message) -> None:
                 create_researcher_agent,
                 create_brain_agent,
                 create_info_agent,
+                create_story_agent,
                 create_triage_agent,
                 create_planner_agent,
                 create_error_checker_agent,
@@ -837,6 +838,7 @@ async def _process_message(message: cl.Message) -> None:
                 "researcher": create_researcher_agent,
                 "brain":      create_brain_agent,
                 "info":       create_info_agent,
+                "story":      create_story_agent,
                 "triage":     create_triage_agent,
                 "planner":    create_planner_agent,
                 "error_checker": create_error_checker_agent,
@@ -846,6 +848,7 @@ async def _process_message(message: cl.Message) -> None:
                 "researcher": "_researcher",
                 "brain":      "_brain",
                 "info":       "_info_agent",
+                "story":      "_story_agent",
                 "triage":     "_triage_agent",
                 "planner":    "_planner_agent",
                 "error_checker": "_error_checker_agent",

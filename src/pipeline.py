@@ -26,7 +26,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, Field, ValidationError
 from strands import Agent
 
-from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_triage_agent, create_vision_agent, _settings
+from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_story_agent, create_triage_agent, create_vision_agent, _settings
 from src.tools.image_handling import set_vision_agent as _set_vision_agent
 from src.utils.chat_summary import summarize_conversation, log_agent_messages, log_agent_exchange
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
@@ -310,6 +310,7 @@ class Pipeline:
         brain: Agent,
         *,
         info_agent: Agent | None = None,
+        story_agent: Agent | None = None,
         triage_agent: Agent | None = None,
         planner_agent: Agent | None = None,
         error_checker_agent: Agent | None = None,
@@ -321,6 +322,7 @@ class Pipeline:
         self._researcher = researcher
         self._brain = brain
         self._info_agent: Agent = info_agent or create_info_agent()
+        self._story_agent: Agent = story_agent or create_story_agent()
         self._triage_agent: Agent = triage_agent or create_triage_agent()
         self._planner_agent: Agent = planner_agent or create_planner_agent()
         self._error_checker_agent: Agent = error_checker_agent or create_error_checker_agent()
@@ -665,6 +667,26 @@ class Pipeline:
             _trace("pipeline.answer: return")
             return
 
+        if handler == "story":
+            if self._verbose:
+                print("pipeline: story → Story agent (streamed)")
+            _story_snap = self._usage_snapshot(self._story_agent)
+            _story_chunks: list[str] = []
+            _trace("pipeline.story: story_agent.stream_async begin")
+            async for event in self._story_agent.stream_async(user_text):
+                if isinstance(event, dict):
+                    _chunk = event.get("data", "")
+                    if _chunk:
+                        _story_chunks.append(_chunk)
+                yield event
+            _trace("pipeline.story: story stream done; bookkeeping")
+            self._record_agent_usage(self._story_agent, _story_snap)
+            log_agent_exchange("STORY", user_text, "".join(_story_chunks))
+            self._session.last_agent = "story"
+            self._record_chat_summary(user_text, triage_result, status="completed")
+            _trace("pipeline.story: return")
+            return
+
         if handler == "needs_image":
             if self._verbose:
                 print("pipeline: needs_image → handoff to user (missing image)")
@@ -694,6 +716,25 @@ class Pipeline:
                 self._record_agent_usage(self._info_agent, _info_snap)
                 log_agent_exchange("INFO", user_text, "".join(_info_fb_chunks))
                 self._session.last_agent = "info"
+                self._record_chat_summary(user_text, triage_result, status="completed")
+                return
+            # Context-dependent feedback routing: if the previous turn was the Story
+            # agent (e.g. "make it darker", "shorter"), revise the story rather than
+            # handing the feedback to the Brain, which has no knowledge of the story.
+            if triage_result.intent == MessageIntent.feedback and self._session.last_agent == "story":
+                if self._verbose:
+                    print("pipeline: feedback on Story-agent output → routing back to Story agent")
+                _story_snap = self._usage_snapshot(self._story_agent)
+                _story_fb_chunks: list[str] = []
+                async for event in self._story_agent.stream_async(user_text):
+                    if isinstance(event, dict):
+                        _chunk = event.get("data", "")
+                        if _chunk:
+                            _story_fb_chunks.append(_chunk)
+                    yield event
+                self._record_agent_usage(self._story_agent, _story_snap)
+                log_agent_exchange("STORY", user_text, "".join(_story_fb_chunks))
+                self._session.last_agent = "story"
                 self._record_chat_summary(user_text, triage_result, status="completed")
                 return
             # Follow-up: skip Researcher, send directly to Brain (streamed)
@@ -2138,6 +2179,7 @@ def create_pipeline(
         ollama_model=brain_ollama_model,
     )
     info_agent = create_info_agent()
+    story_agent = create_story_agent()
     triage_agent = create_triage_agent(
         llm=triage_llm,
         ollama_model=triage_ollama_model,
@@ -2152,6 +2194,7 @@ def create_pipeline(
         researcher,
         brain,
         info_agent=info_agent,
+        story_agent=story_agent,
         triage_agent=triage_agent,
         planner_agent=planner_agent,
         verbose=verbose,

@@ -208,7 +208,8 @@ def route(result: TriageResult) -> str:
     Returns
     -------
     str
-        One of ``"researcher"`` | ``"brain"`` | ``"answer"`` | ``"needs_image"`` | ``"log_warning"``.
+        One of ``"researcher"`` | ``"brain"`` | ``"answer"`` | ``"story"`` |
+        ``"needs_image"`` | ``"log_warning"``.
     """
     if result.confidence < 0.6:
         return "log_warning"
@@ -216,6 +217,8 @@ def route(result: TriageResult) -> str:
     match result.intent:
         case MessageIntent.info_query | MessageIntent.chat:
             return "answer"
+        case MessageIntent.story:
+            return "story"
         case MessageIntent.needs_image:
             return "needs_image"
         case MessageIntent.param_tweak | MessageIntent.feedback:

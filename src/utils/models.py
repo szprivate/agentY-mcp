@@ -22,6 +22,7 @@ class MessageIntent(str, Enum):
     info_query          = "info_query"           # question about capabilities / workflows / models
     needs_image         = "needs_image"          # request requires an image input that the user forgot to attach
     chat                = "chat"                 # casual/conversational message with no generation intent
+    story               = "story"                # request to write a small storyline / narrative
 
 
 class ChatSummary(BaseModel):
