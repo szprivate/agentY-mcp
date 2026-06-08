@@ -36,3 +36,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-07 | batch variations require multiprompt.json before batch-handoff execution | Generate distinct prompts using write_text_file to output_workflows/multiprompt.json with keys prompt1..promptN before duplicating workflows.
 
 2026-06-07 | LoadImage validation fails when filename lacks subfolder prefix | Qualify the filename with its subfolder path (e.g., 'agent/image_edit_00005_.png' instead of just 'image_edit_00005_.png') to match ComfyUI input directory structure.
+
+```
+2026-06-07 | LoadImage validation fails when image filename lacks subfolder prefix | Qualify the filename with its full subfolder path (e.g., 'agent/filename.png') to match ComfyUI input directory structure; unqualified names cause custom_validation_failed errors.
+```

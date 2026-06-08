@@ -8,7 +8,7 @@ Classify the incoming user message into **exactly one** of the following intents
 |---|---|
 | `new_request` | Always a fresh generation with no dependency on prior output. Either a single-step generation request, or a multi-step generation request where several versions of the same workflow need be run after another |
 | `batch_request` | Run the **same workflow** N times, varying only parameters (seed, prompt tokens like ethnicity/angle/style) across iterations. The workflow structure itself does not change — only inputs are swapped. Examples: "make 5 versions with different seeds", "generate 4 variations changing only the ethnicity and camera angle". |
-| `new_planned_request` | **Strictly** 2 or more **structurally different** pipeline stages executed in sequence, where the output of one feeds the next (e.g. generate → upscale → video). Each stage uses a **different workflow type**. Do NOT use this when the user just wants N repetitions of the same workflow with different parameters. |
+| `new_planned_request` | 2 or more **structurally different** stages executed in sequence, where the output of one feeds the next. Stages may be any mix of: **analysis** (analyse/describe an image, make a prompt from one), **writing** (synopsis, storyline, scene/shot descriptions), and **generation** (image/video/3D/audio). This **includes text-only sequences** — e.g. "analyse this image → write a synopsis → turn it into scene descriptions" — generation is NOT required. Do NOT use this for N repetitions of the same operation with different parameters (that is `batch_request`). |
 | `chain` | Feed the last sessions output (if no image annotated), OR the annotated image / video into a new workflow: upscale, video, 3D, audio processing, etc. |
 | `feedback` | Qualitative correction on the output: "the face looks off", "too saturated", "make it more dramatic". |
 | `info_query` | Question about capabilities, templates, or models — not a generation request. |
@@ -37,6 +37,9 @@ Classify the incoming user message into **exactly one** of the following intents
 - "First create an image of a futuristic city, then make a video from it" -> `new_planned_request`
 - "Create a product photo, edit the background, then upscale the result" -> `new_planned_request`
 - "Generate 3 landscapes, upscale each one, then compile a video slideshow" -> `new_planned_request`
+- "Analyse this image, write a short synopsis about the character, then turn it into a 5-shot scene description" -> `new_planned_request`
+- "Take this image, describe it, then build a storyline, then a textual scene description — do NOT generate any images yet" -> `new_planned_request`
+- "Make a prompt from this image, then write a synopsis from it, then expand into scenes" -> `new_planned_request`
 - "Create a depth image from this image: [path_to_image or annotated_image]" -> `chain`
 - "Let's make 5 more..." -> `chain`
 - "Upscale this" -> `chain`
@@ -72,9 +75,9 @@ Classify the incoming user message into **exactly one** of the following intents
   3. The `status` in that context is `'success'` or equivalent (i.e. there is actual prior output to chain from).
   If any condition is false, fall back to `new_request` (or `needs_image` if no image was provided).
 - Use `batch_request` when the user asks for multiple runs of the **same** workflow with varied parameters (seed, prompt details, style tokens). The key signal is that the workflow template/type stays constant — only values change. Words like "variations", "versions", "different [X]", "only change", "same workflow" are strong indicators. The workflow is assembled **once** and executed N times with substituted parameters.
-- Use `new_planned_request` ONLY when each step uses a **different workflow type** (e.g. txt2img → upscaler → video). If all steps are the same workflow type with varying parameters, use `batch_request` instead. Never classify "N variations of the same workflow" as `new_planned_request`.
+- Use `new_planned_request` for any sequence of 2 or more **structurally different** stages where each feeds the next. The stages may be **analysis** (analyse/describe an image, make a prompt), **writing** (storyline/synopsis/scene or shot descriptions), and/or **generation** (different workflow types like txt2img → upscaler → video) — in any combination, **including text-only sequences with no image generation at all**. Strong signals: the user lists steps with "then", "after that", or numbers them; mixes "analyse … then write … then …"; or explicitly frames it as a multi-step / "planned" request. If all steps are the same generation workflow with varying parameters, use `batch_request` instead.
 - Use `info_query` only when the user is clearly asking *about* the system, not directing it to produce something.
-- Use `story` when the user asks for a **written** story, tale, narrative, plot, or scene (text creative writing). Do NOT use `story` for image/video generation requests — those remain `new_request`/`chain`/etc. A request like "make an image that tells a story" is a generation request, not `story`.
+- Use `story` for a **single** written-text task — one storyline, synopsis, plot, or scene description. The moment the request chains it with another stage — e.g. it first asks to **analyse an image**, or asks for a synopsis **and then** to expand it into scene descriptions as a separate step — classify it as `new_planned_request` instead, so the planner can sequence the stages and forward results between them. Do NOT use `story` for image/video generation requests.
 - Use `chat` for any message that is purely conversational: greetings ("hello", "hi"), social replies ("thanks", "ok", "got it", "sounds good"), or small talk with no generation or information intent. This prevents the generation pipeline from firing on idle chatter.
 - Set `confidence < 0.6` when genuinely ambiguous — the pipeline will treat low-confidence results as `new_request` and log a warning.
 - Use `needs_image` **only** when ALL four conditions are met:

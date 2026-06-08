@@ -829,6 +829,24 @@ class Pipeline:
 
     # ── Planner helpers ──────────────────────────────────────────────── #
 
+    @staticmethod
+    def _normalize_step_kind(raw: object) -> str:
+        """Normalise a planner step's ``kind`` to one of analysis|writing|generation.
+
+        Unknown / missing values fall back to ``generation`` (the historical
+        Researcher → Brain → Executor path), with light synonym handling so a
+        slightly-off label from the planner still routes correctly.
+        """
+        k = str(raw or "generation").strip().lower()
+        if k in {"analysis", "writing", "generation"}:
+            return k
+        if k.startswith("anal") or k in {"info", "describe", "description", "vision", "caption"}:
+            return "analysis"
+        if k in {"writing", "write", "story", "synopsis", "scene", "scenes",
+                 "narrative", "screenplay", "text", "prose"}:
+            return "writing"
+        return "generation"
+
     async def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
         """Call the Planner agent to decompose *user_text* into ordered steps.
 
@@ -870,6 +888,7 @@ class Pipeline:
                     validated.append({
                         "request": str(s["request"]),
                         "description": str(s.get("description", f"Step {len(validated) + 1}")),
+                        "kind": self._normalize_step_kind(s.get("kind", "generation")),
                     })
             if len(validated) < 2:
                 if self._verbose:
@@ -985,6 +1004,62 @@ class Pipeline:
                 print("[error_checker] WARNING: could not parse verdict JSON — treating as ok.")
             return {"status": "ok", "errors": [], "fix_plan": "", "user_message": ""}
 
+    async def _stream_plan_text_step(
+        self,
+        agent,
+        agent_label: str,
+        step_request: str,
+        prev_text: str | None,
+        *,
+        with_gallery: bool,
+    ):
+        """Run one non-generation plan step (Info or Story agent) statelessly.
+
+        Streams the agent's events, forwards the previous step's TEXT result into
+        the prompt (so e.g. the synopsis step sees the image analysis, and the
+        scene step sees the synopsis), optionally surfaces the image gallery
+        (analysis steps only, so "image 4" resolves), and finally emits a
+        ``{"_plan_step_text": <text>}`` sentinel that the planner loop captures —
+        it is NOT forwarded to the UI — to hand the text to the next step.
+
+        The agent's own history is cleared before and after so plan steps stay
+        stateless (token-lean) and never bleed across runs.
+        """
+        try:
+            agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+
+        parts: list[str] = []
+        if with_gallery:
+            _g = self._format_image_gallery()
+            if _g:
+                parts.append(_g)
+        if prev_text:
+            parts.append(
+                "[Result from the previous step — use it as the input/source for this step:]\n"
+                + prev_text[: self._STORY_CONTEXT_CHAR_CAP]
+            )
+        parts.append(step_request)
+        _input = "\n\n".join(parts)
+
+        _snap = self._usage_snapshot(agent)
+        _chunks: list[str] = []
+        async for event in agent.stream_async(_input):
+            if isinstance(event, dict):
+                _c = event.get("data", "")
+                if _c:
+                    _chunks.append(_c)
+            yield event
+        self._record_agent_usage(agent, _snap)
+        _text = "".join(_chunks)
+        log_agent_exchange(agent_label, step_request, _text)
+        try:
+            agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+        yield {"_plan_step_text": _text}
+
     async def _stream_planned_request(
         self,
         user_text: str,
@@ -1050,15 +1125,55 @@ class Pipeline:
                 print(f"  {i}. {s['description']}")
 
         prev_brainbriefing: dict | None = None  # compact context forwarded step-to-step
+        prev_text_output: str | None = None     # TEXT result forwarded between steps
 
         for idx, step in enumerate(steps):
             description = step["description"]
-            step_req = self._inject_context_into_step(step["request"], idx, prev_brainbriefing)
+            kind = self._normalize_step_kind(step.get("kind", "generation"))
 
             yield {"_step_start": True, "idx": idx, "total": total, "description": description}
             yield {"data": f"\n\n**Step {idx + 1}/{total} — {description}**\n"}
             if self._verbose:
-                print(f"\npipeline: ── Plan step {idx + 1}/{total}: {description} ──")
+                print(f"\npipeline: ── Plan step {idx + 1}/{total} ({kind}): {description} ──")
+
+            # Non-generation steps (image analysis / creative writing) must NOT go
+            # to the Researcher (which only emits ComfyUI workflow briefs). Route
+            # them to the Info / Story agent and forward their TEXT to the next step.
+            if kind in ("analysis", "writing"):
+                _agent = self._info_agent if kind == "analysis" else self._story_agent
+                _label = "INFO" if kind == "analysis" else "STORY"
+                _step_text = ""
+                async for _tev in self._stream_plan_text_step(
+                    _agent, _label, step["request"], prev_text_output,
+                    with_gallery=(kind == "analysis"),
+                ):
+                    if isinstance(_tev, dict) and "_plan_step_text" in _tev:
+                        _step_text = _tev["_plan_step_text"]
+                    else:
+                        yield _tev
+                prev_text_output = _step_text or prev_text_output
+                # Keep the per-agent caches coherent so a later non-plan follow-up
+                # (e.g. "make it scarier") can build on the latest output.
+                if kind == "writing":
+                    self._session.last_story_response = _step_text or self._session.last_story_response
+                    self._session.last_agent = "story"
+                else:
+                    self._session.last_info_response = _step_text or None
+                    self._session.last_agent = "info"
+                self._record_chat_summary(step["request"], triage_result, status="completed")
+                yield {"_step_done": True, "idx": idx}
+                if self._verbose:
+                    print(f"pipeline: Step {idx + 1}/{total} ({kind}) finished.")
+                continue
+
+            # Generation step — Researcher → Brain → Executor.
+            step_req = self._inject_context_into_step(step["request"], idx, prev_brainbriefing)
+            if prev_text_output:
+                step_req += (
+                    "\n\n[Use the text produced by the previous step as the creative "
+                    "source for this generation (e.g. the scene / shot descriptions):]\n"
+                    f"{prev_text_output[: self._STORY_CONTEXT_CHAR_CAP]}"
+                )
 
             yield {"_researcher_start": True}
             raw_json = error = researcher_output = None
