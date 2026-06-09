@@ -32,6 +32,7 @@ from src.tools import (
     BRAIN_TOOLS,
     INFO_TOOLS,
     STORY_TOOLS,
+    SCOUT_TOOLS,
     ERROR_CHECKER_TOOLS,
     PLANNER_TOOLS,
     TRIAGE_TOOLS,
@@ -194,6 +195,7 @@ _SYSTEM_PROMPT_FILE: dict[str, str] = {
     "planner": "system_prompt.planner",
     "info": "system_prompt.info",
     "story": "system_prompt.story",
+    "scout": "system_prompt.scout",
     "learnings": "system_prompt.learnings",
     "error_checker": "system_prompt.error_checker",
     "qa_checker": "system_prompt.qaChecker",
@@ -875,6 +877,77 @@ def create_story_agent(
         plugins=story_plugins or None,
         **kwargs,
     )
+
+
+def create_scout_agent(
+    llm: str | None = None,
+    ollama_model: str | None = None,
+    anthropic_model: str | None = None,
+    **kwargs,
+) -> Agent:
+    """Create the Reference Scout agent — a focused web-reference gatherer.
+
+    Given a request, it searches the web, downloads the best reference image(s),
+    decides per reference whether it is best used as a direct image input or a
+    textual description, and returns a JSON manifest. Shares the same web/image
+    tools as the Info agent but with a focused prompt and structured output so the
+    Storyboard director can reliably consume the result.
+
+    Reads ``llm.pipeline.scout`` from settings.json (format ``'provider,model'``);
+    falls back to the Info-agent setting, then ``claude-haiku-4-5``. Env var
+    ``SCOUT_LLM`` overrides the combined setting; ``SCOUT_OLLAMA_MODEL`` /
+    ``SCOUT_ANTHROPIC_MODEL`` override the provider-specific model.
+
+    Args:
+        llm: ``'claude'`` or ``'ollama'``. Falls back to ``SCOUT_LLM`` env/settings.
+        ollama_model: Ollama model override.
+        anthropic_model: Anthropic model override.
+        **kwargs: Forwarded to the Strands Agent constructor.
+    """
+    if ollama_model and llm is None:
+        llm = "ollama"
+
+    # Fall back to the Info-agent setting so no extra config is required.
+    _info_default = str(_cfg("INFO_LLM", "pipeline", "info", default="claude,claude-haiku-4-5"))
+    _raw = str(_cfg("SCOUT_LLM", "pipeline", "scout", default=_info_default))
+    _settings_llm, _settings_model = _parse_llm_setting(_raw)
+    resolved_llm = llm or _settings_llm or "claude"
+
+    system_prompt = _load_system_prompt("scout")
+
+    if resolved_llm == "ollama":
+        resolved_ollama = (
+            ollama_model
+            or os.environ.get("SCOUT_OLLAMA_MODEL")
+            or _settings_model
+            or str(_cfg("LLM_FUNCTIONS_MODEL", "pipeline", "llm_functions", default="qwen3.5:9b"))
+        )
+        agent = _make_agent(
+            role="scout",
+            llm="ollama",
+            system_prompt=system_prompt,
+            tools=SCOUT_TOOLS,
+            ollama_model=resolved_ollama,
+            **kwargs,
+        )
+    else:
+        resolved_anthropic = (
+            anthropic_model
+            or os.environ.get("SCOUT_ANTHROPIC_MODEL")
+            or _settings_model
+            or str(_cfg("ANTHROPIC_MODEL", "anthropic", "model", default="claude-haiku-4-5"))
+        )
+        agent = _make_agent(
+            role="scout",
+            llm="claude",
+            system_prompt=system_prompt,
+            tools=SCOUT_TOOLS,
+            anthropic_model=resolved_anthropic,
+            **kwargs,
+        )
+    # Single-turn, stateless: each scouting request is independent.
+    agent.conversation_manager = SlidingWindowConversationManager(window_size=6)
+    return agent
 
 
 def create_triage_agent(

@@ -98,6 +98,20 @@ INFO_TOOLS: list = [
 STORY_TOOLS: list = []
 
 # ---------------------------------------------------------------------------
+# Scout-agent tools – web reference search + staging. Shares the same web/image
+# tools as the Info agent, but is a focused subagent the Storyboard director uses
+# to find references and return a structured JSON manifest.
+# ---------------------------------------------------------------------------
+SCOUT_TOOLS: list = [
+    web_search,
+    web_search_images,
+    download_image,      # stage a found image into ComfyUI's input dir
+    analyze_image,       # verify a candidate matches the need
+    get_image_resolution,
+    stop,
+]
+
+# ---------------------------------------------------------------------------
 # Researcher tools – template lookup, asset upload, model resolution.
 # ---------------------------------------------------------------------------
 RESEARCHER_TOOLS: list = [

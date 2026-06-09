@@ -1256,6 +1256,19 @@ async def _process_message(message: cl.Message) -> None:
                 await qa_reply_queue.put(answer)
                 continue
 
+            # ── Reference scout results — display staged web references ────
+            if event.get("_references_ready"):
+                await _close_inline()
+                ref_paths: list[str] = event.get("paths", [])
+                new_refs = [p for p in ref_paths if p not in sent_paths and os.path.isfile(p)]
+                if new_refs:
+                    imgs = [cl.Image(path=p, name=Path(p).name, display="inline") for p in new_refs if _is_image_path(p)]
+                    if imgs:
+                        cap = event.get("caption") or "Web references found"
+                        await cl.Message(content=f"🌐 **{cap} ({len(imgs)}):**", elements=imgs).send()
+                    sent_paths.update(new_refs)
+                continue
+
             # ── Planner step (collapsible) ────────────────────────────────
             if event.get("_planner_start"):
                 await _close_inline()

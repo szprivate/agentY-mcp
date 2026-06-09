@@ -26,7 +26,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, Field, ValidationError
 from strands import Agent
 
-from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_story_agent, create_triage_agent, create_vision_agent, _settings
+from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_scout_agent, create_story_agent, create_triage_agent, create_vision_agent, _settings
 from src.tools.image_handling import set_vision_agent as _set_vision_agent
 from src.utils.chat_summary import summarize_conversation, log_agent_messages, log_agent_exchange
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
@@ -322,6 +322,7 @@ class Pipeline:
         triage_agent: Agent | None = None,
         planner_agent: Agent | None = None,
         error_checker_agent: Agent | None = None,
+        scout_agent: Agent | None = None,
         verbose: bool = True,
         skip_brain: bool = False,
         info_context: dict | None = None,
@@ -334,6 +335,7 @@ class Pipeline:
         self._triage_agent: Agent = triage_agent or create_triage_agent()
         self._planner_agent: Agent = planner_agent or create_planner_agent()
         self._error_checker_agent: Agent = error_checker_agent or create_error_checker_agent()
+        self._scout_agent: Agent = scout_agent or create_scout_agent()
         self._verbose = verbose
         self._skip_brain = skip_brain
         # Storyboard director: max Vision-QA attempts per visual step before the
@@ -537,6 +539,13 @@ class Pipeline:
                     except (EOFError, KeyboardInterrupt):
                         _answer = "n"
                     await qa_q.put(_answer)
+                    continue
+                if event.get("_references_ready"):
+                    _rp = event.get("paths", [])
+                    if _rp:
+                        print(f"\n🌐 {event.get('caption') or 'Web references found'}:")
+                        for _p in _rp:
+                            print(f"   • {_p}")
                     continue
                 if event.get("approval_ask"):
                     _label = event.get("description") or event.get("label") or "this step"
@@ -1508,12 +1517,38 @@ class Pipeline:
         return any(tok in t for tok in triggers)
 
     @staticmethod
+    def _storyboard_wants_references(user_text: str) -> bool:
+        """Return True when the user explicitly asks the agent to look up references.
+
+        Gates the web Reference Scout — we only search/download when the user asks
+        for it (e.g. "find a reference for a 1950s diner", "look up what X looks
+        like"), never proactively.
+        """
+        t = user_text.lower()
+        triggers = (
+            "find a reference", "find references", "look for a reference",
+            "look for references", "search the web", "search for a reference",
+            "reference image", "reference images", "look up", "find an image of",
+            "find images of", "search for images", "use a reference from the web",
+            "find a real", "look up what", "research what", "find pictures of",
+            "web reference", "find a picture of", "get a reference",
+        )
+        return any(tok in t for tok in triggers)
+
+    @staticmethod
     def _parse_storyboard_spec(text: str) -> dict | None:
         """Extract and lightly validate the storyboard JSON spec from Story output.
 
-        Expects a trailing fenced JSON block with ``character``, ``guidelines``
-        and a non-empty ``sequences`` list (each with ``shots``).  Returns the
-        parsed dict, or ``None`` when no usable spec can be recovered.
+        Expects a trailing fenced JSON block with a ``characters`` list, a
+        ``guidelines`` string and a non-empty ``sequences`` list (each with
+        ``shots`` and ``character_tags``). Back-compatible with the old single
+        ``character`` field. Returns the normalised dict, or ``None`` when no
+        usable spec can be recovered.
+
+        Normalised shape:
+          - ``characters``: list of ``{tag, description, shot_count}``
+          - ``sequences``: list of ``{index, summary, start_frame_prompt,
+            character_tags, shots:[{prompt, duration}]}``
         """
         raw = _extract_json(text or "")
         if not raw:
@@ -1527,7 +1562,33 @@ class Pipeline:
         seqs = spec.get("sequences")
         if not isinstance(seqs, list) or not seqs:
             return None
-        # Normalise each sequence so downstream code can rely on the shape.
+
+        # ── Characters: prefer the new list; fall back to the old singular field ──
+        chars_raw = spec.get("characters")
+        norm_chars: list[dict] = []
+        if isinstance(chars_raw, list):
+            for c in chars_raw:
+                if isinstance(c, dict) and c.get("tag") and c.get("description"):
+                    try:
+                        sc = int(c.get("shot_count", 0) or 0)
+                    except (TypeError, ValueError):
+                        sc = 0
+                    norm_chars.append({
+                        "tag": str(c["tag"]).strip(),
+                        "description": str(c["description"]).strip(),
+                        "shot_count": sc,
+                    })
+        elif isinstance(spec.get("character"), dict) and spec["character"].get("present"):
+            c = spec["character"]
+            norm_chars.append({
+                "tag": str(c.get("tag") or "MAIN").strip(),
+                "description": str(c.get("description") or "").strip(),
+                "shot_count": 0,
+            })
+
+        valid_tags = {c["tag"] for c in norm_chars}
+
+        # ── Sequences ────────────────────────────────────────────────────────
         norm_seqs: list[dict] = []
         for i, s in enumerate(seqs, 1):
             if not isinstance(s, dict):
@@ -1543,17 +1604,32 @@ class Pipeline:
                     clean_shots.append({"prompt": str(sh["prompt"]), "duration": max(1, dur)})
             if not clean_shots:
                 continue
+            tags_raw = s.get("character_tags")
+            if isinstance(tags_raw, list):
+                seq_tags = [str(t).strip() for t in tags_raw if str(t).strip() in valid_tags]
+            else:
+                seq_tags = list(valid_tags)  # default: assume all characters present
             norm_seqs.append({
                 "index": int(s.get("index", i) or i),
                 "summary": str(s.get("summary", f"Sequence {i}")),
                 "start_frame_prompt": str(s.get("start_frame_prompt", "")).strip(),
+                "character_tags": seq_tags,
                 "shots": clean_shots,
             })
         if not norm_seqs:
             return None
+
+        # ── Derive missing shot_counts from sequence appearances ─────────────
+        # When the Story agent didn't supply shot_count, approximate it as the
+        # number of shots in the sequences that list the character.
+        for ch in norm_chars:
+            if ch["shot_count"] <= 0:
+                ch["shot_count"] = sum(
+                    len(sq["shots"]) for sq in norm_seqs if ch["tag"] in sq["character_tags"]
+                )
+
+        spec["characters"] = norm_chars
         spec["sequences"] = norm_seqs
-        if not isinstance(spec.get("character"), dict):
-            spec["character"] = {"present": False, "tag": "", "description": ""}
         return spec
 
     async def _storyboard_story(self, user_text: str, ref_desc: str, *, reminder: str = ""):
@@ -1600,6 +1676,49 @@ class Pipeline:
         log_agent_exchange("STORY", "[storyboard breakdown]", text)
         self._clear_story_history()
         yield {"_sb_story": text}
+
+    async def _stream_scout(self, user_text: str):
+        """Run the Reference Scout to find + stage web references for *user_text*.
+
+        Streams the scout's events inside a UI bracket and yields a final
+        ``{"_scout_manifest": <dict>}`` sentinel with the parsed manifest
+        (``{"references": [{query, mode, path?, name?, subfolder?, description}]}``).
+        """
+        try:
+            self._scout_agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+        prompt = (
+            "Find the visual reference(s) the user asks for below, stage the best "
+            "candidate(s) as files with download_image, and return ONLY the JSON "
+            "manifest exactly as specified in your instructions.\n\n"
+            f"User request:\n{user_text}"
+        )
+        _snap = self._usage_snapshot(self._scout_agent)
+        chunks: list[str] = []
+        yield {"_story_start": True, "name": "🌐 Reference scout"}
+        async for event in self._scout_agent.stream_async(prompt):
+            if isinstance(event, dict):
+                c = event.get("data", "")
+                if c:
+                    chunks.append(c)
+            yield event
+        yield {"_story_done": True}
+        self._record_agent_usage(self._scout_agent, _snap)
+        raw = "".join(chunks)
+        log_agent_exchange("SCOUT", user_text, raw)
+        manifest: dict = {}
+        try:
+            parsed = json.loads(_extract_json(raw) or raw)
+            if isinstance(parsed, dict):
+                manifest = parsed
+        except Exception:  # noqa: BLE001
+            manifest = {}
+        try:
+            self._scout_agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+        yield {"_scout_manifest": manifest}
 
     async def _storyboard_gen_step(
         self,
@@ -1845,15 +1964,48 @@ class Pipeline:
         ))
 
         yield {"data": (
-            "\n🎬 **Storyboard mode** — I'll design the character, break the story into "
+            "\n🎬 **Storyboard mode** — I'll design the character(s), break the story into "
             "≤10s Kling multi-shot sequences covering the whole story, then generate a "
             "start frame and video for each."
             + ("" if auto_approve else " I'll pause for your approval after each step.")
             + "\n"
         )}
 
-        # ── Pre-step: analyse reference images → character/style description ──
+        # ── Pre-step: web reference scout (only when the user asks for it) ──
         ref_desc = ""
+        scout_image_refs: list[str] = []
+        if self._storyboard_wants_references(user_text):
+            manifest: dict = {}
+            async for ev in self._stream_scout(user_text):
+                if isinstance(ev, dict) and "_scout_manifest" in ev:
+                    manifest = ev["_scout_manifest"]
+                else:
+                    yield ev
+            refs = manifest.get("references", []) if isinstance(manifest, dict) else []
+            ref_lines: list[str] = []
+            staged: list[str] = []
+            for r in refs:
+                if not isinstance(r, dict):
+                    continue
+                d = (r.get("description") or "").strip()
+                q = (r.get("query") or "reference").strip()
+                if d:
+                    ref_lines.append(f"- {q}: {d}")
+                if r.get("mode") == "image":
+                    p = (r.get("path") or "").strip()
+                    if p and os.path.isfile(p):
+                        staged.append(p)
+            scout_image_refs = list(dict.fromkeys(staged))
+            if ref_lines:
+                ref_desc += "Web references found:\n" + "\n".join(ref_lines) + "\n"
+            if scout_image_refs:
+                yield {"_references_ready": True, "paths": scout_image_refs, "caption": "Web references found"}
+            elif refs:
+                yield {"data": "\n_🌐 Found reference description(s); folded into the brief._\n"}
+            else:
+                yield {"data": "\n_🌐 No usable web references found; continuing from your brief._\n"}
+
+        # ── Pre-step: analyse user-provided reference images → description ──
         if user_refs:
             yield {"_story_start": True, "name": "🔎 Reference analysis"}
             _ref_request = (
@@ -1863,14 +2015,17 @@ class Pipeline:
                 "Call analyze_image on each path.\nReference image file(s):\n"
                 + "\n".join(f"- {p}" for p in user_refs)
             )
+            _ud = ""
             async for ev in self._stream_plan_text_step(
                 self._info_agent, "INFO", _ref_request, None, with_gallery=False
             ):
                 if isinstance(ev, dict) and "_plan_step_text" in ev:
-                    ref_desc = ev["_plan_step_text"] or ""
+                    _ud = ev["_plan_step_text"] or ""
                 else:
                     yield ev
             yield {"_story_done": True}
+            if _ud:
+                ref_desc = (ref_desc + "\n" + _ud).strip() if ref_desc else _ud
 
         # ── Story step: bible + ≤10s sequence breakdown covering the story ──
         spec: dict | None = None
@@ -1901,18 +2056,17 @@ class Pipeline:
             )}
             return
 
-        character = spec.get("character", {})
-        char_present = bool(character.get("present"))
-        char_desc = (character.get("description") or "").strip() or ref_desc
+        characters = spec.get("characters", [])
         sequences = spec["sequences"]
         n_seq = len(sequences)
 
         # Story-breakdown approval gate.
         if not auto_approve and qa_reply_queue is not None:
+            n_char = len(characters)
             yield {
                 "approval_ask": True,
                 "label": "Story breakdown",
-                "description": f"Approve the {n_seq}-sequence breakdown (character + shots)?",
+                "description": f"Approve the {n_seq}-sequence / {n_char}-character breakdown?",
                 "image_paths": [],
             }
             _d = (await qa_reply_queue.get() or "").strip()
@@ -1927,116 +2081,170 @@ class Pipeline:
                         spec = self._parse_storyboard_spec(ev["_sb_story"]) or spec
                     else:
                         yield ev
-                character = spec.get("character", {})
-                char_present = bool(character.get("present"))
-                char_desc = (character.get("description") or "").strip() or ref_desc
+                characters = spec.get("characters", [])
                 sequences = spec["sequences"]
                 n_seq = len(sequences)
 
-        # Persistent style/quality bar (echoed by the Story agent from the user's
-        # brief) — applies to EVERY visual step. Each step additionally gets its own
-        # task-specific QA briefing (``qa_brief``) so Vision QA judges, e.g., the
-        # character sheet AS a character sheet rather than against the video brief.
+        # Persistent FOOTAGE style/quality bar (echoed by the Story agent) — applies
+        # to the start frames and videos. Character references use the dedicated
+        # clean guidelines instead (a reference asset, never the film grade).
         style_guidelines = (spec.get("guidelines") or "").strip()
+        char_descs: dict[str, str] = {c["tag"]: c["description"] for c in characters}
 
-        # ── Build the UI task list (character sheet + per-sequence steps) ──
+        # Map known references to characters. We can only auto-map the user's image
+        # when there is exactly one character; otherwise every character gets a
+        # generated single-frame reference (and user/scout images stay global refs).
+        char_ref_map: dict[str, str] = {}
+        if len(characters) == 1 and user_refs:
+            char_ref_map[characters[0]["tag"]] = user_refs[0]
+
+        # ── Plan the character phase: per character, a single-frame reference
+        # (when none is provided) and, when it appears in >1 shot, a 3x3 chart. ──
+        char_plan: list[dict] = []
         step_labels: list[str] = []
-        if char_present:
-            step_labels.append("Character sheet (multi-angle)")
+        for c in characters:
+            base_ref = char_ref_map.get(c["tag"])
+            need_single = base_ref is None
+            need_chart = int(c.get("shot_count", 0)) > 1
+            char_plan.append({
+                "tag": c["tag"], "desc": c["description"],
+                "base_ref": base_ref, "need_single": need_single, "need_chart": need_chart,
+            })
+            if need_single:
+                step_labels.append(f"Character ref — {c['tag']}")
+            if need_chart:
+                step_labels.append(f"Character chart — {c['tag']}")
         for s in sequences:
             step_labels.append(f"Sequence {s['index']} — start frame")
             step_labels.append(f"Sequence {s['index']} — multi-shot video")
         total = len(step_labels)
         yield {"_plan_ready": True, "steps": [{"description": d} for d in step_labels]}
 
-        step_idx = 0
-        char_sheet_path: str | None = None
-
-        # ── Step: character sheet (multiple angles) ──
-        if char_present:
-            if user_refs:
-                cs_request = (
-                    self._SB_SCOPE_IMG.format(asset="a single character sheet image")
-                    + "Create a CHARACTER SHEET showing the character from multiple angles/poses "
-                    "(a 3x3 turnaround sheet) using the NanoBananaPro_3x3CharacterSheet template. "
-                    f"Use this reference image as the character: {user_refs[0]}. "
-                    f"Character description (keep identity consistent): {char_desc}. "
-                    "Do NOT apply the film's grungy / VHS / found-footage look to this sheet. "
-                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
-                )
-            else:
-                cs_request = (
-                    self._SB_SCOPE_IMG.format(asset="a single character sheet image")
-                    + "Create a CHARACTER DESIGN SHEET showing the character from multiple angles "
-                    "and poses in a single image (a 3x3 turnaround / character reference sheet), "
-                    "generated from this description. Use a capable text-to-image or Nano-Banana "
-                    "template; render a clean reference sheet on a neutral background. "
-                    f"Character description: {char_desc}. "
-                    "Do NOT apply the film's grungy / VHS / found-footage look to this sheet. "
-                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
-                )
-            cs_qa_brief = (
-                "A clean character reference / turnaround sheet showing the SAME character from "
-                "multiple distinct angles and poses, on a clean, uncluttered background, with "
-                "natural colours true to the reference and NO film grain / VHS / grading. "
-                f"Character: {char_desc}."
-                + (" The character's identity must match the provided reference image(s)." if user_refs else "")
-            )
-            cs_result: dict | None = None
-            async for ev in self._storyboard_step(
-                idx=step_idx, total=total, label=step_labels[step_idx],
-                request=cs_request, qa_brief=cs_qa_brief,
-                guidelines=self._SB_CHARSHEET_GUIDELINES,
-                reference_paths=user_refs, auto_approve=auto_approve,
-                qa_reply_queue=qa_reply_queue,
+        async def _run_one(idx: int, label: str, request: str, qa_brief: str,
+                           guidelines: str, reference_paths: list[str]):
+            """Drive one storyboard step and return its ``_sb_done`` result dict."""
+            _res: dict | None = None
+            async for _ev in self._storyboard_step(
+                idx=idx, total=total, label=label, request=request, qa_brief=qa_brief,
+                guidelines=guidelines, reference_paths=reference_paths,
+                auto_approve=auto_approve, qa_reply_queue=qa_reply_queue,
             ):
-                if isinstance(ev, dict) and "_sb_done" in ev:
-                    cs_result = ev["_sb_done"]
+                if isinstance(_ev, dict) and "_sb_done" in _ev:
+                    _res = _ev["_sb_done"]
                 else:
-                    yield ev
-            step_idx += 1
-            if not cs_result or not cs_result.get("success"):
-                self._record_chat_summary(user_text, triage_result, status="aborted" if (cs_result or {}).get("aborted") else "qa_failed")
-                yield {"data": "\n\n🛑 Storyboard stopped at the character sheet step."}
-                return
-            char_sheet_path = self._first_image(cs_result.get("output_paths", []))
+                    yield _ev
+            yield {"_one": _res}
+
+        step_idx = 0
+        references: dict[str, str] = {}  # tag → best consistency reference path
+
+        # ── Character phase: per-character single-frame reference + chart ──
+        for cp in char_plan:
+            tag, desc = cp["tag"], cp["desc"]
+            base_ref = cp["base_ref"]
+
+            if cp["need_single"]:
+                sref_request = (
+                    self._SB_SCOPE_IMG.format(asset=f"a single clean reference portrait of {tag}")
+                    + f"Generate ONE clean character reference portrait of {tag} — a single image, "
+                    "full-body or 3/4 view, neutral standing pose, plain uncluttered background — to "
+                    "serve as the identity reference for this character in a short film. Use a "
+                    "text-to-image or Nano-Banana template. "
+                    f"Character: {desc}. "
+                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
+                )
+                sref_qa = (
+                    f"A single clean reference portrait of one character ({tag}) on a plain "
+                    f"background, natural colours, no film grain / VHS / grading. Character: {desc}."
+                )
+                _res = None
+                async for ev in _run_one(step_idx, step_labels[step_idx], sref_request, sref_qa,
+                                         self._SB_CHARSHEET_GUIDELINES, scout_image_refs):
+                    if isinstance(ev, dict) and "_one" in ev:
+                        _res = ev["_one"]
+                    else:
+                        yield ev
+                step_idx += 1
+                if not _res or not _res.get("success"):
+                    self._record_chat_summary(user_text, triage_result, status="aborted" if (_res or {}).get("aborted") else "qa_failed")
+                    yield {"data": f"\n\n🛑 Storyboard stopped at the character reference for {tag}."}
+                    return
+                base_ref = self._first_image(_res.get("output_paths", [])) or base_ref
+
+            references[tag] = base_ref or ""
+
+            if cp["need_chart"] and base_ref:
+                chart_request = (
+                    self._SB_SCOPE_IMG.format(asset=f"a single character chart image for {tag}")
+                    + f"Create a CHARACTER SHEET (a 3x3 turnaround) for {tag} using the "
+                    "NanoBananaPro_3x3CharacterSheet template. "
+                    f"Use this reference image as the character: {base_ref}. "
+                    f"Character (keep identity consistent): {desc}. "
+                    "Do NOT apply the film's grungy / VHS / found-footage look to this sheet. "
+                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
+                )
+                chart_qa = (
+                    f"A clean character turnaround sheet for one character ({tag}) showing them from "
+                    "multiple distinct angles/poses on a clean background, identity matching the "
+                    f"reference, natural colours, no film grain / VHS / grading. Character: {desc}."
+                )
+                _res = None
+                async for ev in _run_one(step_idx, step_labels[step_idx], chart_request, chart_qa,
+                                         self._SB_CHARSHEET_GUIDELINES, [base_ref]):
+                    if isinstance(ev, dict) and "_one" in ev:
+                        _res = ev["_one"]
+                    else:
+                        yield ev
+                step_idx += 1
+                if not _res or not _res.get("success"):
+                    self._record_chat_summary(user_text, triage_result, status="aborted" if (_res or {}).get("aborted") else "qa_failed")
+                    yield {"data": f"\n\n🛑 Storyboard stopped at the character chart for {tag}."}
+                    return
+                chart_path = self._first_image(_res.get("output_paths", []))
+                if chart_path:
+                    references[tag] = chart_path  # prefer the multi-angle chart for shots
 
         # ── Per-sequence loop: start frame → Kling multi-shot video ──
         produced_videos: list[str] = []
         for s in sequences:
             seq_i = s["index"]
-            # Reference set for QA: character sheet + user refs.
-            seq_refs = [p for p in ([char_sheet_path] + user_refs) if p]
+            seq_tags = s.get("character_tags", [])
+            seq_char_refs = list(dict.fromkeys(references[t] for t in seq_tags if references.get(t)))
+            seq_char_desc = "; ".join(
+                f"{t}: {char_descs[t]}" for t in seq_tags if char_descs.get(t)
+            ) or ref_desc
+            # Reference pool for QA + identity: this sequence's character refs first,
+            # then global web/user references.
+            seq_ref_pool = list(dict.fromkeys(
+                p for p in (seq_char_refs + scout_image_refs + user_refs) if p
+            ))
 
             # 1. Start frame
             sf_ref_hint = (
-                f"Use the character sheet as the character reference for identity consistency: {char_sheet_path}. "
-                if char_sheet_path else ""
+                "Use these character reference image(s) for identity consistency: "
+                + ", ".join(seq_char_refs) + ". "
+                if seq_char_refs else ""
             )
             sf_request = (
                 self._SB_SCOPE_IMG.format(asset="a single start-frame still image")
                 + f"Generate a single START FRAME still image (16:9) for sequence {seq_i} of a short film, "
                 f"to be used as the first frame of a Kling video. {sf_ref_hint}"
-                "Use an image generation/editing template that accepts the character reference (e.g. a "
-                "Nano-Banana image-edit template) so the character stays identical. "
+                "Use an image generation/editing template that accepts the character reference(s) (e.g. a "
+                "Nano-Banana image-edit template) so the character(s) stay identical. "
                 f"Start frame description: {s['start_frame_prompt']}\n"
-                f"Character lock (keep identical): {char_desc}\n"
+                + (f"Characters present (keep identical): {seq_char_desc}\n" if seq_char_desc else "")
                 + (f"Style/quality guidelines: {style_guidelines}" if style_guidelines else "")
             )
             sf_qa_brief = (
                 f"A single still image — the opening START FRAME (16:9) of sequence {seq_i} — depicting: "
-                f"{s['start_frame_prompt']} The character must match the reference character sheet. "
-                f"Character: {char_desc}."
+                f"{s['start_frame_prompt']} The character(s) must match their reference image(s). "
+                + (f"Characters: {seq_char_desc}." if seq_char_desc else "")
             )
-            sf_result: dict | None = None
-            async for ev in self._storyboard_step(
-                idx=step_idx, total=total, label=step_labels[step_idx],
-                request=sf_request, qa_brief=sf_qa_brief, guidelines=style_guidelines,
-                reference_paths=seq_refs, auto_approve=auto_approve,
-                qa_reply_queue=qa_reply_queue,
-            ):
-                if isinstance(ev, dict) and "_sb_done" in ev:
-                    sf_result = ev["_sb_done"]
+            sf_result = None
+            async for ev in _run_one(step_idx, step_labels[step_idx], sf_request, sf_qa_brief,
+                                     style_guidelines, seq_ref_pool):
+                if isinstance(ev, dict) and "_one" in ev:
+                    sf_result = ev["_one"]
                 else:
                     yield ev
             step_idx += 1
@@ -2055,27 +2263,26 @@ class Pipeline:
                 f"Start frame (LoadImage node 14): {start_frame_path}. "
                 f"Use EXACTLY these {len(s['shots'])} shot prompts as the storyboard array, in order, each with "
                 f"its duration (total {total_secs}s, must be <=10s):\n{shots_json}\n"
-                f"Character lock (keep verbatim in every shot): {char_desc}\n"
-                f"Set multi_shot to match the shot count. Aspect ratio 16:9, resolution 720p. "
+                + (f"Character lock(s) (keep verbatim in every shot): {seq_char_desc}\n" if seq_char_desc else "")
+                + "Set multi_shot to match the shot count. Aspect ratio 16:9, resolution 720p. "
                 + (f"Style/quality guidelines: {style_guidelines}" if style_guidelines else "")
             )
             seq_summary = s.get("summary") or f"sequence {seq_i}"
             shot_lines = "; ".join(sh["prompt"][:90] for sh in s["shots"])
             vid_qa_brief = (
                 f"A {total_secs}s multi-shot video (sequence {seq_i}, {len(s['shots'])} shots) depicting: "
-                f"{seq_summary}. Shots in order: {shot_lines}. The character must stay visually "
-                f"consistent with the character sheet and the start frame. Character: {char_desc}."
+                f"{seq_summary}. Shots in order: {shot_lines}. The character(s) must stay visually "
+                "consistent with their reference(s) and the start frame."
+                + (f" Characters: {seq_char_desc}." if seq_char_desc else "")
             )
-            vid_refs = [p for p in ([char_sheet_path, start_frame_path] + user_refs) if p]
-            vid_result: dict | None = None
-            async for ev in self._storyboard_step(
-                idx=step_idx, total=total, label=step_labels[step_idx],
-                request=vid_request, qa_brief=vid_qa_brief, guidelines=style_guidelines,
-                reference_paths=vid_refs, auto_approve=auto_approve,
-                qa_reply_queue=qa_reply_queue,
-            ):
-                if isinstance(ev, dict) and "_sb_done" in ev:
-                    vid_result = ev["_sb_done"]
+            vid_ref_pool = list(dict.fromkeys(
+                p for p in ([start_frame_path] + seq_char_refs + scout_image_refs + user_refs) if p
+            ))
+            vid_result = None
+            async for ev in _run_one(step_idx, step_labels[step_idx], vid_request, vid_qa_brief,
+                                     style_guidelines, vid_ref_pool):
+                if isinstance(ev, dict) and "_one" in ev:
+                    vid_result = ev["_one"]
                 else:
                     yield ev
             step_idx += 1
@@ -2088,12 +2295,13 @@ class Pipeline:
         self._record_chat_summary(user_text, triage_result, status="completed")
         self._session.last_agent = "brain"
         vids = ", ".join(f"`{Path(p).name}`" for p in produced_videos if p)
+        n_char = len(characters)
         yield {"data": (
-            f"\n\n✅ **Storyboard complete** — {n_seq} sequence(s) rendered."
+            f"\n\n✅ **Storyboard complete** — {n_char} character(s), {n_seq} sequence(s) rendered."
             + (f"\nVideos: {vids}" if vids else "")
         )}
         if self._verbose:
-            print(f"pipeline: Storyboard director finished — {n_seq} sequence(s).")
+            print(f"pipeline: Storyboard director finished — {n_char} char(s), {n_seq} sequence(s).")
 
     # ── Triage helpers ───────────────────────────────────────────────── #
 
@@ -3212,6 +3420,7 @@ def create_pipeline(
         ollama_model=planner_ollama_model,
         anthropic_model=planner_anthropic_model,
     )
+    scout_agent = create_scout_agent()
     return Pipeline(
         researcher,
         brain,
@@ -3219,6 +3428,7 @@ def create_pipeline(
         story_agent=story_agent,
         triage_agent=triage_agent,
         planner_agent=planner_agent,
+        scout_agent=scout_agent,
         verbose=verbose,
         skip_brain=skip_brain,
         info_context=info_context,

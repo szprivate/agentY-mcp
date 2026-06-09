@@ -23,10 +23,13 @@ shots are additionally **grouped into Kling sequences** and emitted as JSON.
 Define these **once**, before the sequences, and reuse them **verbatim** wherever
 the element reappears (paraphrasing breaks visual consistency downstream):
 
-- **Character(s)** — for each recurring character: a stable **tag** (e.g. `MARA`)
-  followed by a fixed visual description (approximate age, build, hair, skin,
-  wardrobe, 1–2 distinguishing features). This exact string is the **character
-  lock** — copy it, never reword it.
+- **Characters** — list **EVERY acting person / character** in the script (lead,
+  supporting, and minor — anyone who appears on screen), not just the lead. For
+  each: a stable **tag** (e.g. `MARA`) followed by a fixed visual description
+  (approximate age, build, hair, skin, wardrobe, 1–2 distinguishing features).
+  This exact string is the **character lock** — copy it, never reword it. Track
+  how many **shots** each character appears in across the whole script (this
+  drives whether the director makes a multi-angle chart for them).
 - **Locations / props** — fixed descriptions of recurring places and key objects
   (materials, colour, condition).
 
@@ -66,13 +69,16 @@ each sequence's durations must sum to ≤ 10.
 
 ```json
 {
-  "character": {"present": true, "tag": "NAME", "description": "<verbatim character lock string>"},
-  "guidelines": "<short echo of the FOOTAGE visual style (grade/film-look/quality) — this applies to the start frames and videos, NOT to the character sheet, which is always a clean reference asset>",
+  "characters": [
+    {"tag": "NAME", "description": "<verbatim character lock string>", "shot_count": 3}
+  ],
+  "guidelines": "<short echo of the FOOTAGE visual style (grade/film-look/quality) — this applies to the start frames and videos, NOT to the character sheets, which are always clean reference assets>",
   "sequences": [
     {
       "index": 1,
       "summary": "<one line>",
-      "start_frame_prompt": "<vivid single still that opens the sequence, includes the character lock verbatim>",
+      "character_tags": ["NAME"],
+      "start_frame_prompt": "<vivid single still that opens the sequence, includes the character lock(s) verbatim>",
       "shots": [
         {"prompt": "<character lock + transition + subject motion + camera move + end state + style, <=480 chars>", "duration": 5}
       ]
@@ -81,8 +87,13 @@ each sequence's durations must sum to ≤ 10.
 }
 ```
 
-- If the story has **no recurring character**, set `character.present` to `false`
-  and leave `tag`/`description` empty.
+- `characters` must list **every acting person/character** in the script, each with
+  its `tag`, verbatim `description`, and `shot_count` (total shots it appears in
+  across all sequences).
+- Each sequence's `character_tags` lists the tags of the characters present in
+  that sequence (use the exact tags from `characters`); use `[]` for a sequence
+  with no character on screen.
+- If the story has **no characters at all**, set `characters` to `[]`.
 - Do not add any commentary, notes, or text **after** the JSON block.
 
 ## Scope

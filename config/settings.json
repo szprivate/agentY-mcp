@@ -10,7 +10,8 @@
     "learnings": "system_prompt.learnings.md",
     "qa_checker": "system_prompt.qaChecker.md",
     "vision_agent": "system_prompt.vision_agent.md",
-    "story": "system_prompt.story.md"
+    "story": "system_prompt.story.md",
+    "scout": "system_prompt.scout.md"
   },
   "comfyui_models_dir": "L:\\software\\comfyui\\Models",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
@@ -40,6 +41,7 @@
       "triage": "claude,claude-haiku-4-5",
       "info": "claude,claude-haiku-4-5",
       "story": "claude,claude-haiku-4-5",
+      "scout": "claude,claude-haiku-4-5",
       "planner": "claude,claude-haiku-4-5",
       "learnings": "claude,claude-haiku-4-5",
       "error_checker": "claude,claude-haiku-4-5",
