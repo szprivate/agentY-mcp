@@ -54,3 +54,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-08 | LoadImage validation fails when filename lacks subfolder prefix in ComfyUI | Qualify the filename with its full subfolder path (e.g., 'agent/image_generation_00003_.png') when patching LoadImage nodes to match ComfyUI input directory structure.
 
 2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-shot template | Non-blocking validation error; multi-shot Kling nodes embed prompts directly. Skip apply_brainbriefing for positive prompt and proceed to signal_workflow_ready if node 12 multi_shot fields are patched.
+
+2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Inspect workflow with get_workflow_node_info to locate the prompt injection node, then use update_workflow to patch the positive prompt directly into that node's value field.
+
+2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Kling multi-shot templates | For Kling nodes with embedded prompts, skip apply_brainbriefing for positive prompts. Instead, patch multi_shot.storyboard_N_prompt fields directly via update_workflow before calling signal_workflow_ready.

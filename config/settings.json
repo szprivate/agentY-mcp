@@ -24,7 +24,12 @@
   "director": {
     // Storyboard director: max Vision-QA attempts per visual step before asking
     // the user whether to keep retrying (env override: DIRECTOR_AUTO_RETRIES).
-    "auto_retries": 4
+    "auto_retries": 2,
+    // Default for the per-step user-approval gate: true = pause for approval after
+    // each step; false / 0 = run fully autonomously. A request in the user's
+    // message (e.g. "ask me for approval" or "run autonomously") overrides this
+    // per-run. (env override: DIRECTOR_USER_APPROVAL_STEP)
+    "user_approval_step": false
   },
 
   "llm": {

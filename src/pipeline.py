@@ -339,6 +339,9 @@ class Pipeline:
         # Storyboard director: max Vision-QA attempts per visual step before the
         # user is asked whether to keep retrying (settings.json director.auto_retries).
         self._storyboard_max_qa = self._resolve_director_retries()
+        # Default for the per-step approval gate (True = ask). Overridable per-run
+        # by the user's message (settings.json director.user_approval_step).
+        self._approval_default = self._resolve_director_approval()
         self._info_context: dict = info_context or {}
         self._session: AgentSession = AgentSession(session_id=session_id)
         # Brainbriefing JSON from the most recent Researcher run; used by the
@@ -1438,6 +1441,61 @@ class Pipeline:
             return cls._STORYBOARD_MAX_QA
 
     @staticmethod
+    def _coerce_bool(value: object) -> bool | None:
+        """Coerce a settings/env value to bool, or None if not recognisable."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            s = value.strip().lower()
+            if s in {"1", "true", "yes", "on"}:
+                return True
+            if s in {"0", "false", "no", "off"}:
+                return False
+        return None
+
+    @classmethod
+    def _resolve_director_approval(cls) -> bool:
+        """Resolve the DEFAULT for the storyboard per-step approval gate.
+
+        Returns True when the director should pause for user approval after each
+        step, False to run autonomously. Priority: ``DIRECTOR_USER_APPROVAL_STEP``
+        env var > settings.json ``director.user_approval_step`` > default True.
+        The user's message can still override this per-run (see
+        :meth:`_stream_storyboard`).
+        """
+        env = os.environ.get("DIRECTOR_USER_APPROVAL_STEP")
+        if env is not None:
+            c = cls._coerce_bool(env)
+            if c is not None:
+                return c
+        try:
+            c = cls._coerce_bool(_settings().get("director", {}).get("user_approval_step", True))
+            if c is not None:
+                return c
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+
+    @staticmethod
+    def _storyboard_wants_approval(user_text: str) -> bool:
+        """Return True when the user explicitly asks to approve each step.
+
+        Overrides a ``user_approval_step: false`` default so a user who asks for
+        approvals gets them even when the director defaults to autonomous.
+        """
+        t = user_text.lower()
+        triggers = (
+            "ask for approval", "ask me for approval", "ask for my approval",
+            "with approval", "with my approval", "approve each", "approval after each",
+            "let me approve", "let me review each", "review each step",
+            "pause for approval", "wait for my approval", "ask me before",
+            "ask before each", "check with me", "i want to approve", "approval step",
+        )
+        return any(tok in t for tok in triggers)
+
+    @staticmethod
     def _storyboard_auto_approve(user_text: str) -> bool:
         """Return True when the user opted out of per-step approval gating."""
         t = user_text.lower()
@@ -1529,12 +1587,14 @@ class Pipeline:
 
         _snap = self._usage_snapshot(self._story_agent)
         chunks: list[str] = []
+        yield {"_story_start": True, "name": "📝 Storyboard breakdown"}
         async for event in self._story_agent.stream_async(instruction):
             if isinstance(event, dict):
                 c = event.get("data", "")
                 if c:
                     chunks.append(c)
             yield event
+        yield {"_story_done": True}
         self._record_agent_usage(self._story_agent, _snap)
         text = "".join(chunks)
         log_agent_exchange("STORY", "[storyboard breakdown]", text)
@@ -1625,6 +1685,7 @@ class Pipeline:
                 break
 
             qa_fail_event: dict | None = None
+            yield {"_executor_start": True}
             async for line in _execute_workflows_batch(
                 wf_paths,
                 raw_json,
@@ -1639,6 +1700,7 @@ class Pipeline:
                     qa_fail_event = line
                     break
                 yield {"data": f"\n{line}"}
+            yield {"_executor_done": True}
             output_paths = list(exec_paths)
 
             # Keep brain token usage bounded between sub-steps.
@@ -1768,7 +1830,16 @@ class Pipeline:
         """
         if self._verbose:
             print("pipeline: Storyboard director — starting short-film production …")
-        auto_approve = self._storyboard_auto_approve(user_text)
+        # Resolve the approval gate: an explicit request in the user's message
+        # wins; otherwise fall back to the settings default (director.user_approval_step).
+        if self._storyboard_wants_approval(user_text):
+            auto_approve = False          # user explicitly asked to approve each step
+        elif self._storyboard_auto_approve(user_text):
+            auto_approve = True           # user explicitly asked to run autonomously
+        else:
+            auto_approve = not self._approval_default  # settings default
+        if self._verbose:
+            print(f"pipeline: Storyboard approval gate {'OFF (autonomous)' if auto_approve else 'ON'}.")
         user_refs = list(dict.fromkeys(
             [p for p in (self._session.last_user_input_images or []) if p]
         ))
@@ -1784,7 +1855,7 @@ class Pipeline:
         # ── Pre-step: analyse reference images → character/style description ──
         ref_desc = ""
         if user_refs:
-            yield {"data": "\n_🔎 Analysing your reference image(s)…_\n"}
+            yield {"_story_start": True, "name": "🔎 Reference analysis"}
             _ref_request = (
                 "Analyse the following reference image(s) and describe the main character's "
                 "appearance (age, build, hair, skin, wardrobe, distinguishing features) and the "
@@ -1799,9 +1870,9 @@ class Pipeline:
                     ref_desc = ev["_plan_step_text"] or ""
                 else:
                     yield ev
+            yield {"_story_done": True}
 
         # ── Story step: bible + ≤10s sequence breakdown covering the story ──
-        yield {"data": "\n\n_📝 Writing the story bible and shot/sequence breakdown…_\n"}
         spec: dict | None = None
         for _story_try in range(2):
             _reminder = (

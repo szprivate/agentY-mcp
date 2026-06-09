@@ -1111,10 +1111,19 @@ async def _process_message(message: cl.Message) -> None:
     researcher_step: cl.Step | None = None
     brain_step: cl.Step | None = None
     planner_step: cl.Step | None = None
+    story_step: cl.Step | None = None      # storyboard breakdown / reference analysis
     think_step: cl.Step | None = None
-    qa_step: cl.Step | None = None
-    comfy_step: cl.Step | None = None  # live-updating ComfyUI progress bar step
-    download_step: cl.Step | None = None  # live-updating HF download progress step
+    qa_step: cl.Step | None = None         # per-run Vision QA step
+    comfy_step: cl.Step | None = None      # legacy (non-storyboard) live ComfyUI progress
+    executor_step: cl.Step | None = None   # per-run ComfyUI step (storyboard flow)
+    download_step: cl.Step | None = None   # live-updating HF download progress step
+
+    # Executor-step render buffers (storyboard flow): a status log plus a single
+    # live progress line, re-rendered together so each ComfyUI run is one bracket.
+    in_executor: bool = False
+    exec_log: list[str] = []
+    exec_progress: str = ""
+    pending_flush: bool = False  # flush this run's outputs once it closes (after QA)
 
     # Markers that identify Vision-QA output coming from the executor.
     QA_MARKERS = ("🔍 QA `", "🔍 Running Vision QA")
@@ -1129,6 +1138,44 @@ async def _process_message(message: cl.Message) -> None:
     full_response_parts: list[str] = []
     qa_reply_queue: asyncio.Queue = asyncio.Queue()
 
+    async def _render_executor() -> None:
+        """Render the current ComfyUI run as one step: status log + live progress."""
+        nonlocal executor_step
+        if executor_step is None:
+            executor_step = cl.Step(name="⚙️ ComfyUI", type="tool")
+            await executor_step.send()
+        body = "\n".join(exec_log)
+        if exec_progress:
+            body = f"{body}\n{exec_progress}" if body else exec_progress
+        executor_step.output = body
+        await executor_step.update()
+
+    async def _close_inline() -> None:
+        """Finalise per-run inline UI (executor / ComfyUI / QA steps + the main
+        message) and flush any pending outputs, so the next phase renders fresh
+        and in execution order instead of accumulating in an earlier message.
+        """
+        nonlocal executor_step, comfy_step, qa_step, response_msg
+        nonlocal in_executor, exec_log, exec_progress, pending_flush
+        if executor_step is not None:
+            await executor_step.update()
+            executor_step = None
+        in_executor = False
+        exec_log = []
+        exec_progress = ""
+        if comfy_step is not None:
+            await comfy_step.update()
+            comfy_step = None
+        if qa_step is not None:
+            await qa_step.update()
+            qa_step = None
+        if pending_flush:
+            await _flush_new_outputs()
+            pending_flush = False
+        if response_msg is not None:
+            await response_msg.update()
+            response_msg = None
+
     _trace("chainlit: stream loop begin")
     _event_count = 0
     try:
@@ -1139,8 +1186,7 @@ async def _process_message(message: cl.Message) -> None:
 
             # ── Brain assembly failure — ask user for advice and retry ────
             if event.get("brain_assembly_fail_ask"):
-                if response_msg:
-                    await response_msg.update()
+                await _close_inline()
 
                 latest_wf: str = event.get("latest_workflow_path", "")
                 path_hint = f"\n\nLatest workflow JSON: `{latest_wf}`" if latest_wf else ""
@@ -1161,8 +1207,7 @@ async def _process_message(message: cl.Message) -> None:
 
             # ── QA failure — ask user whether to retry ────────────────────
             if event.get("qa_fail_ask"):
-                if response_msg:
-                    await response_msg.update()
+                await _close_inline()
 
                 fail_paths: list[str] = event.get("image_paths", [])
                 new_qa = [p for p in fail_paths if p not in sent_paths and os.path.isfile(p)]
@@ -1193,19 +1238,10 @@ async def _process_message(message: cl.Message) -> None:
 
             # ── Storyboard approval gate — show output, ask to proceed ────
             if event.get("approval_ask"):
-                if response_msg:
-                    await response_msg.update()
-
-                appr_paths: list[str] = event.get("image_paths", [])
-                new_appr = [p for p in appr_paths if p not in sent_paths and os.path.isfile(p)]
-                if new_appr:
-                    imgs = [cl.Image(path=p, name=Path(p).name, display="inline") for p in new_appr if _is_image_path(p)]
-                    vids = [cl.Video(path=p, name=Path(p).name, display="inline") for p in new_appr if _is_video_path(p)]
-                    if imgs:
-                        await cl.Message(content="🖼️ **For your review:**", elements=imgs).send()
-                    if vids:
-                        await cl.Message(content="🎬 **For your review:**", elements=vids).send()
-                    sent_paths.update(new_appr)
+                # _close_inline already finalised this run (ComfyUI → QA) and
+                # flushed its output image in order; surface any stragglers.
+                await _close_inline()
+                await _flush_new_outputs()
 
                 label = event.get("description") or event.get("label") or "this step"
                 ask_resp = await cl.AskUserMessage(
@@ -1222,6 +1258,7 @@ async def _process_message(message: cl.Message) -> None:
 
             # ── Planner step (collapsible) ────────────────────────────────
             if event.get("_planner_start"):
+                await _close_inline()
                 planner_step = cl.Step(name="🗂️ Planner", type="tool")
                 await planner_step.send()
                 continue
@@ -1232,8 +1269,21 @@ async def _process_message(message: cl.Message) -> None:
                     planner_step = None
                 continue
 
+            # ── Storyboard breakdown / reference analysis (collapsible) ────
+            if event.get("_story_start"):
+                await _close_inline()
+                story_step = cl.Step(name=event.get("name") or "📝 Storyboard breakdown", type="tool")
+                await story_step.send()
+                continue
+            if event.get("_story_done"):
+                if story_step is not None:
+                    await story_step.update()
+                    story_step = None
+                continue
+
             # ── Researcher step (collapsible) ─────────────────────────────
             if event.get("_researcher_start"):
+                await _close_inline()
                 researcher_step = cl.Step(name="🔎 Researcher", type="tool")
                 await researcher_step.send()
                 continue
@@ -1245,6 +1295,7 @@ async def _process_message(message: cl.Message) -> None:
 
             # ── Brain step (collapsible) ──────────────────────────────────
             if event.get("_brain_start"):
+                await _close_inline()
                 brain_step = cl.Step(name="🧠 Brain", type="tool")
                 await brain_step.send()
                 continue
@@ -1254,8 +1305,22 @@ async def _process_message(message: cl.Message) -> None:
                     brain_step = None
                 continue
 
+            # ── Executor (ComfyUI) — one collapsible step per run ──────────
+            if event.get("_executor_start"):
+                await _close_inline()
+                in_executor = True
+                exec_log = []
+                exec_progress = ""
+                continue
+            if event.get("_executor_done"):
+                # Finalises the ComfyUI + QA steps and flushes this run's output
+                # image (so it renders after the QA verdict, in execution order).
+                await _close_inline()
+                continue
+
             # ── Plan ready — create task list ─────────────────────────────
             if event.get("_plan_ready"):
+                await _close_inline()
                 task_list = cl.TaskList()
                 task_list.status = "Running..."
                 tasks = [
@@ -1268,6 +1333,7 @@ async def _process_message(message: cl.Message) -> None:
                 continue
 
             if event.get("_step_start"):
+                await _close_inline()
                 idx = event["idx"]
                 if task_list is not None and idx < len(tasks):
                     tasks[idx].status = cl.TaskStatus.RUNNING
@@ -1291,6 +1357,8 @@ async def _process_message(message: cl.Message) -> None:
                     await researcher_step.stream_token(reasoning_text)
                 elif brain_step is not None:
                     await brain_step.stream_token(reasoning_text)
+                elif story_step is not None:
+                    await story_step.stream_token(reasoning_text)
                 else:
                     if think_step is None:
                         think_step = cl.Step(name="💭 Thinking")
@@ -1299,7 +1367,7 @@ async def _process_message(message: cl.Message) -> None:
                 continue
 
             if (event.get("reasoning_signature") is not None
-                    and researcher_step is None and brain_step is None):
+                    and researcher_step is None and brain_step is None and story_step is None):
                 if think_step is not None:
                     await think_step.update()
                     think_step = None
@@ -1323,7 +1391,7 @@ async def _process_message(message: cl.Message) -> None:
                 await download_step.update()
                 continue
 
-            # Researcher / brain output goes into its collapsible step.
+            # Researcher / brain / story output goes into its collapsible step.
             if researcher_step is not None:
                 await researcher_step.stream_token(chunk)
                 continue
@@ -1331,7 +1399,33 @@ async def _process_message(message: cl.Message) -> None:
                 full_response_parts.append(chunk)
                 await brain_step.stream_token(chunk)
                 continue
+            if story_step is not None:
+                await story_step.stream_token(chunk)
+                continue
 
+            # ── Storyboard executor run: one ComfyUI step (status + live
+            # progress) and a separate per-run Vision QA step; the output image
+            # is flushed when the run closes (after the QA verdict). ──────────
+            if in_executor:
+                if any(m in chunk for m in QA_MARKERS):
+                    if qa_step is None:
+                        qa_step = cl.Step(name="🔍 Vision QA", type="tool")
+                        await qa_step.send()
+                    await qa_step.stream_token(chunk)
+                    continue
+                if "🎨 [" in chunk:
+                    exec_progress = chunk.strip().strip("_")
+                    await _render_executor()
+                    continue
+                stripped = chunk.strip()
+                if stripped:
+                    exec_log.append(stripped)
+                    await _render_executor()
+                if "💾" in chunk:
+                    pending_flush = True
+                continue
+
+            # ── Legacy (non-storyboard) executor routing ──────────────────
             # ComfyUI progress bar lines → single live-updating Step.
             if "🎨 [" in chunk:
                 stripped = chunk.strip().strip("_")
@@ -1379,6 +1473,8 @@ async def _process_message(message: cl.Message) -> None:
             await researcher_step.update()
         if brain_step is not None:
             await brain_step.update()
+        if story_step is not None:
+            await story_step.update()
         if planner_step is not None:
             await planner_step.update()
         if download_step is not None:
@@ -1387,8 +1483,12 @@ async def _process_message(message: cl.Message) -> None:
             await think_step.update()
         if qa_step is not None:
             await qa_step.update()
+        if executor_step is not None:
+            await executor_step.update()
         if comfy_step is not None:
             await comfy_step.update()
+        if pending_flush:
+            await _flush_new_outputs()
         if task_list is not None and all(t.status == cl.TaskStatus.DONE for t in tasks):
             task_list.status = "Done"
             await task_list.send()
