@@ -219,6 +219,8 @@ def route(result: TriageResult) -> str:
             return "answer"
         case MessageIntent.story:
             return "story"
+        case MessageIntent.storyboard:
+            return "storyboard"
         case MessageIntent.needs_image:
             return "needs_image"
         case MessageIntent.param_tweak | MessageIntent.feedback:

@@ -40,3 +40,17 @@ If a matching entry exists, **apply the documented solution directly** instead o
 ```
 2026-06-07 | LoadImage validation fails when image filename lacks subfolder prefix | Qualify the filename with its full subfolder path (e.g., 'agent/filename.png') to match ComfyUI input directory structure; unqualified names cause custom_validation_failed errors.
 ```
+
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in brainbriefing | Identify the prompt injection node using get_workflow_node_info, then use update_workflow to patch the prompt value directly into the PrimitiveStringMultiline node feeding the pipeline.
+
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in brainbriefing | Identify the prompt input node using get_workflow_node_info, then use update_workflow to patch the prompt value directly into that node's input field.
+
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in spec | Identify the prompt node using get_workflow_node_info, then use update_workflow to patch the prompt value directly into the correct node's input field.
+
+2026-06-08 | positive_prompt_node_id null in brainbriefing causes apply_brainbriefing to fail | When positive_prompt_node_id is null, use get_workflow_node_info to identify the prompt node, then apply the prompt via update_workflow with the correct node_id and input_name.
+
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null | Identify the prompt node using get_workflow_node_info, then use update_workflow to patch the prompt value directly into that node's input field.
+
+2026-06-08 | LoadImage validation fails when filename lacks subfolder prefix in ComfyUI | Qualify the filename with its full subfolder path (e.g., 'agent/image_generation_00003_.png') when patching LoadImage nodes to match ComfyUI input directory structure.
+
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-shot template | Non-blocking validation error; multi-shot Kling nodes embed prompts directly. Skip apply_brainbriefing for positive prompt and proceed to signal_workflow_ready if node 12 multi_shot fields are patched.

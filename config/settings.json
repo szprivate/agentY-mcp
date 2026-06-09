@@ -21,6 +21,12 @@
   "message_history_log": "./.logs/message_history.log",
   "tokens_usage_log": "./.logs/tokens_usage.log",
 
+  "director": {
+    // Storyboard director: max Vision-QA attempts per visual step before asking
+    // the user whether to keep retrying (env override: DIRECTOR_AUTO_RETRIES).
+    "auto_retries": 4
+  },
+
   "llm": {
     
     "pipeline": {

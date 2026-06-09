@@ -23,6 +23,7 @@ class MessageIntent(str, Enum):
     needs_image         = "needs_image"          # request requires an image input that the user forgot to attach
     chat                = "chat"                 # casual/conversational message with no generation intent
     story               = "story"                # request to write a small storyline / narrative
+    storyboard          = "storyboard"           # end-to-end short-film: character sheet → shots → Kling multishot video sequences
 
 
 class ChatSummary(BaseModel):

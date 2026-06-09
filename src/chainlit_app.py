@@ -1191,6 +1191,35 @@ async def _process_message(message: cl.Message) -> None:
                 await qa_reply_queue.put(answer)
                 continue
 
+            # ── Storyboard approval gate — show output, ask to proceed ────
+            if event.get("approval_ask"):
+                if response_msg:
+                    await response_msg.update()
+
+                appr_paths: list[str] = event.get("image_paths", [])
+                new_appr = [p for p in appr_paths if p not in sent_paths and os.path.isfile(p)]
+                if new_appr:
+                    imgs = [cl.Image(path=p, name=Path(p).name, display="inline") for p in new_appr if _is_image_path(p)]
+                    vids = [cl.Video(path=p, name=Path(p).name, display="inline") for p in new_appr if _is_video_path(p)]
+                    if imgs:
+                        await cl.Message(content="🖼️ **For your review:**", elements=imgs).send()
+                    if vids:
+                        await cl.Message(content="🎬 **For your review:**", elements=vids).send()
+                    sent_paths.update(new_appr)
+
+                label = event.get("description") or event.get("label") or "this step"
+                ask_resp = await cl.AskUserMessage(
+                    content=(
+                        f"⏸️ **Approval needed — {label}**\n\n"
+                        "Reply **yes** to approve and continue, **no** to abort the storyboard, "
+                        "or type a revision note and I'll redo this step."
+                    ),
+                    timeout=600,
+                ).send()
+                answer = ask_resp["output"] if ask_resp else "yes"
+                await qa_reply_queue.put(answer)
+                continue
+
             # ── Planner step (collapsible) ────────────────────────────────
             if event.get("_planner_start"):
                 planner_step = cl.Step(name="🗂️ Planner", type="tool")

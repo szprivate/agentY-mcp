@@ -26,6 +26,15 @@ Set `task.type` to `video i2v`.
 ### Prompt composition (replaces prompt-craft step 7)
 Count the number of shots the user asked for (max 6, default 2). Generate that many **DISTINCT** shot prompts following the formula below. Do not repeat the same prompt across shots.
 
+> **Storyboard director hand-off:** when the request already supplies an explicit
+> list of shot prompts + per-shot durations (the Storyboard director passes them
+> as a JSON array such as `[{"prompt": "...", "duration": 5}, …]`), **use those
+> prompts verbatim** as the storyboard array — do not invent new ones. Still
+> enforce the 512-char limit per shot, keep the supplied character-lock prefix
+> intact, set `task.type` to `video i2v`, and bind the supplied start-frame image
+> as the LoadImage input (node 14). Carry each shot's `duration` through to
+> `multi_shot.storyboard_N_duration`, and make sure the durations sum to ≤10s.
+
 **Each individual shot prompt MUST NOT exceed 512 characters.** Count characters before finalising — trim adjectives or shorten camera descriptions if needed to stay within the limit.
 
 Store all shot prompts in the brainbriefing `prompt.positive` field as a **JSON array string**:

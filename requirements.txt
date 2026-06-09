@@ -21,3 +21,7 @@ tqdm>=4.66.0
 # Web search (no API key required) — ddgs is the maintained successor of the
 # now-deprecated duckduckgo-search package (better rate-limit handling).
 ddgs>=9.0.0
+# Video frame sampling for Vision QA of generated video (Kling multi-shot, etc.).
+# Used by src/utils/video_frames.py; degrades gracefully (OpenCV / ffmpeg-on-PATH
+# fallbacks) if absent, but this is the recommended backend.
+imageio[ffmpeg]>=2.34.0

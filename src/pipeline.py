@@ -336,6 +336,9 @@ class Pipeline:
         self._error_checker_agent: Agent = error_checker_agent or create_error_checker_agent()
         self._verbose = verbose
         self._skip_brain = skip_brain
+        # Storyboard director: max Vision-QA attempts per visual step before the
+        # user is asked whether to keep retrying (settings.json director.auto_retries).
+        self._storyboard_max_qa = self._resolve_director_retries()
         self._info_context: dict = info_context or {}
         self._session: AgentSession = AgentSession(session_id=session_id)
         # Brainbriefing JSON from the most recent Researcher run; used by the
@@ -532,6 +535,19 @@ class Pipeline:
                         _answer = "n"
                     await qa_q.put(_answer)
                     continue
+                if event.get("approval_ask"):
+                    _label = event.get("description") or event.get("label") or "this step"
+                    print(f"\n⏸️  Approval needed — {_label}")
+                    for _p in event.get("image_paths", []):
+                        print(f"   • {_p}")
+                    try:
+                        _answer = input(
+                            "✅ Approve and continue? [y = approve / n = abort / or type a revision note]: "
+                        ).strip()
+                    except (EOFError, KeyboardInterrupt):
+                        _answer = "y"
+                    await qa_q.put(_answer)
+                    continue
 
                 # The Researcher's internal stream (its brainbriefing JSON) is
                 # bracketed by these markers and excluded from the response,
@@ -685,6 +701,16 @@ class Pipeline:
             async for event in self._stream_story(user_text, triage_result):
                 yield event
             _trace("pipeline.story: return")
+            return
+
+        if handler == "storyboard":
+            if self._verbose:
+                print("pipeline: storyboard → Storyboard director (streamed)")
+            async for event in self._stream_storyboard(
+                user_text, triage_result, qa_reply_queue=qa_reply_queue
+            ):
+                yield event
+            _trace("pipeline.storyboard: return")
             return
 
         if handler == "needs_image":
@@ -1345,6 +1371,659 @@ class Pipeline:
 
         if self._verbose:
             print(f"pipeline: Planned execution complete ({total} step(s)).")
+
+    # ── Storyboard director (Option B — dynamic short-film orchestrator) ── #
+
+    # Default bound on Vision-QA attempts per visual step before asking the user.
+    # Overridable via settings.json ``director.auto_retries`` or the
+    # ``DIRECTOR_AUTO_RETRIES`` env var; resolved per-instance into
+    # ``self._storyboard_max_qa`` at construction time.
+    _STORYBOARD_MAX_QA = 4
+    # Free-text replies accepted at an approval gate as "approve" / "abort".
+    _STORYBOARD_AFFIRM = {
+        "approve", "approved", "ok", "okay", "proceed", "continue", "next",
+        "yes", "y", "good", "looks good", "lgtm", "go", "accept", "fine",
+    }
+    _STORYBOARD_ABORT = {"abort", "stop", "cancel", "quit", "no", "nah", "halt", "end"}
+
+    # Scope guards prepended to every per-step Researcher request. Without these,
+    # the persistent style guidelines (which may mention "short film"/"trailer")
+    # tempt the Researcher to treat a single image/video step as a multi-stage
+    # project — wasting tokens deliberating, emitting spurious WARNING blockers,
+    # or (worse) blocking for clarification and aborting the step.
+    _SB_SCOPE_IMG = (
+        "IMPORTANT — SCOPE: This is a SINGLE image-generation task. Produce ONLY {asset}. "
+        "The wider short film is produced by an orchestrator across separate steps; do NOT "
+        "treat the storyline/film as part of THIS task, do NOT plan extra steps, do NOT "
+        "select a video template, and do NOT block for clarification.\n\n"
+    )
+    _SB_SCOPE_VID = (
+        "IMPORTANT — SCOPE: This is a SINGLE video-generation task. Produce ONLY this one "
+        "multi-shot sequence. Other sequences are produced separately by an orchestrator; "
+        "do NOT plan extra steps and do NOT block for clarification.\n\n"
+    )
+
+    # The character sheet is a production REFERENCE asset, not film footage — so it
+    # is generated and QA'd with a clean look, never the film's grade (grain / VHS /
+    # found-footage / colour grading). This honours instructions like "the grungy
+    # look doesn't need to apply to the character sheet" by default; the footage
+    # ``style_guidelines`` are applied only to the start frames and videos.
+    _SB_CHARSHEET_GUIDELINES = (
+        "Clean character reference sheet: even, neutral studio lighting; plain, uncluttered "
+        "background; sharp focus; natural colours true to the reference. This is a production "
+        "reference asset — do NOT apply any film grade, film grain, VHS / found-footage "
+        "artifacts, or stylisation; the film's visual style applies only to the footage, "
+        "not to this sheet."
+    )
+
+    @classmethod
+    def _resolve_director_retries(cls) -> int:
+        """Resolve the storyboard QA auto-retry bound.
+
+        Priority: ``DIRECTOR_AUTO_RETRIES`` env var > settings.json
+        ``director.auto_retries`` > the ``_STORYBOARD_MAX_QA`` default. Always
+        returns at least 1 (one attempt) so a misconfigured 0/negative value
+        can't disable generation entirely.
+        """
+        env = os.environ.get("DIRECTOR_AUTO_RETRIES")
+        if env is not None:
+            try:
+                return max(1, int(env))
+            except ValueError:
+                pass
+        try:
+            val = _settings().get("director", {}).get("auto_retries", cls._STORYBOARD_MAX_QA)
+            return max(1, int(val))
+        except Exception:  # noqa: BLE001
+            return cls._STORYBOARD_MAX_QA
+
+    @staticmethod
+    def _storyboard_auto_approve(user_text: str) -> bool:
+        """Return True when the user opted out of per-step approval gating."""
+        t = user_text.lower()
+        triggers = (
+            "without asking", "don't ask", "dont ask", "do not ask", "no approval",
+            "without approval", "auto approve", "auto-approve", "automatically",
+            "fully automatic", "no need to approve", "don't stop for approval",
+            "without my approval", "no approvals", "skip approval",
+        )
+        return any(tok in t for tok in triggers)
+
+    @staticmethod
+    def _parse_storyboard_spec(text: str) -> dict | None:
+        """Extract and lightly validate the storyboard JSON spec from Story output.
+
+        Expects a trailing fenced JSON block with ``character``, ``guidelines``
+        and a non-empty ``sequences`` list (each with ``shots``).  Returns the
+        parsed dict, or ``None`` when no usable spec can be recovered.
+        """
+        raw = _extract_json(text or "")
+        if not raw:
+            return None
+        try:
+            spec = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        if not isinstance(spec, dict):
+            return None
+        seqs = spec.get("sequences")
+        if not isinstance(seqs, list) or not seqs:
+            return None
+        # Normalise each sequence so downstream code can rely on the shape.
+        norm_seqs: list[dict] = []
+        for i, s in enumerate(seqs, 1):
+            if not isinstance(s, dict):
+                continue
+            shots = s.get("shots") if isinstance(s.get("shots"), list) else []
+            clean_shots = []
+            for sh in shots:
+                if isinstance(sh, dict) and sh.get("prompt"):
+                    try:
+                        dur = int(sh.get("duration", 5) or 5)
+                    except (TypeError, ValueError):
+                        dur = 5
+                    clean_shots.append({"prompt": str(sh["prompt"]), "duration": max(1, dur)})
+            if not clean_shots:
+                continue
+            norm_seqs.append({
+                "index": int(s.get("index", i) or i),
+                "summary": str(s.get("summary", f"Sequence {i}")),
+                "start_frame_prompt": str(s.get("start_frame_prompt", "")).strip(),
+                "shots": clean_shots,
+            })
+        if not norm_seqs:
+            return None
+        spec["sequences"] = norm_seqs
+        if not isinstance(spec.get("character"), dict):
+            spec["character"] = {"present": False, "tag": "", "description": ""}
+        return spec
+
+    async def _storyboard_story(self, user_text: str, ref_desc: str, *, reminder: str = ""):
+        """Stream the Story agent to produce the bible + ≤10s sequence breakdown.
+
+        Drives the Story agent in **Mode C** (the ``story-storyboard`` skill),
+        which holds the authoring rules and the trailing JSON contract this
+        director parses.  Yields the agent's events plus a final
+        ``{"_sb_story": <full_text>}`` sentinel.
+
+        ``reminder`` is appended on retry to push the agent to emit the JSON block.
+        """
+        self._clear_story_history()
+        instruction = textwrap.dedent(f"""
+            Produce a SHORT-FILM storyboard breakdown. Activate the `story-storyboard`
+            skill (Mode C) and follow it exactly: write the story bible and prose
+            breakdown, splitting the WHOLE story (start to finish) into Kling multi-shot
+            sequences of <=10s each, then end your reply with the SINGLE trailing
+            ```json block defined by that skill — and nothing after it.
+
+            User brief / storyline / quality guidelines:
+            {user_text}
+        """).strip()
+        if ref_desc:
+            instruction += (
+                f"\n\nReference character/style description (from the user's reference "
+                f"image(s) — keep the character consistent with this):\n{ref_desc}"
+            )
+        if reminder:
+            instruction += f"\n\n{reminder}"
+
+        _snap = self._usage_snapshot(self._story_agent)
+        chunks: list[str] = []
+        async for event in self._story_agent.stream_async(instruction):
+            if isinstance(event, dict):
+                c = event.get("data", "")
+                if c:
+                    chunks.append(c)
+            yield event
+        self._record_agent_usage(self._story_agent, _snap)
+        text = "".join(chunks)
+        log_agent_exchange("STORY", "[storyboard breakdown]", text)
+        self._clear_story_history()
+        yield {"_sb_story": text}
+
+    async def _storyboard_gen_step(
+        self,
+        *,
+        request: str,
+        qa_brief: str,
+        guidelines: str,
+        reference_paths: list[str],
+        qa_reply_queue: asyncio.Queue | None,
+    ):
+        """Run one visual generation sub-step (Researcher→Brain→Executor) with
+        guideline/reference-grounded Vision QA and bounded auto-retry.
+
+        ``request`` is the full task-specific instruction sent to the Researcher.
+        ``qa_brief`` is a concise statement of what THIS step must produce — it is
+        the ground-truth reference the Vision QA judges the output against (so the
+        character-sheet step is judged as a character sheet, not against the
+        original video brief).  ``guidelines`` is the persistent style/quality bar
+        that applies to every visual step.
+
+        Yields the underlying Strands events plus a final
+        ``{"_sb_result": {"success", "output_paths", "raw_json"}}`` sentinel.
+        Vision QA failures are auto-retried up to ``self._storyboard_max_qa`` times
+        (feeding the QA verdicts back to the Researcher); once exhausted the user
+        is asked (via ``qa_reply_queue``) whether to keep trying.
+        """
+        ref_path_objs = [Path(p) for p in reference_paths if p]
+        attempt = 0
+        qa_feedback: str | None = None
+        success = False
+        output_paths: list[str] = []
+        raw_json: str | None = None
+
+        while True:
+            attempt += 1
+            req = request
+            if qa_feedback:
+                req = (
+                    f"{request}\n\n[The previous attempt FAILED Vision QA. Fix exactly these "
+                    f"issues while keeping the character and style consistent:]\n{qa_feedback}"
+                )
+
+            # 1. Researcher → brainbriefing
+            yield {"_researcher_start": True}
+            raw_json = None
+            r_error: str | None = None
+            async for ev in self._arun_researcher(req):
+                if isinstance(ev, dict) and "_researcher_done" in ev:
+                    raw_json = ev["raw_json"]
+                    r_error = ev["error"]
+                    yield {"_researcher_done": True}
+                else:
+                    yield ev
+            if r_error:
+                yield {"data": f"\n❌ {r_error}"}
+                break
+            blocked = self._researcher_blocked_question(raw_json)
+            if blocked:
+                yield {"data": f"\n🚫 {blocked}"}
+                break
+            self._last_brainbriefing_json = raw_json
+
+            # 2. Brain → workflow assembly
+            self._ensure_clean_history()
+            self._brain.messages.clear()
+            _bsnap = self._usage_snapshot(self._brain)
+            yield {"_brain_start": True}
+            async for ev in self._brain.stream_async(self._build_brain_prompt(raw_json)):
+                yield ev
+            yield {"_brain_done": True}
+            self._record_agent_usage(self._brain, _bsnap)
+
+            # 3. Executor + grounded Vision QA
+            wf_paths = _get_workflow_signal()
+            wf_paths = self._expand_variations(wf_paths, raw_json)
+            self._session.current_output_paths.clear()
+            exec_paths = self._session.current_output_paths
+            if not wf_paths:
+                qa_feedback = "The Brain did not assemble a workflow (signal_workflow_ready was never called)."
+                if attempt < self._storyboard_max_qa:
+                    yield {"data": f"\n\n_🔁 No workflow produced (attempt {attempt}/{self._storyboard_max_qa}). Retrying…_"}
+                    continue
+                break
+
+            qa_fail_event: dict | None = None
+            async for line in _execute_workflows_batch(
+                wf_paths,
+                raw_json,
+                user_message=qa_brief,
+                verbose=self._verbose,
+                collected_paths=exec_paths,
+                run_qa=True,
+                guidelines=guidelines,
+                reference_image_paths=ref_path_objs or None,
+            ):
+                if isinstance(line, dict) and line.get("qa_fail"):
+                    qa_fail_event = line
+                    break
+                yield {"data": f"\n{line}"}
+            output_paths = list(exec_paths)
+
+            # Keep brain token usage bounded between sub-steps.
+            await self._compress_brain_history(extra_output_paths=output_paths)
+
+            if not qa_fail_event:
+                success = True
+                break
+
+            # ── Vision QA failed ─────────────────────────────────────────── #
+            details = qa_fail_event.get("fail_details", [])
+            qa_feedback = "\n".join(
+                f"- {Path(d['path']).name}: {d['verdict']}" for d in details
+            ) or "Vision QA failed."
+            if attempt < self._storyboard_max_qa:
+                yield {"data": f"\n\n_🔁 Vision QA failed (attempt {attempt}/{self._storyboard_max_qa}). Auto-retrying with feedback…_"}
+                continue
+
+            # Exhausted auto-retries — ask the user whether to keep trying.
+            if qa_reply_queue is not None:
+                yield {"qa_fail_ask": True, **qa_fail_event}
+                ans = (await qa_reply_queue.get() or "").strip()
+                if _is_affirmative(ans) or ans.lower() in self._STORYBOARD_AFFIRM:
+                    attempt = 0  # grant a fresh round of auto-retries
+                    yield {"data": "\n\n_🔄 Retrying this step…_"}
+                    continue
+            success = False
+            break
+
+        if success:
+            self._register_generated_images(raw_json)
+        yield {"_sb_result": {"success": success, "output_paths": output_paths, "raw_json": raw_json}}
+
+    async def _storyboard_step(
+        self,
+        *,
+        idx: int,
+        total: int,
+        label: str,
+        request: str,
+        qa_brief: str,
+        guidelines: str,
+        reference_paths: list[str],
+        auto_approve: bool,
+        qa_reply_queue: asyncio.Queue | None,
+    ):
+        """Run one storyboard step (generation + QA) behind an approval gate.
+
+        Emits ``_step_start`` / ``_step_done`` so the UI task list updates, runs
+        the generation sub-step, then — unless ``auto_approve`` — pauses for user
+        approval.  On a non-approve / non-abort reply the user's text is treated
+        as a revision note and the step is re-run.  Yields events plus a final
+        ``{"_sb_done": {"success", "output_paths", "raw_json", "aborted"}}``
+        sentinel.
+        """
+        yield {"_step_start": True, "idx": idx, "total": total, "description": label}
+        yield {"data": f"\n\n**Step {idx + 1}/{total} — {label}**\n"}
+
+        feedback: str | None = None
+        while True:
+            req = request if not feedback else f"{request}\n\n[User revision note for this step:]\n{feedback}"
+            result: dict | None = None
+            async for ev in self._storyboard_gen_step(
+                request=req,
+                qa_brief=qa_brief,
+                guidelines=guidelines,
+                reference_paths=reference_paths,
+                qa_reply_queue=qa_reply_queue,
+            ):
+                if isinstance(ev, dict) and "_sb_result" in ev:
+                    result = ev["_sb_result"]
+                else:
+                    yield ev
+
+            if not result or not result["success"]:
+                yield {"_step_done": True, "idx": idx, "failed": True}
+                yield {"_sb_done": {**(result or {"output_paths": [], "raw_json": None}), "success": False, "aborted": False}}
+                return
+
+            if auto_approve or qa_reply_queue is None:
+                yield {"_step_done": True, "idx": idx}
+                yield {"_sb_done": {**result, "aborted": False}}
+                return
+
+            # ── Approval gate ────────────────────────────────────────────── #
+            yield {
+                "approval_ask": True,
+                "label": label,
+                "description": f"Step {idx + 1}/{total} — {label}",
+                "image_paths": result["output_paths"],
+            }
+            decision = (await qa_reply_queue.get() or "").strip()
+            low = decision.lower()
+            if not decision or _is_affirmative(low) or low in self._STORYBOARD_AFFIRM:
+                yield {"_step_done": True, "idx": idx}
+                yield {"_sb_done": {**result, "aborted": False}}
+                return
+            if low in self._STORYBOARD_ABORT:
+                yield {"_step_done": True, "idx": idx, "failed": True}
+                yield {"_sb_done": {**result, "success": False, "aborted": True}}
+                return
+            # Otherwise: treat the reply as a revision note and re-run the step.
+            feedback = decision
+            yield {"data": f"\n\n_🔄 Revising **{label}** per your note…_"}
+
+    @staticmethod
+    def _first_image(paths: list[str]) -> str | None:
+        """Return the first image file path in *paths*, or None."""
+        for p in paths:
+            if _is_image_file(p):
+                return p
+        return None
+
+    async def _stream_storyboard(
+        self,
+        user_text: str,
+        triage_result: TriageResult,
+        *,
+        qa_reply_queue: asyncio.Queue | None = None,
+    ):
+        """Option B orchestrator: storyline → character sheet → per-sequence
+        start-frame + Kling multi-shot video, each Vision-QA'd and approval-gated.
+
+        The story is split into Kling multi-shot sequences of <=10s that together
+        cover the whole storyline (preserving character consistency within each
+        sequence and via the shared character sheet across sequences).
+        """
+        if self._verbose:
+            print("pipeline: Storyboard director — starting short-film production …")
+        auto_approve = self._storyboard_auto_approve(user_text)
+        user_refs = list(dict.fromkeys(
+            [p for p in (self._session.last_user_input_images or []) if p]
+        ))
+
+        yield {"data": (
+            "\n🎬 **Storyboard mode** — I'll design the character, break the story into "
+            "≤10s Kling multi-shot sequences covering the whole story, then generate a "
+            "start frame and video for each."
+            + ("" if auto_approve else " I'll pause for your approval after each step.")
+            + "\n"
+        )}
+
+        # ── Pre-step: analyse reference images → character/style description ──
+        ref_desc = ""
+        if user_refs:
+            yield {"data": "\n_🔎 Analysing your reference image(s)…_\n"}
+            _ref_request = (
+                "Analyse the following reference image(s) and describe the main character's "
+                "appearance (age, build, hair, skin, wardrobe, distinguishing features) and the "
+                "overall visual style, concisely, for use as a character/style lock. "
+                "Call analyze_image on each path.\nReference image file(s):\n"
+                + "\n".join(f"- {p}" for p in user_refs)
+            )
+            async for ev in self._stream_plan_text_step(
+                self._info_agent, "INFO", _ref_request, None, with_gallery=False
+            ):
+                if isinstance(ev, dict) and "_plan_step_text" in ev:
+                    ref_desc = ev["_plan_step_text"] or ""
+                else:
+                    yield ev
+
+        # ── Story step: bible + ≤10s sequence breakdown covering the story ──
+        yield {"data": "\n\n_📝 Writing the story bible and shot/sequence breakdown…_\n"}
+        spec: dict | None = None
+        for _story_try in range(2):
+            _reminder = (
+                "Your previous reply did not include the required trailing ```json block "
+                "from the story-storyboard skill. Output the full breakdown again and END "
+                "with that single JSON block exactly per the skill's schema."
+                if _story_try > 0 else ""
+            )
+            story_text = ""
+            async for ev in self._storyboard_story(user_text, ref_desc, reminder=_reminder):
+                if isinstance(ev, dict) and "_sb_story" in ev:
+                    story_text = ev["_sb_story"]
+                else:
+                    yield ev
+            spec = self._parse_storyboard_spec(story_text)
+            if spec:
+                break
+            if self._verbose:
+                print("pipeline: storyboard spec JSON missing/invalid — re-asking Story agent.")
+
+        if not spec:
+            self._record_chat_summary(user_text, triage_result, status="error")
+            yield {"data": (
+                "\n\n❌ I couldn't derive a structured sequence breakdown from the story. "
+                "Please restate the storyline (and any character/style guidelines) and I'll retry."
+            )}
+            return
+
+        character = spec.get("character", {})
+        char_present = bool(character.get("present"))
+        char_desc = (character.get("description") or "").strip() or ref_desc
+        sequences = spec["sequences"]
+        n_seq = len(sequences)
+
+        # Story-breakdown approval gate.
+        if not auto_approve and qa_reply_queue is not None:
+            yield {
+                "approval_ask": True,
+                "label": "Story breakdown",
+                "description": f"Approve the {n_seq}-sequence breakdown (character + shots)?",
+                "image_paths": [],
+            }
+            _d = (await qa_reply_queue.get() or "").strip()
+            if _d and not (_is_affirmative(_d) or _d.lower() in self._STORYBOARD_AFFIRM):
+                if _d.lower() in self._STORYBOARD_ABORT:
+                    yield {"data": "\n\n🛑 Storyboard cancelled."}
+                    self._record_chat_summary(user_text, triage_result, status="aborted")
+                    return
+                # Re-run the story once with the user's note.
+                async for ev in self._storyboard_story(user_text + f"\n\n[Revision note:]\n{_d}", ref_desc):
+                    if isinstance(ev, dict) and "_sb_story" in ev:
+                        spec = self._parse_storyboard_spec(ev["_sb_story"]) or spec
+                    else:
+                        yield ev
+                character = spec.get("character", {})
+                char_present = bool(character.get("present"))
+                char_desc = (character.get("description") or "").strip() or ref_desc
+                sequences = spec["sequences"]
+                n_seq = len(sequences)
+
+        # Persistent style/quality bar (echoed by the Story agent from the user's
+        # brief) — applies to EVERY visual step. Each step additionally gets its own
+        # task-specific QA briefing (``qa_brief``) so Vision QA judges, e.g., the
+        # character sheet AS a character sheet rather than against the video brief.
+        style_guidelines = (spec.get("guidelines") or "").strip()
+
+        # ── Build the UI task list (character sheet + per-sequence steps) ──
+        step_labels: list[str] = []
+        if char_present:
+            step_labels.append("Character sheet (multi-angle)")
+        for s in sequences:
+            step_labels.append(f"Sequence {s['index']} — start frame")
+            step_labels.append(f"Sequence {s['index']} — multi-shot video")
+        total = len(step_labels)
+        yield {"_plan_ready": True, "steps": [{"description": d} for d in step_labels]}
+
+        step_idx = 0
+        char_sheet_path: str | None = None
+
+        # ── Step: character sheet (multiple angles) ──
+        if char_present:
+            if user_refs:
+                cs_request = (
+                    self._SB_SCOPE_IMG.format(asset="a single character sheet image")
+                    + "Create a CHARACTER SHEET showing the character from multiple angles/poses "
+                    "(a 3x3 turnaround sheet) using the NanoBananaPro_3x3CharacterSheet template. "
+                    f"Use this reference image as the character: {user_refs[0]}. "
+                    f"Character description (keep identity consistent): {char_desc}. "
+                    "Do NOT apply the film's grungy / VHS / found-footage look to this sheet. "
+                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
+                )
+            else:
+                cs_request = (
+                    self._SB_SCOPE_IMG.format(asset="a single character sheet image")
+                    + "Create a CHARACTER DESIGN SHEET showing the character from multiple angles "
+                    "and poses in a single image (a 3x3 turnaround / character reference sheet), "
+                    "generated from this description. Use a capable text-to-image or Nano-Banana "
+                    "template; render a clean reference sheet on a neutral background. "
+                    f"Character description: {char_desc}. "
+                    "Do NOT apply the film's grungy / VHS / found-footage look to this sheet. "
+                    f"Sheet style: {self._SB_CHARSHEET_GUIDELINES}"
+                )
+            cs_qa_brief = (
+                "A clean character reference / turnaround sheet showing the SAME character from "
+                "multiple distinct angles and poses, on a clean, uncluttered background, with "
+                "natural colours true to the reference and NO film grain / VHS / grading. "
+                f"Character: {char_desc}."
+                + (" The character's identity must match the provided reference image(s)." if user_refs else "")
+            )
+            cs_result: dict | None = None
+            async for ev in self._storyboard_step(
+                idx=step_idx, total=total, label=step_labels[step_idx],
+                request=cs_request, qa_brief=cs_qa_brief,
+                guidelines=self._SB_CHARSHEET_GUIDELINES,
+                reference_paths=user_refs, auto_approve=auto_approve,
+                qa_reply_queue=qa_reply_queue,
+            ):
+                if isinstance(ev, dict) and "_sb_done" in ev:
+                    cs_result = ev["_sb_done"]
+                else:
+                    yield ev
+            step_idx += 1
+            if not cs_result or not cs_result.get("success"):
+                self._record_chat_summary(user_text, triage_result, status="aborted" if (cs_result or {}).get("aborted") else "qa_failed")
+                yield {"data": "\n\n🛑 Storyboard stopped at the character sheet step."}
+                return
+            char_sheet_path = self._first_image(cs_result.get("output_paths", []))
+
+        # ── Per-sequence loop: start frame → Kling multi-shot video ──
+        produced_videos: list[str] = []
+        for s in sequences:
+            seq_i = s["index"]
+            # Reference set for QA: character sheet + user refs.
+            seq_refs = [p for p in ([char_sheet_path] + user_refs) if p]
+
+            # 1. Start frame
+            sf_ref_hint = (
+                f"Use the character sheet as the character reference for identity consistency: {char_sheet_path}. "
+                if char_sheet_path else ""
+            )
+            sf_request = (
+                self._SB_SCOPE_IMG.format(asset="a single start-frame still image")
+                + f"Generate a single START FRAME still image (16:9) for sequence {seq_i} of a short film, "
+                f"to be used as the first frame of a Kling video. {sf_ref_hint}"
+                "Use an image generation/editing template that accepts the character reference (e.g. a "
+                "Nano-Banana image-edit template) so the character stays identical. "
+                f"Start frame description: {s['start_frame_prompt']}\n"
+                f"Character lock (keep identical): {char_desc}\n"
+                + (f"Style/quality guidelines: {style_guidelines}" if style_guidelines else "")
+            )
+            sf_qa_brief = (
+                f"A single still image — the opening START FRAME (16:9) of sequence {seq_i} — depicting: "
+                f"{s['start_frame_prompt']} The character must match the reference character sheet. "
+                f"Character: {char_desc}."
+            )
+            sf_result: dict | None = None
+            async for ev in self._storyboard_step(
+                idx=step_idx, total=total, label=step_labels[step_idx],
+                request=sf_request, qa_brief=sf_qa_brief, guidelines=style_guidelines,
+                reference_paths=seq_refs, auto_approve=auto_approve,
+                qa_reply_queue=qa_reply_queue,
+            ):
+                if isinstance(ev, dict) and "_sb_done" in ev:
+                    sf_result = ev["_sb_done"]
+                else:
+                    yield ev
+            step_idx += 1
+            if not sf_result or not sf_result.get("success"):
+                self._record_chat_summary(user_text, triage_result, status="aborted" if (sf_result or {}).get("aborted") else "qa_failed")
+                yield {"data": f"\n\n🛑 Storyboard stopped at sequence {seq_i} (start frame)."}
+                return
+            start_frame_path = self._first_image(sf_result.get("output_paths", []))
+
+            # 2. Kling multi-shot video for this sequence
+            shots_json = json.dumps([{"prompt": sh["prompt"], "duration": sh["duration"]} for sh in s["shots"]])
+            total_secs = sum(sh["duration"] for sh in s["shots"])
+            vid_request = (
+                self._SB_SCOPE_VID
+                + f"Generate a Kling multi-shot video for sequence {seq_i} using the Kling3_multiShot template. "
+                f"Start frame (LoadImage node 14): {start_frame_path}. "
+                f"Use EXACTLY these {len(s['shots'])} shot prompts as the storyboard array, in order, each with "
+                f"its duration (total {total_secs}s, must be <=10s):\n{shots_json}\n"
+                f"Character lock (keep verbatim in every shot): {char_desc}\n"
+                f"Set multi_shot to match the shot count. Aspect ratio 16:9, resolution 720p. "
+                + (f"Style/quality guidelines: {style_guidelines}" if style_guidelines else "")
+            )
+            seq_summary = s.get("summary") or f"sequence {seq_i}"
+            shot_lines = "; ".join(sh["prompt"][:90] for sh in s["shots"])
+            vid_qa_brief = (
+                f"A {total_secs}s multi-shot video (sequence {seq_i}, {len(s['shots'])} shots) depicting: "
+                f"{seq_summary}. Shots in order: {shot_lines}. The character must stay visually "
+                f"consistent with the character sheet and the start frame. Character: {char_desc}."
+            )
+            vid_refs = [p for p in ([char_sheet_path, start_frame_path] + user_refs) if p]
+            vid_result: dict | None = None
+            async for ev in self._storyboard_step(
+                idx=step_idx, total=total, label=step_labels[step_idx],
+                request=vid_request, qa_brief=vid_qa_brief, guidelines=style_guidelines,
+                reference_paths=vid_refs, auto_approve=auto_approve,
+                qa_reply_queue=qa_reply_queue,
+            ):
+                if isinstance(ev, dict) and "_sb_done" in ev:
+                    vid_result = ev["_sb_done"]
+                else:
+                    yield ev
+            step_idx += 1
+            if not vid_result or not vid_result.get("success"):
+                self._record_chat_summary(user_text, triage_result, status="aborted" if (vid_result or {}).get("aborted") else "qa_failed")
+                yield {"data": f"\n\n🛑 Storyboard stopped at sequence {seq_i} (video)."}
+                return
+            produced_videos.extend(vid_result.get("output_paths", []))
+
+        self._record_chat_summary(user_text, triage_result, status="completed")
+        self._session.last_agent = "brain"
+        vids = ", ".join(f"`{Path(p).name}`" for p in produced_videos if p)
+        yield {"data": (
+            f"\n\n✅ **Storyboard complete** — {n_seq} sequence(s) rendered."
+            + (f"\nVideos: {vids}" if vids else "")
+        )}
+        if self._verbose:
+            print(f"pipeline: Storyboard director finished — {n_seq} sequence(s).")
+
     # ── Triage helpers ───────────────────────────────────────────────── #
 
     @staticmethod

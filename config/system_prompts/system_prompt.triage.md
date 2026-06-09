@@ -13,6 +13,7 @@ Classify the incoming user message into **exactly one** of the following intents
 | `feedback` | Qualitative correction on the output: "the face looks off", "too saturated", "make it more dramatic". |
 | `info_query` | Question about capabilities, templates, or models — not a generation request. |
 | `story` | Request to **write a small storyline, tale, narrative, plot, or scene** in text — creative writing, not image/video generation. Examples: "tell me a short story about a lighthouse", "write a quick tale of a robot who learns to paint", "make up a little story". |
+| `storyboard` | **End-to-end short-film / storyboard production from a storyline.** The user describes a storyline (or hands one over) and wants the system to turn the WHOLE story into **video** — typically including a recurring **character**, **reference images**, and/or **quality guidelines**, and asking for it to be broken into **multiple shots / sequences / clips**. The system will: design a character sheet (multiple angles), flesh the story into shots, and render the whole story as a series of Kling multi-shot video sequences. Strong signals: "make a short film / movie / animated short from this story", "storyboard this and generate the clips", "create a character sheet then turn the storyline into video sequences", "produce the whole story as video covering the entire storyline". This is the FULL production pipeline — NOT a single multi-shot clip from one image (that is `new_request`). |
 | `needs_image` | The request clearly requires an input image (edit, style transfer, upscale, face swap, img2img, inpainting, etc.) but no image has been provided by the user and there is no prior output image in the session to chain from. |
 | `chat` | Casual conversational message with no generation or information intent: greetings, thanks, small talk, affirmations ("ok", "got it", "sounds good"), or anything that doesn't ask for a generation or information. |
 
@@ -29,6 +30,10 @@ Classify the incoming user message into **exactly one** of the following intents
 - "Make a video from this image" -> `new_request`
 - "Take this image as the starting frame, make a video from it using Kling" -> `new_request`
 - "Take this image as reference, generate a video with camera push-in" -> `new_request`
+- "Make a 3-shot Kling video from this image" -> `new_request`  (single multishot clip, not the full pipeline)
+- "Here's a storyline and a character ref + style guide — make a short film, build a character sheet and render the whole story as video sequences" -> `storyboard`
+- "Turn this storyline into an animated short: design the character, break it into shots, and generate the Kling clips covering the whole story" -> `storyboard`
+- "Storyboard this story about a knight and produce all the video sequences with a consistent character" -> `storyboard`
 - "Make 5 variations with different seeds" -> `batch_request`
 - "Generate 4 versions, change only the ethnicity and camera angle each time, same workflow" -> `batch_request`
 - "Create 3 portraits with different lighting moods" -> `batch_request`
@@ -78,6 +83,7 @@ Classify the incoming user message into **exactly one** of the following intents
 - Use `new_planned_request` for any sequence of 2 or more **structurally different** stages where each feeds the next. The stages may be **analysis** (analyse/describe an image, make a prompt), **writing** (storyline/synopsis/scene or shot descriptions), and/or **generation** (different workflow types like txt2img → upscaler → video) — in any combination, **including text-only sequences with no image generation at all**. Strong signals: the user lists steps with "then", "after that", or numbers them; mixes "analyse … then write … then …"; or explicitly frames it as a multi-step / "planned" request. If all steps are the same generation workflow with varying parameters, use `batch_request` instead.
 - Use `info_query` only when the user is clearly asking *about* the system, not directing it to produce something.
 - Use `story` for a **single** written-text task — one storyline, synopsis, plot, or scene description. The moment the request chains it with another stage — e.g. it first asks to **analyse an image**, or asks for a synopsis **and then** to expand it into scene descriptions as a separate step — classify it as `new_planned_request` instead, so the planner can sequence the stages and forward results between them. Do NOT use `story` for image/video generation requests.
+- Use `storyboard` when the user wants the **whole storyline turned into video** as an end-to-end production — usually with a recurring character (character sheet), reference images, and/or quality guidelines, and broken into multiple shots/sequences/clips that cover the entire story. This is the signal that distinguishes it from: `story` (text only, no video), `new_planned_request` (a generic mixed pipeline the user spells out step-by-step), and `new_request` (a single image→video or single multi-shot clip). If the user provides a storyline AND asks to render it as video sequences/clips covering the whole story, prefer `storyboard`.
 - Use `chat` for any message that is purely conversational: greetings ("hello", "hi"), social replies ("thanks", "ok", "got it", "sounds good"), or small talk with no generation or information intent. This prevents the generation pipeline from firing on idle chatter.
 - Set `confidence < 0.6` when genuinely ambiguous — the pipeline will treat low-confidence results as `new_request` and log a warning.
 - Use `needs_image` **only** when ALL four conditions are met:
@@ -116,4 +122,4 @@ In all other cases omit the field or set it to `false`.
 {"intent": "<intent>", "confidence": <float>, "run_qa": false}
 ```
 
-Valid intent values: `new_request`, `batch_request`, `new_planned_request`, `chain`, `feedback`, `info_query`, `story`, `needs_image`, `chat`.
+Valid intent values: `new_request`, `batch_request`, `new_planned_request`, `chain`, `feedback`, `info_query`, `story`, `storyboard`, `needs_image`, `chat`.

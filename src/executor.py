@@ -338,16 +338,24 @@ async def _vision_qa(
     *,
     user_message: str = "",
     input_image_paths: list[Path] | None = None,
+    guidelines: str = "",
+    reference_image_paths: list[Path] | None = None,
 ) -> str:
     """Run a QA pass comparing *image_path* against the user's original request.
 
     Uses *user_message* (the raw text the user sent) as the ground-truth
-    reference.  When *input_image_paths* is supplied (image-editing task) the
-    input images are sent alongside the output so the model can judge edit
-    fidelity.  Supports any number of input images.
+    reference.  Three grounding modes, in priority order:
 
-    Image ordering sent to the model: all input images first (IMAGE 1 … N),
-    then the generated output as the last image (IMAGE N+1).
+    * **Storyboard** — when *guidelines* or *reference_image_paths* is supplied
+      (short-film production steps). The reference images (character sheet,
+      user style refs) are sent first and the output is judged against both the
+      quality guidelines and reference consistency via ``question_storyboard``.
+    * **Edit** — when *input_image_paths* is supplied (image-editing task) the
+      input images are sent alongside the output to judge edit fidelity.
+    * **Generation** — text-to-image; the output is judged against the request.
+
+    Image ordering sent to the model: all reference/input images first
+    (IMAGE 1 … N), then the generated output as the last image (IMAGE N+1).
 
     This is a standalone Ollama call that does NOT touch any agent's context
     window or conversation history.  The model used is defined by
@@ -371,47 +379,76 @@ async def _vision_qa(
             positive_prompt = brainbriefing.get("prompt", {}).get("positive", "")
             reference = f"Task: {task_desc}\nPrompt: {positive_prompt}".strip()
 
-        # Load each input image; skip any that cannot be read.
-        input_bytes_list: list[bytes] = []
-        if input_image_paths:
-            for inp_path in input_image_paths:
+        def _read_all(paths: list[Path] | None) -> list[bytes]:
+            out: list[bytes] = []
+            for p in paths or []:
                 try:
-                    input_bytes_list.append(inp_path.read_bytes())
-                except Exception as read_exc:
-                    logger.warning(
-                        "executor: could not read input image %s — %s",
-                        inp_path, read_exc,
-                    )
-
-        is_edit = bool(input_bytes_list)
+                    out.append(Path(p).read_bytes())
+                except Exception as read_exc:  # noqa: BLE001
+                    logger.warning("executor: could not read QA image %s — %s", p, read_exc)
+            return out
 
         qa_prompts = _load_qa_prompts()
         system = qa_prompts.get("system", "You are a visual QA analyst for AI-generated images.")
 
-        if is_edit:
-            n_inputs = len(input_bytes_list)
-            output_img_num = n_inputs + 1
-            if n_inputs == 1:
+        is_storyboard = bool(guidelines.strip() or reference_image_paths)
+
+        if is_storyboard:
+            # Reference images (character sheet + style refs) first, output last.
+            ref_bytes_list = _read_all(reference_image_paths)
+            n_refs = len(ref_bytes_list)
+            output_img_num = n_refs + 1
+            if n_refs == 0:
+                image_description = "ONE image: IMAGE 1 is the GENERATED output image (no reference images provided)."
+            elif n_refs == 1:
                 image_description = (
-                    f"TWO images: IMAGE 1 is the ORIGINAL input image, "
-                    f"IMAGE 2 is the GENERATED output image."
+                    "TWO images: IMAGE 1 is a REFERENCE image (character/style), "
+                    "IMAGE 2 is the GENERATED output image."
                 )
             else:
-                input_labels = ", ".join(f"IMAGE {i + 1}" for i in range(n_inputs))
+                ref_labels = ", ".join(f"IMAGE {i + 1}" for i in range(n_refs))
                 image_description = (
-                    f"{n_inputs + 1} images: {input_labels} are the ORIGINAL input images "
-                    f"(in the order provided), IMAGE {output_img_num} is the GENERATED output image."
+                    f"{n_refs + 1} images: {ref_labels} are REFERENCE images (character/style, "
+                    f"in order), IMAGE {output_img_num} is the GENERATED output image."
                 )
-            template_key = "question_edit"
             question = (
-                qa_prompts.get(template_key, "")
+                qa_prompts.get("question_storyboard", "")
                 .replace("{{REFERENCE}}", reference)
+                .replace("{{GUIDELINES}}", guidelines.strip() or "(none specified — judge against the request)")
                 .replace("{{IMAGE_DESCRIPTION}}", image_description)
                 .replace("{{OUTPUT_IMAGE_NUM}}", str(output_img_num))
             )
+            primary_bytes = ref_bytes_list[0] if ref_bytes_list else output_bytes
+            extra_images: list[bytes] = (ref_bytes_list[1:] + [output_bytes]) if ref_bytes_list else []
         else:
-            template_key = "question_generation"
-            question = qa_prompts.get(template_key, "").replace("{{REFERENCE}}", reference)
+            input_bytes_list = _read_all(input_image_paths)
+            is_edit = bool(input_bytes_list)
+            if is_edit:
+                n_inputs = len(input_bytes_list)
+                output_img_num = n_inputs + 1
+                if n_inputs == 1:
+                    image_description = (
+                        "TWO images: IMAGE 1 is the ORIGINAL input image, "
+                        "IMAGE 2 is the GENERATED output image."
+                    )
+                else:
+                    input_labels = ", ".join(f"IMAGE {i + 1}" for i in range(n_inputs))
+                    image_description = (
+                        f"{n_inputs + 1} images: {input_labels} are the ORIGINAL input images "
+                        f"(in the order provided), IMAGE {output_img_num} is the GENERATED output image."
+                    )
+                question = (
+                    qa_prompts.get("question_edit", "")
+                    .replace("{{REFERENCE}}", reference)
+                    .replace("{{IMAGE_DESCRIPTION}}", image_description)
+                    .replace("{{OUTPUT_IMAGE_NUM}}", str(output_img_num))
+                )
+                primary_bytes = input_bytes_list[0]
+                extra_images = input_bytes_list[1:] + [output_bytes]
+            else:
+                question = qa_prompts.get("question_generation", "").replace("{{REFERENCE}}", reference)
+                primary_bytes = output_bytes
+                extra_images = []
 
         if not question:
             # Minimal inline fallback if the file is missing
@@ -420,17 +457,6 @@ async def _vision_qa(
                 "Does this generated image satisfy that request?\n"
                 "Reply with: PASS or FAIL, followed by a brief explanation."
             )
-
-        # Send images to the model: inputs first (IMAGE 1…N), output last (IMAGE N+1).
-        # vision_chat prepends image_bytes as the first image, so we pass the first
-        # input (or the output for generation tasks) as the primary argument and
-        # append the remainder.
-        if is_edit:
-            primary_bytes = input_bytes_list[0]
-            extra_images: list[bytes] = input_bytes_list[1:] + [output_bytes]
-        else:
-            primary_bytes = output_bytes
-            extra_images = []
 
         verdict = await llm.vision_chat(
             question,
@@ -461,6 +487,8 @@ async def _process_completed_job(
     collected_paths: list[str] | None,
     label: str = "",
     run_qa: bool = False,
+    guidelines: str = "",
+    reference_image_paths: list[Path] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Download outputs, run Vision QA, and collect outputs for one finished job.
 
@@ -563,20 +591,52 @@ async def _process_completed_job(
         yield f"{pfx}❌ All output downloads failed."
         return
 
-    # Vision QA — only when explicitly requested by the user.
+    # Vision QA — when explicitly requested by the user, or always for storyboard
+    # steps (signalled by guidelines / reference images being supplied).
     qa_failures: list[dict] = []
-    if run_qa:
+    if run_qa or guidelines or reference_image_paths:
+        from src.utils.video_frames import extract_frames, is_video
+
         yield f"{pfx}🔍 Running Vision QA…"
         for path in saved_paths:
-            verdict = await _vision_qa(
-                path,
-                brainbriefing,
-                user_message=user_message,
-                input_image_paths=input_image_paths or None,
-            )
-            yield f"{pfx}🔍 QA `{path.name}` → {verdict}"
-            if "FAIL" in verdict.upper():
-                qa_failures.append({"path": str(path), "verdict": verdict})
+            if is_video(path):
+                # Sample frames and QA each; the video FAILs if any frame FAILs.
+                frames = extract_frames(path, count=3)
+                if not frames:
+                    yield (
+                        f"{pfx}🔍 QA `{path.name}` → video decoder unavailable "
+                        f"(install imageio[ffmpeg]) — skipping deep video QA."
+                    )
+                    continue
+                frame_verdicts: list[str] = []
+                video_failed = False
+                for fi, frame in enumerate(frames, 1):
+                    verdict = await _vision_qa(
+                        frame,
+                        brainbriefing,
+                        user_message=user_message,
+                        input_image_paths=input_image_paths or None,
+                        guidelines=guidelines,
+                        reference_image_paths=reference_image_paths,
+                    )
+                    yield f"{pfx}🔍 QA `{path.name}` frame {fi}/{len(frames)} → {verdict}"
+                    frame_verdicts.append(f"frame {fi}: {verdict}")
+                    if "FAIL" in verdict.upper():
+                        video_failed = True
+                if video_failed:
+                    qa_failures.append({"path": str(path), "verdict": " | ".join(frame_verdicts)})
+            else:
+                verdict = await _vision_qa(
+                    path,
+                    brainbriefing,
+                    user_message=user_message,
+                    input_image_paths=input_image_paths or None,
+                    guidelines=guidelines,
+                    reference_image_paths=reference_image_paths,
+                )
+                yield f"{pfx}🔍 QA `{path.name}` → {verdict}"
+                if "FAIL" in verdict.upper():
+                    qa_failures.append({"path": str(path), "verdict": verdict})
 
     # Copy the finished workflow to the ComfyUI user directory — run in a
     # background thread so a slow UNC/network share doesn't stall the pipeline.
@@ -616,6 +676,8 @@ async def execute_workflow(
     verbose: bool = True,
     collected_paths: list[str] | None = None,
     run_qa: bool = False,
+    guidelines: str = "",
+    reference_image_paths: list[Path] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Submit the validated workflow, poll ComfyUI, run QA, and collect outputs.
 
@@ -693,6 +755,8 @@ async def execute_workflow(
         verbose=verbose,
         collected_paths=collected_paths,
         run_qa=run_qa,
+        guidelines=guidelines,
+        reference_image_paths=reference_image_paths,
     ):
         yield line
 
@@ -709,6 +773,8 @@ async def execute_workflows_batch(
     verbose: bool = True,
     collected_paths: list[str] | None = None,
     run_qa: bool = False,
+    guidelines: str = "",
+    reference_image_paths: list[Path] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Submit ALL workflows to ComfyUI first, then poll + process each in order.
 
@@ -809,5 +875,7 @@ async def execute_workflows_batch(
             collected_paths=collected_paths,
             label=label,
             run_qa=run_qa,
+            guidelines=guidelines,
+            reference_image_paths=reference_image_paths,
         ):
             yield line
