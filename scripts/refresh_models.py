@@ -2,10 +2,8 @@
 """
 Refresh ComfyUI model caches before agent startup.
 
-Writes two config files:
-  - config/models.json   → adds/overwrites an "available" key with all model
-                           files grouped by folder (custom_nodes excluded).
-  - config/custom_nodes.json → sorted list of top-level custom-node names.
+Writes config/models.json → adds/overwrites an "available" key with all model
+files grouped by folder (custom_nodes excluded).
 
 Run once at startup via run_agent.ps1.  Exits silently if ComfyUI is offline.
 """
@@ -29,17 +27,13 @@ def main() -> None:
         return
 
     try:
-        from src.utils.comfyui_retrieve_models_customnodes import (
-            fetch_available_models,
-            fetch_custom_node_names,
-        )
+        from src.utils.comfyui_retrieve_models_customnodes import fetch_available_models
     except Exception as exc:
         print(f"[refresh_models] Could not import utils: {exc}")
         return
 
     try:
         available = fetch_available_models()
-        custom_node_names = fetch_custom_node_names()
     except Exception as exc:
         print(f"[refresh_models] ComfyUI offline or unreachable – skipping model cache refresh: {exc}")
         return
@@ -60,13 +54,6 @@ def main() -> None:
 
     total = sum(len(v) for v in available.values() if isinstance(v, list))
     print(f"[refresh_models] models.json refreshed – {len(available)} folders, {total} files")
-
-    # ── Write custom_nodes.json ───────────────────────────────────────────────
-    if custom_node_names:
-        cn_path = PROJECT_ROOT / "config" / "custom_nodes.json"
-        with open(cn_path, "w", encoding="utf-8") as f:
-            json.dump({"custom_nodes": custom_node_names}, f, indent=2)
-        print(f"[refresh_models] custom_nodes.json refreshed – {len(custom_node_names)} nodes")
 
 
 if __name__ == "__main__":

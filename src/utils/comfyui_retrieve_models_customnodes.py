@@ -1,5 +1,5 @@
 """
-Utility functions for retrieving ComfyUI model lists and custom-node names.
+Utility functions for retrieving ComfyUI model lists.
 
 These are plain (non-tool) helpers shared between:
   - src/tools/comfyui.py  (thin @tool wrappers for agent use)
@@ -43,8 +43,7 @@ def fetch_available_models() -> dict[str, list[str] | dict]:
     """Return all installed model files grouped by folder type.
 
     Filters each folder to only real model/weight files (see MODULE_EXTENSIONS).
-    The ``custom_nodes`` folder is excluded entirely — use
-    ``fetch_custom_node_names()`` for that.
+    The ``custom_nodes`` folder is excluded entirely.
 
     Folders that raise an error are included as ``{"error": "<message>"}``.
 
@@ -72,24 +71,3 @@ def fetch_available_models() -> dict[str, list[str] | dict]:
             result[folder] = {"error": str(exc)}
 
     return result
-
-
-def fetch_custom_node_names() -> list[str]:
-    """Return a sorted list of top-level custom-node directory names.
-
-    Each entry in the ComfyUI ``custom_nodes`` folder is typically a path like
-    ``NodePack/some/file.py``.  Only the first component (the node-pack name)
-    is kept, and duplicates are removed.
-    """
-    client = get_client()
-    try:
-        entries: list = client.get("/models/custom_nodes")
-    except Exception:
-        return []
-
-    top: set[str] = set()
-    for entry in entries:
-        parts = Path(entry).parts
-        top.add(parts[0] if parts else entry)
-
-    return sorted(top)

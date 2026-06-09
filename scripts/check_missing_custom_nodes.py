@@ -4,13 +4,22 @@
 Steps:
   1. Load the list of workflow templates from ./config/workflow_templates.json
   2. Extract all ``class_type`` values from the corresponding JSON template files under
-     ./comfyui_workflow_templates_custom/templates/
-  3. Identify which types belong to a custom-node package by looking them up in
-     the ComfyUI-Manager extension-node-map.json (fetched from GitHub).
-  4. Compare the required packages against the installed ones listed in
-     config/custom_nodes.json.
-  5. Install every missing package via the ComfyUI Manager REST API.
+     ./comfyui_workflow_templates_custom/templates/  → the node types the templates need.
+  3. Ask the **running ComfyUI** which node types it already provides via GET
+     /object_info.  This is the authoritative "already available" set — it covers
+     core nodes and every loaded custom pack regardless of its folder name.
+  4. The genuinely-missing types are ``needed − available``.  Map only those to a
+     custom-node package via the ComfyUI-Manager extension-node-map.json (GitHub).
+  5. Install every resolved package via the ComfyUI Manager REST API.
   6. Restart the ComfyUI server (only when at least one package was installed).
+
+Why /object_info instead of config/custom_nodes.json: the old approach compared
+the required packages against folder names listed in custom_nodes.json (a raw
+listing of the custom_nodes directory).  Matching repo-URL folder names against
+that listing produced false "missing" results for node types provided by private,
+renamed, or forked packs (whose folder name differs from the public repo), causing
+unneeded reinstalls.  Querying the live node registry asks ground truth instead, so
+only types ComfyUI truly cannot provide are installed.
 
 Run once at startup via run_agent.ps1.  Exits silently if ComfyUI is offline
 or the Manager extension is not installed.
@@ -35,7 +44,6 @@ load_dotenv(PROJECT_ROOT / ".env")
 # ---------------------------------------------------------------------------
 TEMPLATES_DIR = PROJECT_ROOT / "comfyui_workflow_templates_custom" / "templates"
 WORKFLOW_TEMPLATES_CONFIG = PROJECT_ROOT / "config" / "workflow_templates.json"
-CUSTOM_NODES_CONFIG = PROJECT_ROOT / "config" / "custom_nodes.json"
 EXTENSION_NODE_MAP_URL = (
     "https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/extension-node-map.json"
 )
@@ -115,13 +123,26 @@ def extract_node_types_from_templates() -> set[str]:
     return types
 
 
-def load_installed_custom_nodes() -> set[str]:
-    """Return the set of installed custom-node folder names from config/custom_nodes.json."""
-    if not CUSTOM_NODES_CONFIG.exists():
-        return set()
-    with open(CUSTOM_NODES_CONFIG, encoding="utf-8") as f:
-        data = json.load(f)
-    return set(data.get("custom_nodes", []))
+def fetch_available_node_types(base_url: str, headers: dict) -> set[str] | None:
+    """Return the set of node ``class_type``s the live ComfyUI provides (/object_info).
+
+    This is the authoritative source for what is already available — it covers
+    core nodes *and* every loaded custom pack regardless of its install-folder
+    name, so it avoids the false positives that folder-name matching produced.
+
+    Returns ``None`` when ComfyUI is unreachable (the caller then skips, since
+    installing is impossible without a running server anyway).
+    """
+    try:
+        resp = requests.get(f"{base_url}/object_info", headers=headers, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, dict):
+            return set(data.keys())
+        print("[check_nodes] Unexpected /object_info response shape – cannot verify nodes.")
+    except Exception as exc:
+        print(f"[check_nodes] Could not fetch /object_info: {exc}")
+    return None
 
 
 def fetch_extension_node_map() -> dict:
@@ -176,35 +197,25 @@ def repo_url_to_folder_name(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 
-def find_missing_packages(
-    node_types: set[str],
-    installed: set[str],
+def find_packages_for_types(
+    missing_types: set[str],
     nodetype_to_repos: dict[str, set[str]],
 ) -> dict[str, str]:
-    """Return {git_url: folder_name} for packages that need to be installed.
+    """Return {git_url: folder_name} for packages that provide *missing_types*.
 
-    A node type is considered satisfied when *any* repo that provides it has a
-    folder name appearing (case-insensitively) in the installed set.  This
-    prevents false positives caused by multiple forks registering the same types.
+    ``missing_types`` are the node types the live ComfyUI does **not** already
+    provide (``needed − /object_info``), so every one genuinely needs a package.
+    When several forks register the same type, the alphabetically-first provider
+    is queued as the canonical one.
     """
-    installed_lower = {name.lower() for name in installed}
-
     missing: dict[str, str] = {}  # git_url -> folder_name
-    for nt in node_types:
+    for nt in sorted(missing_types):
         repos = nodetype_to_repos.get(nt)
         if not repos:
-            continue  # built-in ComfyUI node or unknown – skip
-
-        # Satisfied if any provider is already installed
-        if any(repo_url_to_folder_name(url).lower() in installed_lower for url in repos):
-            continue
-
-        # None installed – queue the first (alphabetically) as the canonical one
+            continue  # not in the Manager map – cannot auto-install (see warning)
         for url in sorted(repos):
-            if url not in missing:
-                missing[url] = repo_url_to_folder_name(url)
-                break
-
+            missing.setdefault(url, repo_url_to_folder_name(url))
+            break
     return missing
 
 
@@ -261,20 +272,37 @@ def restart_comfyui(base_url: str, headers: dict) -> None:
 def main() -> None:
     print("[check_nodes] Checking workflow templates for missing custom nodes...")
 
-    # 1. Extract all node types used in templates
+    # 1. Node types the templates require.
     node_types = extract_node_types_from_templates()
     if not node_types:
         print("[check_nodes] No node types found in templates – nothing to check.")
         return
-    print(f"[check_nodes] Found {len(node_types)} unique node types across all templates.")
+    print(f"[check_nodes] Templates require {len(node_types)} unique node type(s).")
 
-    # 2. Load installed custom nodes
-    installed = load_installed_custom_nodes()
-    if not installed:
-        print("[check_nodes] WARNING: config/custom_nodes.json is empty or missing – "
-              "run refresh_models.py first to populate it if ComfyUI is already online.")
+    # 2. Ask the live ComfyUI what it already provides (authoritative). Installing
+    #    is impossible without a running server, so a failure here ends the run.
+    base_url = _get_comfyui_base_url()
+    try:
+        headers = _comfyui_headers(base_url)
+    except Exception as exc:
+        print(f"[check_nodes] Could not build auth headers: {exc}")
+        headers = {"Accept": "application/json"}
 
-    # 3. Fetch extension-node-map
+    available = fetch_available_node_types(base_url, headers)
+    if available is None:
+        print("[check_nodes] ComfyUI offline/unreachable – cannot verify or install. Skipping.")
+        return
+    print(f"[check_nodes] ComfyUI provides {len(available)} node type(s).")
+
+    # 3. The genuinely-missing types are the ones the running ComfyUI cannot provide.
+    missing_types = {t for t in node_types if t not in available}
+    if not missing_types:
+        print("[check_nodes] All node types required by the templates are already available.")
+        return
+    print(f"[check_nodes] {len(missing_types)} required node type(s) not available: "
+          f"{', '.join(sorted(missing_types))}")
+
+    # 4. Map only the missing types to installable packages.
     extension_map = fetch_extension_node_map()
     if not extension_map:
         print("[check_nodes] Cannot proceed without the extension-node-map – skipping.")
@@ -283,33 +311,21 @@ def main() -> None:
 
     nodetype_to_repos = build_nodetype_to_repos(extension_map)
 
-    # 4. Determine missing packages
-    missing = find_missing_packages(node_types, installed, nodetype_to_repos)
+    unmapped = sorted(t for t in missing_types if t not in nodetype_to_repos)
+    if unmapped:
+        print(f"[check_nodes] WARNING: {len(unmapped)} missing type(s) are not in the "
+              f"Manager map and cannot be auto-installed: {', '.join(unmapped)}")
+
+    missing = find_packages_for_types(missing_types, nodetype_to_repos)
     if not missing:
-        print("[check_nodes] All required custom nodes are installed.")
+        print("[check_nodes] No installable packages resolved for the missing types.")
         return
 
-    print(f"[check_nodes] {len(missing)} missing custom node package(s) detected:")
+    print(f"[check_nodes] {len(missing)} package(s) to install:")
     for url, folder in sorted(missing.items(), key=lambda x: x[1].lower()):
         print(f"  - {folder}  ({url})")
 
-    # 5. Ensure ComfyUI + Manager are reachable
-    base_url = _get_comfyui_base_url()
-    try:
-        headers = _comfyui_headers(base_url)
-    except Exception as exc:
-        print(f"[check_nodes] Could not build auth headers: {exc}")
-        headers = {"Accept": "application/json"}
-
-    # Quick connectivity check
-    try:
-        resp = requests.get(f"{base_url}/system_stats", headers=headers, timeout=10)
-        resp.raise_for_status()
-    except Exception as exc:
-        print(f"[check_nodes] ComfyUI is offline or unreachable ({exc}) – skipping install.")
-        return
-
-    # 6. Install missing packages
+    # 5. Install missing packages
     installed_count = 0
     for git_url, folder in sorted(missing.items(), key=lambda x: x[1].lower()):
         print(f"[check_nodes] Installing {folder} ...")
@@ -324,7 +340,7 @@ def main() -> None:
         print("[check_nodes] No packages were installed – skipping restart.")
         return
 
-    # 7. Restart ComfyUI
+    # 6. Restart ComfyUI
     print(f"[check_nodes] {installed_count} package(s) installed. Restarting ComfyUI...")
     restart_comfyui(base_url, headers)
 

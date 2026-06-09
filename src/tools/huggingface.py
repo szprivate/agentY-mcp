@@ -88,24 +88,20 @@ def _models_base_dir() -> Path:
 # ---------------------------------------------------------------------------
 
 def _refresh_model_cache() -> None:
-    """Refresh config/models.json and config/custom_nodes.json.
+    """Refresh config/models.json.
 
     Mirrors the logic in scripts/refresh_models.py so that the in-process
     tool call updates the cache immediately after a download, without needing
     to shell out to the script.
     """
     try:
-        from src.utils.comfyui_retrieve_models_customnodes import (
-            fetch_available_models,
-            fetch_custom_node_names,
-        )
+        from src.utils.comfyui_retrieve_models_customnodes import fetch_available_models
     except Exception as exc:
         logger.warning("_refresh_model_cache: could not import refresh utils: %s", exc)
         return
 
     try:
         available = fetch_available_models()
-        custom_node_names = fetch_custom_node_names()
     except Exception as exc:
         logger.warning("_refresh_model_cache: ComfyUI unreachable – skipping cache refresh: %s", exc)
         return
@@ -129,12 +125,6 @@ def _refresh_model_cache() -> None:
 
     total = sum(len(v) for v in available.values() if isinstance(v, list))
     logger.info("[refresh_models] models.json refreshed – %d folders, %d files", len(available), total)
-
-    if custom_node_names:
-        cn_path = project_root / "config" / "custom_nodes.json"
-        with open(cn_path, "w", encoding="utf-8") as f:
-            json.dump({"custom_nodes": custom_node_names}, f, indent=2)
-        logger.info("[refresh_models] custom_nodes.json refreshed – %d nodes", len(custom_node_names))
 
 
 # ---------------------------------------------------------------------------
