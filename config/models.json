@@ -367,12 +367,6 @@
     "geometry_estimation": [],
     "optical_flow": [],
     ".cache": [],
-    "Hunyuan": [
-      "split_files\\clip_vision\\sigclip_vision_patch14_384.safetensors",
-      "split_files\\diffusion_models\\hunyuanvideo1.5_1080p_sr_distilled_fp8_scaled.safetensors",
-      "split_files\\diffusion_models\\hunyuanvideo1.5_480p_i2v_cfg_distilled_fp8_scaled.safetensors",
-      "split_files\\diffusion_models\\hunyuanvideo1.5_480p_i2v_step_distilled_fp8_scaled.safetensors"
-    ],
     "animatediff_models": [],
     "animatediff_motion_lora": [],
     "bit_depth_enhancement": [
@@ -384,6 +378,12 @@
       "GFPGANv1.3.pth",
       "GFPGANv1.4.pth",
       "codeformer-v0.1.0.pth"
+    ],
+    "Hunyuan": [
+      "split_files\\clip_vision\\sigclip_vision_patch14_384.safetensors",
+      "split_files\\diffusion_models\\hunyuanvideo1.5_1080p_sr_distilled_fp8_scaled.safetensors",
+      "split_files\\diffusion_models\\hunyuanvideo1.5_480p_i2v_cfg_distilled_fp8_scaled.safetensors",
+      "split_files\\diffusion_models\\hunyuanvideo1.5_480p_i2v_step_distilled_fp8_scaled.safetensors"
     ],
     "hyperswap": [
       "hyperswap_1a_256.onnx",
@@ -484,7 +484,7 @@
     "kjnodes_fonts": [],
     "rmbg": [],
     "LLM": [],
-    "seedvr2": [],
+    "sharp": [],
     "VHS_video_formats": [],
     "wav2vec2": [],
     "nlf": [],
