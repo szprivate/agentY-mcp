@@ -159,8 +159,12 @@ try {
         $dlComposeDir = ""
         if (Test-Path $settingsPath) {
             $settingsRaw = Get-Content $settingsPath -Raw
-            # Strip single-line comments (// ...) before parsing
-            $settingsClean = $settingsRaw -replace '(?m)//[^"\r\n]*', ''
+            # Strip whole-line // comments before parsing (matches the Python
+            # loader in src/agent.py). A regex-based strip is unsafe here: it
+            # corrupts "http://..." URLs and chokes on comments that contain
+            # double quotes, which silently breaks the datalayer startup.
+            $settingsClean = ($settingsRaw -split "`r?`n" |
+                Where-Object { -not $_.TrimStart().StartsWith('//') }) -join "`n"
             try {
                 $settings = $settingsClean | ConvertFrom-Json
                 $dlComposeDir = $settings.chainlit_datalayer_dir
