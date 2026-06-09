@@ -16,7 +16,7 @@ from pathlib import Path
 
 from strands import tool
 
-from src.utils.comfyui_client import get_client
+from src.utils.comfyui_client import get_client, parse_argv_dir_flag
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -580,15 +580,14 @@ def get_comfyui_dirs() -> str:
         argv: list = stats.get("system", {}).get("argv", [])
         result: dict[str, str] = {"source": "argv"}
 
-        for arg in argv:
-            if not isinstance(arg, str):
-                continue
-            if arg.startswith("--input-directory="):
-                result["input_dir"] = arg.split("=", 1)[1]
-            elif arg.startswith("--output-directory="):
-                result["output_dir"] = arg.split("=", 1)[1]
-            elif arg.startswith("--user-directory="):
-                result["user_dir"] = arg.split("=", 1)[1]
+        for key, flag in (
+            ("input_dir", "--input-directory"),
+            ("output_dir", "--output-directory"),
+            ("user_dir", "--user-directory"),
+        ):
+            val = parse_argv_dir_flag(argv, flag)
+            if val:
+                result[key] = val
 
         # Fill in missing dirs with ComfyUI's conventional defaults
         # (relative to where the server was launched from, typically the ComfyUI root).
@@ -1248,8 +1247,14 @@ def patch_workflow(workflow_path: str, patches: str) -> str:
         if inp_name:
             if "inputs" not in node:
                 node["inputs"] = {}
-            node["inputs"][inp_name] = patch["value"]
-            val_repr = repr(patch["value"])
+            value = patch["value"]
+            # A LoadImage reference must carry the 'agent/' input subfolder that
+            # upload_image stages files into; a bare filename makes ComfyUI look
+            # in the input root and reject it as "Invalid image file".
+            if inp_name == "image" and node.get("class_type") == "LoadImage" and isinstance(value, str):
+                value = _agent_input_ref(value)
+            node["inputs"][inp_name] = value
+            val_repr = repr(value)
             if len(val_repr) > 80:
                 val_repr = val_repr[:77] + "..."
             applied.append(f"Node {nid}.inputs.{inp_name} → {val_repr}")
@@ -1417,8 +1422,14 @@ def update_workflow(
         if inp_name:
             if "inputs" not in node:
                 node["inputs"] = {}
-            node["inputs"][inp_name] = patch["value"]
-            val_repr = repr(patch["value"])
+            value = patch["value"]
+            # A LoadImage reference must carry the 'agent/' input subfolder that
+            # upload_image stages files into; a bare filename makes ComfyUI look
+            # in the input root and reject it as "Invalid image file".
+            if inp_name == "image" and node.get("class_type") == "LoadImage" and isinstance(value, str):
+                value = _agent_input_ref(value)
+            node["inputs"][inp_name] = value
+            val_repr = repr(value)
             if len(val_repr) > 80:
                 val_repr = val_repr[:77] + "..."
             applied.append(f"Node {nid}.inputs.{inp_name} → {val_repr}")

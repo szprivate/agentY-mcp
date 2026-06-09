@@ -83,17 +83,16 @@ def _load_comfyui_dirs() -> None:
     if _COMFYUI_DIR_CACHE_LOADED:
         return
     try:
-        from src.utils.comfyui_client import get_client
+        from src.utils.comfyui_client import get_client, parse_argv_dir_flag
 
         stats = get_client().get("/system_stats")
         argv = stats.get("system", {}).get("argv", []) if isinstance(stats, dict) else []
-        for arg in argv:
-            if not isinstance(arg, str):
-                continue
-            if arg.startswith("--output-directory="):
-                _COMFYUI_OUTPUT_DIR = Path(arg.split("=", 1)[1]).resolve()
-            elif arg.startswith("--user-directory="):
-                _COMFYUI_USER_DIR = Path(arg.split("=", 1)[1]).resolve()
+        out_dir = parse_argv_dir_flag(argv, "--output-directory")
+        if out_dir:
+            _COMFYUI_OUTPUT_DIR = Path(out_dir).resolve()
+        usr_dir = parse_argv_dir_flag(argv, "--user-directory")
+        if usr_dir:
+            _COMFYUI_USER_DIR = Path(usr_dir).resolve()
     except Exception as exc:
         logger.debug("executor: could not query ComfyUI dirs — %s", exc)
     _COMFYUI_DIR_CACHE_LOADED = True

@@ -36,11 +36,34 @@ the element reappears (paraphrasing breaks visual consistency downstream):
 ## 2. Split the WHOLE story into sequences
 - Break the entire storyline into ordered **shots**, then group the shots into
   **sequences**. A sequence is one Kling multi-shot clip.
-- **Each sequence: at most 6 shots, and the sum of its shot durations must be
-  ≤ 10 seconds.** Default each shot to **5 seconds** (≈2 shots per 10s sequence);
-  use shorter shots only when a beat needs it.
-- Use **as many sequences as needed** so the sequences together cover the story
-  from beginning to end — do not stop early.
+- **Hard per-sequence limits (never exceed):** at most **6 shots**, and the sum
+  of a sequence's shot durations must be **≤ 10 seconds**.
+
+### Length & shot budget — honour what the user asked for
+Before defaulting anything, read the brief for an explicit **total video length**
+and/or **total shot count** and treat them as hard targets, in this order:
+
+1. **Both total length and shot count given** (e.g. "10 seconds, 5 shots"):
+   per-shot duration = round(total_length ÷ shot_count), minimum 1s. Produce
+   *exactly* that many shots. Example: 10s ÷ 5 shots → five 2-second shots.
+2. **Only total length given** (e.g. "a 10-second clip"): keep the sum of all
+   shot durations across the whole film equal to that length. Pick a shot count
+   that fits — "fast-paced" / "snappy" → more, shorter shots (2–3s);
+   "slow" / "lingering" → fewer, longer shots.
+3. **Only shot count given:** use exactly that many shots; default each to 5s
+   unless pacing words say otherwise.
+4. **Neither given (open-ended story):** default each shot to **5 seconds**
+   (≈2 shots per 10s sequence) and use **as many sequences as needed** to cover
+   the story start to finish — do not stop early.
+
+After deciding the shots and their durations, **pack them into the FEWEST
+sequences** that still satisfy the per-sequence limits above (≤6 shots AND ≤10s
+each). Five 2-second shots = 10s total = **one** sequence, not three. Only open a
+new sequence when the next shot would breach the 6-shot or 10-second limit.
+
+Pacing words ("fast-paced", "rapid cuts", "quick", "snappy") mean **shorter shots
+and more cuts** — never inflate the total length or add sequences to fit a
+default 5s/shot.
 
 ## 3. Per sequence
 - **Start frame** — a vivid single-still description that opens the sequence,

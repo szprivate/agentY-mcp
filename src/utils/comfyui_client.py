@@ -17,6 +17,27 @@ from src.utils.secrets import get_secret
 _DEFAULT_COMFYUI_URL = "http://127.0.0.1:8188"
 
 
+def parse_argv_dir_flag(argv: list, flag: str) -> str | None:
+    """Extract a directory value passed to ComfyUI as ``--flag=VALUE`` or ``--flag VALUE``.
+
+    ``/system_stats`` echoes the server's ``sys.argv`` verbatim, so a
+    space-separated flag arrives as two consecutive list elements
+    (``["--input-directory", "W:\\..."]``) while the ``=`` form arrives as a
+    single element (``["--input-directory=W:\\..."]``).  Earlier code only
+    handled the ``=`` form, so space-separated launch flags were silently
+    missed and callers fell back to ComfyUI's stock install defaults.  Handle
+    both forms; return ``None`` when the flag is absent.
+    """
+    for i, arg in enumerate(argv):
+        if not isinstance(arg, str):
+            continue
+        if arg.startswith(flag + "="):
+            return arg.split("=", 1)[1]
+        if arg == flag and i + 1 < len(argv) and isinstance(argv[i + 1], str):
+            return argv[i + 1]
+    return None
+
+
 class ComfyUIClient:
     """HTTP client for the ComfyUI REST API."""
 

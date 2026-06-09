@@ -58,3 +58,13 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Inspect workflow with get_workflow_node_info to locate the prompt injection node, then use update_workflow to patch the positive prompt directly into that node's value field.
 
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Kling multi-shot templates | For Kling nodes with embedded prompts, skip apply_brainbriefing for positive prompts. Instead, patch multi_shot.storyboard_N_prompt fields directly via update_workflow before calling signal_workflow_ready.
+
+2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Gemini-based templates | Identify the prompt node using get_workflow_node_info, then patch the positive prompt directly into that node's value field via update_workflow instead of relying on apply_brainbriefing.
+
+2026-06-09 | GeminiImage2Node outputs IMAGE directly, not latent; VAE decode unnecessary | When using GeminiImage2Node for text-to-image generation, wire its output directly to SaveImage node. Do not add VAE decode nodes; the node outputs ready-to-save IMAGE format.
+2026-06-09 | Template mismatch: imageEdit requires input images but brainbriefing provides none | Inspect node schema before patching. GeminiImage2Node has optional images input—suitable for pure text-to-image. Remove LoadImage nodes with empty paths and wire prompt directly to generation node.
+
+2026-06-09 | LoadImage validation fails when image file missing from ComfyUI input directory | Copy source image to ComfyUI input subfolder using iterate/Python before patching LoadImage node. Ensure file exists locally before validation.
+2026-06-09 | Multi-shot Kling template requires node 12 storyboard prompts patched via update_workflow not apply_brainbriefing | Bypass apply_brainbriefing for Kling multi-shot; use update_workflow to patch node 12 multi_shot fields directly with storyboard prompts and durations.
+
+2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-node prompt pipelines | Identify the prompt injection node using get_workflow_node_info, then patch it directly via update_workflow targeting the specific node's input field (e.g., node 5 value for grid prompts).

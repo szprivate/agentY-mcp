@@ -1650,6 +1650,12 @@ class Pipeline:
             sequences of <=10s each, then end your reply with the SINGLE trailing
             ```json block defined by that skill — and nothing after it.
 
+            If the brief states an explicit total video length and/or total shot
+            count, treat them as hard targets: derive per-shot duration from them
+            (e.g. 10s / 5 shots = five 2s shots) and pack the shots into the FEWEST
+            sequences allowed (<=6 shots AND <=10s each) — do not pad with extra
+            sequences or inflate the total to fit a default 5s/shot.
+
             User brief / storyline / quality guidelines:
             {user_text}
         """).strip()
