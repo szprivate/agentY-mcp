@@ -38,6 +38,7 @@ from src.tools import (
     TRIAGE_TOOLS,
     LEARNINGS_TOOLS,
     VISION_AGENT_TOOLS,
+    DOP_TOOLS,
     reset_patch_workflow_guard,
 )
 from src.steering import get_brain_steering_handlers, get_researcher_steering_handlers
@@ -120,6 +121,31 @@ class AnthropicModel(_BaseAnthropicModel):
             req["tools"] = head + [{**last, "cache_control": {"type": "ephemeral"}}]
         return req
 
+    def format_chunk(self, event):  # type: ignore[override]
+        """Surface Anthropic prompt-cache token counts in the usage metadata.
+
+        The upstream Strands Anthropic model maps only ``input_tokens`` /
+        ``output_tokens`` and silently drops ``cache_read_input_tokens`` and
+        ``cache_creation_input_tokens``.  Because this model caches the system
+        prompt and the entire tools block, the cached tokens — the bulk of input
+        on warm calls, plus the 1.25x cache-write on the cold call — would
+        otherwise be billed at $0.  We re-attach them as ``cacheReadInputTokens``
+        / ``cacheWriteInputTokens`` so the Strands metrics layer accumulates them
+        (it already sums those keys) and the cost accounting can price them.
+        """
+        chunk = super().format_chunk(event)
+        if isinstance(event, dict) and event.get("type") == "metadata":
+            usage = event.get("usage") or {}
+            meta_usage = chunk.get("metadata", {}).get("usage")
+            if isinstance(meta_usage, dict):
+                cache_read = usage.get("cache_read_input_tokens")
+                cache_write = usage.get("cache_creation_input_tokens")
+                if cache_read is not None:
+                    meta_usage["cacheReadInputTokens"] = int(cache_read or 0)
+                if cache_write is not None:
+                    meta_usage["cacheWriteInputTokens"] = int(cache_write or 0)
+        return chunk
+
 
 def _load_models() -> dict:
     """Return the parsed models.json, or {} if the file is absent/invalid."""
@@ -196,6 +222,7 @@ _SYSTEM_PROMPT_FILE: dict[str, str] = {
     "info": "system_prompt.info",
     "story": "system_prompt.story",
     "scout": "system_prompt.scout",
+    "dop": "system_prompt.dop",
     "learnings": "system_prompt.learnings",
     "error_checker": "system_prompt.error_checker",
     "qa_checker": "system_prompt.qaChecker",
@@ -947,6 +974,81 @@ def create_scout_agent(
         )
     # Single-turn, stateless: each scouting request is independent.
     agent.conversation_manager = SlidingWindowConversationManager(window_size=6)
+    return agent
+
+
+def create_dop_agent(
+    llm: str | None = None,
+    ollama_model: str | None = None,
+    anthropic_model: str | None = None,
+    **kwargs,
+) -> Agent:
+    """Create the DoP (Director of Photography) agent — a stateless cinematographer.
+
+    Given a **finished storyboard JSON spec or a single prompt/scene**, it applies
+    concrete cinematography rules (lighting, composition, camera movement, colour)
+    and returns the enriched result — the SAME storyboard JSON schema when handed a
+    storyboard, or an enriched prompt when handed a single prompt. It writes text
+    only and calls no tools.
+
+    Two callers use it:
+      • the Storyboard director — to enrich every start frame + shot before generation;
+      • the Planner — as a ``dop`` step in a normal multi-step plan.
+
+    Reads ``llm.pipeline.dop`` from settings.json (format: ``'provider,model'``);
+    falls back to the Story-agent setting, then ``claude-haiku-4-5``. Env var
+    ``DOP_LLM`` overrides the combined setting; ``DOP_OLLAMA_MODEL`` /
+    ``DOP_ANTHROPIC_MODEL`` override the provider-specific model.
+
+    Args:
+        llm: ``'claude'`` or ``'ollama'``. Falls back to ``DOP_LLM`` env/settings.
+        ollama_model: Ollama model override.
+        anthropic_model: Anthropic model override.
+        **kwargs: Forwarded to the Strands Agent constructor.
+    """
+    if ollama_model and llm is None:
+        llm = "ollama"
+
+    # Fall back to the Story-agent setting so no extra config is required.
+    _story_default = str(_cfg("STORY_LLM", "pipeline", "story", default="claude,claude-haiku-4-5"))
+    _raw = str(_cfg("DOP_LLM", "pipeline", "dop", default=_story_default))
+    _settings_llm, _settings_model = _parse_llm_setting(_raw)
+    resolved_llm = llm or _settings_llm or "claude"
+
+    system_prompt = _load_system_prompt("dop")
+
+    if resolved_llm == "ollama":
+        resolved_ollama = (
+            ollama_model
+            or os.environ.get("DOP_OLLAMA_MODEL")
+            or _settings_model
+            or str(_cfg("LLM_FUNCTIONS_MODEL", "pipeline", "llm_functions", default="qwen3.5:9b"))
+        )
+        agent = _make_agent(
+            role="dop",
+            llm="ollama",
+            system_prompt=system_prompt,
+            tools=DOP_TOOLS,
+            ollama_model=resolved_ollama,
+            **kwargs,
+        )
+    else:
+        resolved_anthropic = (
+            anthropic_model
+            or os.environ.get("DOP_ANTHROPIC_MODEL")
+            or _settings_model
+            or str(_cfg("ANTHROPIC_MODEL", "anthropic", "model", default="claude-haiku-4-5"))
+        )
+        agent = _make_agent(
+            role="dop",
+            llm="claude",
+            system_prompt=system_prompt,
+            tools=DOP_TOOLS,
+            anthropic_model=resolved_anthropic,
+            **kwargs,
+        )
+    # Single-turn, stateless: each storyboard/prompt is enriched independently.
+    agent.conversation_manager = SlidingWindowConversationManager(window_size=4)
     return agent
 
 

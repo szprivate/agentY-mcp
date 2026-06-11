@@ -211,14 +211,40 @@ def get_model_prices_for(obj) -> Tuple[float, float]:
     return _mtok(3.00, 15.00)
 
 
+# Anthropic ephemeral (5-minute) prompt-cache multipliers, relative to the base
+# input-token price: cache reads bill at 0.1x and cache writes (cache creation)
+# at 1.25x. These are the standard Anthropic rates; cache-token usage fields are
+# only emitted for Anthropic models in this app, so a single multiplier pair
+# suffices. Override-friendly via the constants below if other providers are added.
+_CACHE_READ_MULTIPLIER = 0.1
+_CACHE_WRITE_MULTIPLIER = 1.25
+
+
 def compute_cost_from_usage(usage: dict, obj) -> Tuple[float, int]:
     """Compute total cost (USD) and total tokens from a usage dict and model obj.
 
-    Cost = inputTokens * input_price + outputTokens * output_price.
-    Returns (cost_in_dollars, total_tokens).
+    Cost = inputTokens          * input_price
+         + outputTokens         * output_price
+         + cacheReadInputTokens  * input_price * 0.1   (cache hit)
+         + cacheWriteInputTokens * input_price * 1.25  (cache write)
+
+    Anthropic reports cached tokens *separately* from ``inputTokens`` (which counts
+    only the fresh, uncached input), so the cache terms are additive — omitting
+    them undercounts the real bill, most heavily for agents with large cached
+    system prompts / tool blocks. Ollama models price every term at 0.
+
+    Returns (cost_in_dollars, total_tokens) where total_tokens now includes the
+    cache tokens too.
     """
     in_tok = int(usage.get("inputTokens", 0) or 0)
     out_tok = int(usage.get("outputTokens", 0) or 0)
+    cache_read = int(usage.get("cacheReadInputTokens", 0) or 0)
+    cache_write = int(usage.get("cacheWriteInputTokens", 0) or 0)
     in_price, out_price = get_model_prices_for(obj)
-    cost = in_tok * in_price + out_tok * out_price
-    return cost, in_tok + out_tok
+    cost = (
+        in_tok * in_price
+        + out_tok * out_price
+        + cache_read * in_price * _CACHE_READ_MULTIPLIER
+        + cache_write * in_price * _CACHE_WRITE_MULTIPLIER
+    )
+    return cost, in_tok + out_tok + cache_read + cache_write

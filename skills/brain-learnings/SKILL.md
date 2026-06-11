@@ -70,3 +70,14 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-node prompt pipelines | Identify the prompt injection node using get_workflow_node_info, then patch it directly via update_workflow targeting the specific node's input field (e.g., node 5 value for grid prompts).
 
 2026-06-10 | apply_brainbriefing fails with null positive_prompt_node_id on Kling templates | For Kling3_multiShot, inject prompts directly into node 12 via update_workflow patches to multi_shot.storyboard_N_prompt fields; skip apply_brainbriefing positive prompt injection and proceed to signal_workflow_ready.
+
+2026-06-11 | Multi-shot template apply_brainbriefing fails when positive_prompt_node_id is null | For Kling3_multiShot, patch shot prompts directly to node 12 via update_workflow before calling apply_brainbriefing. Skip positive prompt in apply_brainbriefing; it will report "no matching node found" but workflow remains valid.
+
+2026-06-11 | Batch variations mode requires seed randomization per duplicate to avoid collisions | When duplicating workflows for variations, explicitly set distinct seed values (e.g., 42, 84) via update_workflow to ensure each iteration produces unique outputs and avoids seed-mismatch errors.
+2026-06-11 | Multi-shot Kling templates embed prompts directly in storyboard fields, not external prompt nodes | For Kling3_multiShot, patch prompts via multi_shot.storyboard_N_prompt inputs on the KlingVideoNode; do not attempt to use positive_prompt_node_id or CLIPTextEncode nodes.
+2026-06-11 | Kling multi-shot storyboard prompts require continuity cues between consecutive shots | Structure each shot prompt with explicit transition language (e.g., "Continuous from previous shot", "Immediately following") to ensure the model generates seamless multi-shot sequences without discontinuity.
+
+2026-06-11 | Shot 6 prompt exceeds 512-char limit in Kling multishot template | Condense narrative details while preserving spatial framing (foreground/midground/background composition) and core story beats; prioritize camera POV and action over descriptive flourish.
+2026-06-11 | apply_brainbriefing skips positive prompt when positive_prompt_node_id is null in Kling3_multiShot | For Kling multishot templates, patch individual shot prompts directly via update_workflow to multi_shot.storyboard_N_prompt fields; skip positive prompt patching in apply_brainbriefing and proceed to signal_workflow_ready.
+
+2026-06-11 | Kling API enforces 3-second minimum duration constraint, not 2 seconds | When targeting Kling i2v generation, verify API duration limits (min=3, max=15 seconds) early. Adjust brainbriefing duration expectations or inform user that requested 2-second duration will be rounded up to 3 seconds minimum.

@@ -112,6 +112,13 @@ SCOUT_TOOLS: list = [
 ]
 
 # ---------------------------------------------------------------------------
+# DoP-agent tools – pure text transformation; no tools needed. The Director of
+# Photography agent reads a finished storyboard/prompt and rewrites it with
+# concrete lighting/composition/camera/colour decisions. It calls no tools.
+# ---------------------------------------------------------------------------
+DOP_TOOLS: list = []
+
+# ---------------------------------------------------------------------------
 # Researcher tools – template lookup, asset upload, model resolution.
 # ---------------------------------------------------------------------------
 RESEARCHER_TOOLS: list = [

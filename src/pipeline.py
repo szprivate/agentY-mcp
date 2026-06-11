@@ -26,7 +26,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, Field, ValidationError
 from strands import Agent
 
-from src.agent import create_brain_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_scout_agent, create_story_agent, create_triage_agent, create_vision_agent, _settings
+from src.agent import create_brain_agent, create_dop_agent, create_error_checker_agent, create_info_agent, create_planner_agent, create_researcher_agent, create_scout_agent, create_story_agent, create_triage_agent, create_vision_agent, _settings
 from src.tools.image_handling import set_vision_agent as _set_vision_agent
 from src.utils.chat_summary import summarize_conversation, log_agent_messages, log_agent_exchange
 from src.utils.comfyui_interrupt_hook import INTERRUPT_NAME
@@ -323,6 +323,7 @@ class Pipeline:
         planner_agent: Agent | None = None,
         error_checker_agent: Agent | None = None,
         scout_agent: Agent | None = None,
+        dop_agent: Agent | None = None,
         verbose: bool = True,
         skip_brain: bool = False,
         info_context: dict | None = None,
@@ -336,6 +337,7 @@ class Pipeline:
         self._planner_agent: Agent = planner_agent or create_planner_agent()
         self._error_checker_agent: Agent = error_checker_agent or create_error_checker_agent()
         self._scout_agent: Agent = scout_agent or create_scout_agent()
+        self._dop_agent: Agent = dop_agent or create_dop_agent()
         self._verbose = verbose
         self._skip_brain = skip_brain
         # Storyboard director: max Vision-QA attempts per visual step before the
@@ -344,6 +346,9 @@ class Pipeline:
         # Default for the per-step approval gate (True = ask). Overridable per-run
         # by the user's message (settings.json director.user_approval_step).
         self._approval_default = self._resolve_director_approval()
+        # Default for the DoP cinematography pass (True = run it). Overridable
+        # per-run by the user's message (settings.json director.apply_cinematography).
+        self._cinematography_default = self._resolve_director_cinematography()
         self._info_context: dict = info_context or {}
         self._session: AgentSession = AgentSession(session_id=session_id)
         # Brainbriefing JSON from the most recent Researcher run; used by the
@@ -364,15 +369,22 @@ class Pipeline:
         # a previous session in the same process.
         _clear_tool_caches()
         # Initialise Vision Agent so analyze_image(mode='describe') works for
-        # all agents (Researcher, Info, etc.) in this pipeline.
+        # all agents (Researcher, Info, etc.) in this pipeline. Keep a reference so
+        # its per-turn token usage can be folded into the cost accounting (it runs
+        # outside the per-agent snapshot brackets, via the analyze_image tool).
+        self._vision_agent: Agent | None = None
         try:
-            _set_vision_agent(create_vision_agent())
+            self._vision_agent = create_vision_agent()
+            _set_vision_agent(self._vision_agent)
         except Exception as _va_exc:
             print(f"[agentY] WARNING: could not initialise VisionAgent ({_va_exc}). "
                   "analyze_image will fall back to mode='full'.")
         # Per-turn usage tracking: list of (delta_usage_dict, agent_obj) for every
         # agent that contributed tokens this turn. Reset at the start of each turn.
         self._last_turn_usages: list = []
+        # Turn-start snapshot of the Vision agent's accumulated usage, so its
+        # delta for the turn can be recorded at cost-finalisation time.
+        self._vision_usage_snap: dict = {}
         # Brain-history compression is moved off the critical path: the executor
         # finishes, the final stream events flow to the UI, and only then this
         # background task summarises the conversation.  The next user turn
@@ -446,9 +458,30 @@ class Pipeline:
     # of only the Brain.
     @property
     def event_loop_metrics(self):  # noqa: ANN201
+        # Fold in the Vision agent's per-turn delta before reporting, so the
+        # combined token picture includes analyze_image usage.
+        self._record_vision_usage()
         return _TurnMetrics(self._last_turn_usages)
 
     # ── Per-turn usage tracking helpers ─────────────────────────────── #
+
+    def _record_vision_usage(self) -> None:
+        """Fold the shared Vision agent's per-turn token delta into the turn usage.
+
+        The Vision agent (used by the ``analyze_image`` tool across Researcher /
+        Info / etc.) runs outside the per-agent ``_usage_snapshot`` brackets, so
+        its tokens are captured here from the turn-start snapshot taken in
+        :meth:`stream_async`. Idempotent within a turn: after recording, the
+        snapshot is advanced so a repeat call contributes nothing (and a later
+        call only adds vision tokens accrued since). Priced at the Vision model's
+        own rate via ``_cost_meta`` — so an Ollama vision model contributes 0 cost
+        (but its tokens still count toward the displayed total).
+        """
+        agent = self._vision_agent
+        if agent is None:
+            return
+        self._record_agent_usage(agent, self._vision_usage_snap)
+        self._vision_usage_snap = self._usage_snapshot(agent)
 
     def _usage_snapshot(self, agent) -> dict:
         """Return a copy of *agent*'s current accumulated usage, or {} on error."""
@@ -490,6 +523,8 @@ class Pipeline:
         tokens billed at claude-haiku prices while Brain tokens at a different
         rate, and Ollama agents contribute 0 cost regardless of token count.
         """
+        # Ensure the Vision agent's per-turn usage is included before pricing.
+        self._record_vision_usage()
         total_cost = 0.0
         total_tokens = 0
         for usage, agent in self._last_turn_usages:
@@ -607,6 +642,9 @@ class Pipeline:
         # Stage 0 – Triage (classify intent before any agent is called)
         _trace("pipeline.stream_async: triage begin")
         self._last_turn_usages = []
+        # Snapshot the Vision agent's usage so this turn's analyze_image tokens
+        # can be attributed (and priced) at cost-finalisation time.
+        self._vision_usage_snap = self._usage_snapshot(self._vision_agent) if self._vision_agent else {}
         user_text = self._extract_text(user_input)
         user_text = self._annotate_attachments(user_input, user_text)
         _triage_snap = self._usage_snapshot(self._triage_agent)
@@ -869,20 +907,23 @@ class Pipeline:
 
     @staticmethod
     def _normalize_step_kind(raw: object) -> str:
-        """Normalise a planner step's ``kind`` to one of analysis|writing|generation.
+        """Normalise a planner step's ``kind`` to analysis|writing|dop|generation.
 
         Unknown / missing values fall back to ``generation`` (the historical
         Researcher → Brain → Executor path), with light synonym handling so a
         slightly-off label from the planner still routes correctly.
         """
         k = str(raw or "generation").strip().lower()
-        if k in {"analysis", "writing", "generation"}:
+        if k in {"analysis", "writing", "dop", "generation"}:
             return k
         if k.startswith("anal") or k in {"info", "describe", "description", "vision", "caption"}:
             return "analysis"
         if k in {"writing", "write", "story", "synopsis", "scene", "scenes",
                  "narrative", "screenplay", "text", "prose"}:
             return "writing"
+        if k in {"dp", "cinematography", "cinematographer", "camera", "lighting",
+                 "photography", "director of photography", "cinema"}:
+            return "dop"
         return "generation"
 
     async def _run_planner(self, user_text: str) -> tuple[list[dict[str, str]], str]:
@@ -1174,12 +1215,18 @@ class Pipeline:
             if self._verbose:
                 print(f"\npipeline: ── Plan step {idx + 1}/{total} ({kind}): {description} ──")
 
-            # Non-generation steps (image analysis / creative writing) must NOT go
-            # to the Researcher (which only emits ComfyUI workflow briefs). Route
-            # them to the Info / Story agent and forward their TEXT to the next step.
-            if kind in ("analysis", "writing"):
-                _agent = self._info_agent if kind == "analysis" else self._story_agent
-                _label = "INFO" if kind == "analysis" else "STORY"
+            # Non-generation steps (image analysis / creative writing / DoP
+            # cinematography) must NOT go to the Researcher (which only emits ComfyUI
+            # workflow briefs). Route them to the Info / Story / DoP agent and forward
+            # their TEXT to the next step. The DoP agent reads the previous step's
+            # storyboard/prompt and rewrites it with concrete camera/light/colour.
+            if kind in ("analysis", "writing", "dop"):
+                if kind == "analysis":
+                    _agent, _label = self._info_agent, "INFO"
+                elif kind == "writing":
+                    _agent, _label = self._story_agent, "STORY"
+                else:
+                    _agent, _label = self._dop_agent, "DOP"
                 _step_text = ""
                 async for _tev in self._stream_plan_text_step(
                     _agent, _label, step["request"], prev_text_output,
@@ -1192,12 +1239,14 @@ class Pipeline:
                 prev_text_output = _step_text or prev_text_output
                 # Keep the per-agent caches coherent so a later non-plan follow-up
                 # (e.g. "make it scarier") can build on the latest output.
-                if kind == "writing":
-                    self._session.last_story_response = _step_text or self._session.last_story_response
-                    self._session.last_agent = "story"
-                else:
+                if kind == "analysis":
                     self._session.last_info_response = _step_text or None
                     self._session.last_agent = "info"
+                else:
+                    # writing + dop both produce text the next step / a follow-up
+                    # can build on; treat them as the latest "story" text output.
+                    self._session.last_story_response = _step_text or self._session.last_story_response
+                    self._session.last_agent = "story"
                 self._record_chat_summary(step["request"], triage_result, status="completed")
                 yield {"_step_done": True, "idx": idx}
                 if self._verbose:
@@ -1487,6 +1536,43 @@ class Pipeline:
             pass
         return True
 
+    @classmethod
+    def _resolve_director_cinematography(cls) -> bool:
+        """Resolve the DEFAULT for the storyboard DoP cinematography pass.
+
+        Returns True when the director should run the DoP agent over the finished
+        storyboard (rewriting every start frame + shot with concrete lighting /
+        composition / camera / colour) before generation. Priority:
+        ``DIRECTOR_APPLY_CINEMATOGRAPHY`` env var > settings.json
+        ``director.apply_cinematography`` > default True. The user's message can
+        still override this per-run (see :meth:`_stream_storyboard`).
+        """
+        env = os.environ.get("DIRECTOR_APPLY_CINEMATOGRAPHY")
+        if env is not None:
+            c = cls._coerce_bool(env)
+            if c is not None:
+                return c
+        try:
+            c = cls._coerce_bool(_settings().get("director", {}).get("apply_cinematography", True))
+            if c is not None:
+                return c
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+
+    @staticmethod
+    def _storyboard_skip_cinematography(user_text: str) -> bool:
+        """Return True when the user explicitly opts out of the DoP pass."""
+        t = user_text.lower()
+        triggers = (
+            "skip cinematography", "no cinematography", "without cinematography",
+            "skip the dop", "no dop", "without the dop", "skip camera rules",
+            "don't apply cinematography", "dont apply cinematography",
+            "do not apply cinematography", "skip the camera pass",
+            "no camera pass", "don't apply the camera", "skip dop",
+        )
+        return any(tok in t for tok in triggers)
+
     @staticmethod
     def _storyboard_wants_approval(user_text: str) -> bool:
         """Return True when the user explicitly asks to approve each step.
@@ -1682,6 +1768,126 @@ class Pipeline:
         log_agent_exchange("STORY", "[storyboard breakdown]", text)
         self._clear_story_history()
         yield {"_sb_story": text}
+
+    async def _storyboard_apply_dop(self, spec: dict):
+        """Run the DoP agent over the finished storyboard to enrich cinematography.
+
+        Sends the whole finalized breakdown (guidelines, character locks, every
+        start frame and shot) to the DoP agent, which applies concrete lighting /
+        composition / camera-movement / colour decisions ACROSS THE WHOLE FILM (so
+        the colour arc is coherent) and returns the SAME JSON schema with each
+        ``start_frame_prompt`` and shot ``prompt`` rewritten.  Merges the rewrites
+        back into *spec* in place (preserving indices, character_tags, durations
+        and the verbatim character locks).  Yields the agent's events plus a final
+        ``{"_sb_dop_applied": <bool>}`` sentinel.  Any parse failure is non-fatal:
+        the spec is left unchanged and ``False`` is reported.
+        """
+        payload = {
+            "guidelines": spec.get("guidelines", ""),
+            "characters": [
+                {"tag": c.get("tag", ""), "description": c.get("description", "")}
+                for c in spec.get("characters", [])
+            ],
+            "sequences": [
+                {
+                    "index": s.get("index"),
+                    "summary": s.get("summary", ""),
+                    "character_tags": s.get("character_tags", []),
+                    "start_frame_prompt": s.get("start_frame_prompt", ""),
+                    "shots": [
+                        {"prompt": sh.get("prompt", ""), "duration": sh.get("duration", 5)}
+                        for sh in s.get("shots", [])
+                    ],
+                }
+                for s in spec.get("sequences", [])
+            ],
+        }
+        instruction = (
+            "Apply your cinematography rules (Storyboard mode) to this FINISHED "
+            "storyboard. Return ONE ```json block with the SAME schema — keep every "
+            "character lock, tag, sequence index, summary, character_tags and shot "
+            "duration UNCHANGED; rewrite only `guidelines`, each `start_frame_prompt` "
+            "and each shot `prompt`, weaving in concrete lighting, composition, camera "
+            "movement and colour, coherent across the whole film. Keep each shot prompt "
+            "<=480 characters. Output the JSON only.\n\nStoryboard JSON:\n```json\n"
+            + json.dumps(payload, ensure_ascii=False, indent=2)
+            + "\n```"
+        )
+        try:
+            self._dop_agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+        _snap = self._usage_snapshot(self._dop_agent)
+        chunks: list[str] = []
+        yield {"_story_start": True, "name": "🎥 Cinematography (DoP)"}
+        async for event in self._dop_agent.stream_async(instruction):
+            if isinstance(event, dict):
+                c = event.get("data", "")
+                if c:
+                    chunks.append(c)
+            yield event
+        yield {"_story_done": True}
+        self._record_agent_usage(self._dop_agent, _snap)
+        raw = "".join(chunks)
+        log_agent_exchange("DOP", "[storyboard cinematography]", raw)
+        try:
+            self._dop_agent.messages.clear()
+        except Exception:  # noqa: BLE001
+            pass
+        yield {"_sb_dop_applied": self._merge_dop_spec(spec, raw)}
+
+    @staticmethod
+    def _merge_dop_spec(spec: dict, raw: str) -> bool:
+        """Merge DoP-rewritten prompts from *raw* JSON back into *spec* in place.
+
+        Only ``guidelines``, each sequence's ``start_frame_prompt`` and each shot's
+        ``prompt`` are taken from the DoP output; sequences are matched by ``index``
+        and shots by position, so indices, tags, durations and the verbatim
+        character locks are never disturbed.  Returns ``True`` when at least one
+        field was updated, ``False`` when nothing usable parsed (spec unchanged).
+        """
+        parsed_raw = _extract_json(raw or "")
+        if not parsed_raw:
+            return False
+        try:
+            enriched = json.loads(parsed_raw)
+        except (json.JSONDecodeError, TypeError):
+            return False
+        if not isinstance(enriched, dict):
+            return False
+        e_seqs = enriched.get("sequences")
+        if not isinstance(e_seqs, list):
+            return False
+
+        updated = False
+        # Enriched guidelines (base palette + film look) — adopt when non-empty.
+        e_guidelines = enriched.get("guidelines")
+        if isinstance(e_guidelines, str) and e_guidelines.strip():
+            spec["guidelines"] = e_guidelines.strip()
+            updated = True
+
+        by_index = {
+            es.get("index"): es
+            for es in e_seqs
+            if isinstance(es, dict) and es.get("index") is not None
+        }
+        for s in spec.get("sequences", []):
+            es = by_index.get(s.get("index"))
+            if not isinstance(es, dict):
+                continue
+            e_sf = es.get("start_frame_prompt")
+            if isinstance(e_sf, str) and e_sf.strip():
+                s["start_frame_prompt"] = e_sf.strip()
+                updated = True
+            e_shots = es.get("shots")
+            if isinstance(e_shots, list):
+                for orig_shot, e_shot in zip(s.get("shots", []), e_shots):
+                    if isinstance(e_shot, dict):
+                        e_p = e_shot.get("prompt")
+                        if isinstance(e_p, str) and e_p.strip():
+                            orig_shot["prompt"] = e_p.strip()
+                            updated = True
+        return updated
 
     async def _stream_scout(self, user_text: str):
         """Run the Reference Scout to find + stage web references for *user_text*.
@@ -2090,6 +2296,24 @@ class Pipeline:
                 characters = spec.get("characters", [])
                 sequences = spec["sequences"]
                 n_seq = len(sequences)
+
+        # ── DoP pass: enrich the finished breakdown with concrete cinematography ──
+        # On by default (settings director.apply_cinematography); the user can opt
+        # out per-run ("skip cinematography"). Rewrites every start frame + shot with
+        # lighting / composition / camera movement / colour, coherent across the
+        # whole film. Runs after the breakdown is approved so the approved structure
+        # is what gets photographed; a parse failure is non-fatal (prompts unchanged).
+        if self._cinematography_default and not self._storyboard_skip_cinematography(user_text):
+            async for ev in self._storyboard_apply_dop(spec):
+                if isinstance(ev, dict) and "_sb_dop_applied" in ev:
+                    if ev["_sb_dop_applied"]:
+                        sequences = spec["sequences"]
+                        if self._verbose:
+                            print("pipeline: DoP cinematography pass applied to storyboard.")
+                    elif self._verbose:
+                        print("pipeline: DoP pass returned no usable rewrite — keeping original prompts.")
+                else:
+                    yield ev
 
         # Persistent FOOTAGE style/quality bar (echoed by the Story agent) — applies
         # to the start frames and videos. Character references use the dedicated
@@ -3427,6 +3651,7 @@ def create_pipeline(
         anthropic_model=planner_anthropic_model,
     )
     scout_agent = create_scout_agent()
+    dop_agent = create_dop_agent()
     return Pipeline(
         researcher,
         brain,
@@ -3435,6 +3660,7 @@ def create_pipeline(
         triage_agent=triage_agent,
         planner_agent=planner_agent,
         scout_agent=scout_agent,
+        dop_agent=dop_agent,
         verbose=verbose,
         skip_brain=skip_brain,
         info_context=info_context,

@@ -11,7 +11,8 @@
     "qa_checker": "system_prompt.qaChecker.md",
     "vision_agent": "system_prompt.vision_agent.md",
     "story": "system_prompt.story.md",
-    "scout": "system_prompt.scout.md"
+    "scout": "system_prompt.scout.md",
+    "dop": "system_prompt.dop.md"
   },
   "comfyui_models_dir": "L:\\software\\comfyui\\Models",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
@@ -30,7 +31,13 @@
     // each step; false / 0 = run fully autonomously. A request in the user's
     // message (e.g. "ask me for approval" or "run autonomously") overrides this
     // per-run. (env override: DIRECTOR_USER_APPROVAL_STEP)
-    "user_approval_step": false
+    "user_approval_step": false,
+    // Run the DoP (Director of Photography) pass over the finished storyboard
+    // before generation: rewrites every start frame + shot with concrete
+    // lighting/composition/camera/colour. true = on (default), false / 0 = off.
+    // A request in the user's message (e.g. "skip cinematography") overrides this
+    // per-run. (env override: DIRECTOR_APPLY_CINEMATOGRAPHY)
+    "apply_cinematography": true
   },
 
   "llm": {
@@ -42,6 +49,7 @@
       "info": "claude,claude-haiku-4-5",
       "story": "claude,claude-haiku-4-5",
       "scout": "claude,claude-haiku-4-5",
+      "dop": "claude,claude-haiku-4-5",
       "planner": "claude,claude-haiku-4-5",
       "learnings": "claude,claude-haiku-4-5",
       "error_checker": "claude,claude-haiku-4-5",

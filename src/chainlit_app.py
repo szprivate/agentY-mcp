@@ -970,6 +970,7 @@ async def _process_message(message: cl.Message) -> None:
                 create_triage_agent,
                 create_planner_agent,
                 create_error_checker_agent,
+                create_dop_agent,
             )
             _pipeline = cl.user_session.get("pipeline")
             if _pipeline is None:
@@ -989,6 +990,7 @@ async def _process_message(message: cl.Message) -> None:
                 "triage":     create_triage_agent,
                 "planner":    create_planner_agent,
                 "error_checker": create_error_checker_agent,
+                "dop":        create_dop_agent,
             }
             _new_agent = _factory_map[_agent_name](**_kwargs)
             _attr_map = {
@@ -999,6 +1001,7 @@ async def _process_message(message: cl.Message) -> None:
                 "triage":     "_triage_agent",
                 "planner":    "_planner_agent",
                 "error_checker": "_error_checker_agent",
+                "dop":        "_dop_agent",
             }
             setattr(_pipeline, _attr_map[_agent_name], _new_agent)
             _display = f"`{_provider},{_model}`" if _model else f"`{_provider}`"
