@@ -68,3 +68,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-09 | Multi-shot Kling template requires node 12 storyboard prompts patched via update_workflow not apply_brainbriefing | Bypass apply_brainbriefing for Kling multi-shot; use update_workflow to patch node 12 multi_shot fields directly with storyboard prompts and durations.
 
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-node prompt pipelines | Identify the prompt injection node using get_workflow_node_info, then patch it directly via update_workflow targeting the specific node's input field (e.g., node 5 value for grid prompts).
+
+2026-06-10 | apply_brainbriefing fails with null positive_prompt_node_id on Kling templates | For Kling3_multiShot, inject prompts directly into node 12 via update_workflow patches to multi_shot.storyboard_N_prompt fields; skip apply_brainbriefing positive prompt injection and proceed to signal_workflow_ready.
