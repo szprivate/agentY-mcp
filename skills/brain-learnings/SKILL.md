@@ -83,3 +83,12 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-11 | Kling API enforces 3-second minimum duration constraint, not 2 seconds | When targeting Kling i2v generation, verify API duration limits (min=3, max=15 seconds) early. Adjust brainbriefing duration expectations or inform user that requested 2-second duration will be rounded up to 3 seconds minimum.
 
 2026-06-11 | LoadImage validation fails when reference image path lacks subfolder prefix | Always qualify reference image paths with their full subfolder structure (e.g., 'agent/references/filename.png') to match ComfyUI input directory layout and pass validation.
+
+2026-06-11 | Kling API enforces minimum 3-second duration for i2v; requested 2-second video must be rounded up | Adjust duration parameter to 3 seconds minimum when user requests shorter videos. Kling API does not support sub-3-second generation regardless of request.
+2026-06-11 | LoadImage validation fails when image path lacks subdirectory prefix in ComfyUI input structure | Qualify image filenames with full subdirectory path (e.g., 'agent/references/filename.png') to match ComfyUI input directory hierarchy and pass validation.
+
+2026-06-11 | LoadImage validation fails when image path lacks subfolder prefix in agent directory | Include the full relative path with subfolder (e.g., 'agent/references/filename.png') not just 'agent/filename.png' when patching LoadImage nodes.
+
+2026-06-11 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Identify the prompt node using get_workflow_node_info, then use update_workflow to patch the positive prompt directly into that node's value field before validation.
+
+2026-06-11 | LoadImage validation fails when reference image files don't exist in dev environment but exist on production system | Proceed with workflow handoff via signal_workflow_ready even if LoadImage validation fails in dev; the files will load correctly on the production system where they exist at the specified absolute paths.

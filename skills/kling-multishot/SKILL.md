@@ -13,6 +13,18 @@ allowed-tools: update_workflow, get_workflow_template
 
 ---
 
+## ⛔ Hard constraint — shot prompt length (NON-NEGOTIABLE)
+
+**Every shot prompt MUST be shorter than 512 characters (511 characters max). No exception.**
+
+This is a hard limit of the Kling `storyboard_N_prompt` input: a prompt of 512 characters or more is rejected by ComfyUI (`storyboard_N_prompt cannot be longer than 512 characters`) and fails the entire workflow.
+
+- Applies to **both** the Researcher (when composing prompts) and the Brain (when patching node 12).
+- Applies even to prompts handed over **verbatim** by the Storyboard director: if a supplied prompt is ≥ 512 characters, trim it (drop style tags and camera adjectives first, keep the character lock intact) until it is shorter than 512 — **never patch an over-length prompt**.
+- **Count the characters of every shot prompt before finalising.** If any prompt is ≥ 512, shorten it until it is < 512.
+
+---
+
 ## Researcher — Template selection and prompt composition
 
 ### Template selection (step 2)
@@ -30,12 +42,13 @@ Count the number of shots the user asked for (max 6, default 2). Generate that m
 > list of shot prompts + per-shot durations (the Storyboard director passes them
 > as a JSON array such as `[{"prompt": "...", "duration": 5}, …]`), **use those
 > prompts verbatim** as the storyboard array — do not invent new ones. Still
-> enforce the 512-char limit per shot, keep the supplied character-lock prefix
+> enforce the hard "shorter than 512 characters" limit per shot (trim if a
+> supplied prompt is ≥ 512), keep the supplied character-lock prefix
 > intact, set `task.type` to `video i2v`, and bind the supplied start-frame image
 > as the LoadImage input (node 14). Carry each shot's `duration` through to
 > `multi_shot.storyboard_N_duration`, and make sure the durations sum to ≤10s.
 
-**Each individual shot prompt MUST NOT exceed 512 characters.** Count characters before finalising — trim adjectives or shorten camera descriptions if needed to stay within the limit.
+**Each individual shot prompt MUST be shorter than 512 characters (511 max) — see the hard constraint above.** Count characters before finalising — trim adjectives or shorten camera descriptions if needed to stay under the limit.
 
 Store all shot prompts in the brainbriefing `prompt.positive` field as a **JSON array string**:
 ```
@@ -185,6 +198,7 @@ Shot 4: A tall woman with short copper hair, steel-blue lab coat, early 40s, sli
 - [ ] `task.type` set to `video i2v`
 - [ ] Shot count confirmed (max 6)
 - [ ] `prompt.positive` is a JSON array with N distinct shot prompts
+- [ ] **Every shot prompt is shorter than 512 characters (511 max)**
 - [ ] `prompt.negative` populated
 - [ ] Shot count + duration noted in `blockers` as WARNING
 
@@ -192,6 +206,7 @@ Shot 4: A tall woman with short copper hair, steel-blue lab coat, early 40s, sli
 - [ ] Shot prompts parsed from `prompt.positive` JSON array
 - [ ] `multi_shot` enum matches shot count exactly
 - [ ] Shot prompts patched directly into `multi_shot.storyboard_N_prompt` inputs on node 12
+- [ ] **Every patched shot prompt is shorter than 512 characters (511 max)** — trim before patching if needed
 - [ ] Durations set per shot on node 12 (default `1`)
 - [ ] `generate_audio` set to `true` + model `kling-v3-omni` only if user requested audio
 - [ ] Character lock phrase identical across all shots
