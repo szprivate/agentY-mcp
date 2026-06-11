@@ -81,3 +81,5 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-11 | apply_brainbriefing skips positive prompt when positive_prompt_node_id is null in Kling3_multiShot | For Kling multishot templates, patch individual shot prompts directly via update_workflow to multi_shot.storyboard_N_prompt fields; skip positive prompt patching in apply_brainbriefing and proceed to signal_workflow_ready.
 
 2026-06-11 | Kling API enforces 3-second minimum duration constraint, not 2 seconds | When targeting Kling i2v generation, verify API duration limits (min=3, max=15 seconds) early. Adjust brainbriefing duration expectations or inform user that requested 2-second duration will be rounded up to 3 seconds minimum.
+
+2026-06-11 | LoadImage validation fails when reference image path lacks subfolder prefix | Always qualify reference image paths with their full subfolder structure (e.g., 'agent/references/filename.png') to match ComfyUI input directory layout and pass validation.

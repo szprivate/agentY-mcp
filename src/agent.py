@@ -483,6 +483,16 @@ def _make_agent(
         model = AnthropicModel(
             model_id=model_id,
             max_tokens=tokens,
+            # Disable Strands' native count_tokens API for context-window
+            # estimation. On the warm path it calls count_tokens() with only the
+            # messages AFTER the last assistant turn (event_loop.py); that slice
+            # starts with a tool_result whose tool_use is in the excluded message,
+            # which Anthropic rejects with HTTP 400 ("each tool_result must have a
+            # corresponding tool_use"). The error is caught and falls back to local
+            # estimation anyway, so the native call only adds a failing round-trip
+            # and log noise on every tool call. Local estimation has no effect on
+            # cost accounting (which reads real accumulated_usage from responses).
+            use_native_token_count=False,
             params={
                 "system": [
                     {
