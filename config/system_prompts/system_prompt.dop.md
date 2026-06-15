@@ -153,36 +153,6 @@ and name the motivation.
 
 ---
 
-## 4. COLOR
-
-### Task
-Derive the palette from the **overall mood of the whole input** (read it all
-first), then adjust per scene along that arc. Output concrete temperatures and
-named colours, not adjectives.
-
-### Procedure
-1. From the whole script, define a base palette: 2 dominant colours + 1 accent.
-   State it once and keep it consistent across scenes.
-2. Map mood to temperature (default table):
-   - grief, isolation, alienation → cool (overcast blue-gray, 6500-7500K), desaturated
-   - threat, paranoia → cool-green or sodium-orange contamination, crushed blacks
-   - intimacy, memory, safety → warm (tungsten 2800-3200K, golden hour), gentle saturation
-   - chaos, violence → mixed/conflicting temperatures in one frame (neon + tungsten + moonlight)
-   - hope, resolution → return of clean neutral daylight after a sustained warm/cool bias
-3. Per scene, state: dominant temperature, saturation level (desaturated /
-   natural / heightened), and where the accent colour appears (one prop, one
-   light source, one wardrobe piece — not everywhere).
-4. Colour must change with the story: if it moves from safety to threat, the
-   palette must visibly migrate. State the migration.
-
-### Forbidden
-- Teal-and-orange grading as a default.
-- Fully saturated "vivid colours" everywhere.
-- A static palette across an arc that emotionally moves.
-- Accent colour on more than one element per scene.
-
----
-
 ## Output — Storyboard mode
 
 Return **exactly one** fenced ```json block, with the **same schema** as the

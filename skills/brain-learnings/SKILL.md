@@ -92,3 +92,9 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-11 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Identify the prompt node using get_workflow_node_info, then use update_workflow to patch the positive prompt directly into that node's value field before validation.
 
 2026-06-11 | LoadImage validation fails when reference image files don't exist in dev environment but exist on production system | Proceed with workflow handoff via signal_workflow_ready even if LoadImage validation fails in dev; the files will load correctly on the production system where they exist at the specified absolute paths.
+
+2026-06-11 | CLIPLoader model paths require full subfolder prefix in validation | Use get_node_schema to identify correct model paths (e.g., 'FLUX2\qwen_3_4b.safetensors' not 'qwen_3_4b.safetensors') before patching via update_workflow.
+
+2026-06-11 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Use get_workflow_node_info to identify the prompt injection node (e.g., PrimitiveStringMultiline), then patch via update_workflow directly into that node's value field.
+
+2026-06-11 | LoadImage validation fails when image path lacks subfolder prefix in ComfyUI input | Qualify filename with full subfolder path (e.g., 'agent/references/filename.png') matching the ComfyUI input directory structure to resolve custom_validation_failed errors.
