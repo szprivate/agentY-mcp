@@ -1,72 +1,8 @@
 {
   "comfyui_url": "http://127.0.0.1:8188",
-  "system_prompts": {
-    "researcher": "system_prompt.researcher.md",
-    "brain": "system_prompt.brain.md",
-    "triage": "system_prompt.triage.md",
-    "planner": "system_prompt.planner.md",
-    "error_checker": "system_prompt.error_checker.md",
-    "info": "system_prompt.info.md",
-    "learnings": "system_prompt.learnings.md",
-    "qa_checker": "system_prompt.qaChecker.md",
-    "vision_agent": "system_prompt.vision_agent.md",
-    "story": "system_prompt.story.md",
-    "scout": "system_prompt.scout.md",
-    "dop": "system_prompt.dop.md"
-  },
   "comfyui_models_dir": "L:\\software\\comfyui\\Models",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
   "output_dir": "./output_images/",
   "output_workflows_dir": "./output_workflows/",
-  "comfyui_user_dir": "D:\\ai\\ComfyUI\\user\\default",
-  "chainlit_datalayer_dir": "D:\\AI\\agentY\\chainlit-datalayer",
-  "message_history_log": "./.logs/message_history.log",
-  "tokens_usage_log": "./.logs/tokens_usage.log",
-
-  "director": {
-    // Storyboard director: max Vision-QA attempts per visual step before asking
-    // the user whether to keep retrying (env override: DIRECTOR_AUTO_RETRIES).
-    "auto_retries": 2,
-    // Default for the per-step user-approval gate: true = pause for approval after
-    // each step; false / 0 = run fully autonomously. A request in the user's
-    // message (e.g. "ask me for approval" or "run autonomously") overrides this
-    // per-run. (env override: DIRECTOR_USER_APPROVAL_STEP)
-    "user_approval_step": false,
-    // Run the DoP (Director of Photography) pass over the finished storyboard
-    // before generation: rewrites every start frame + shot with concrete
-    // lighting/composition/camera/colour. true = on (default), false / 0 = off.
-    // A request in the user's message (e.g. "skip cinematography") overrides this
-    // per-run. (env override: DIRECTOR_APPLY_CINEMATOGRAPHY)
-    "apply_cinematography": true
-  },
-
-  "llm": {
-    
-    "pipeline": {
-      "researcher": "claude,claude-haiku-4-5",
-      "brain": "claude,claude-haiku-4-5",
-      "triage": "claude,claude-haiku-4-5",
-      "info": "claude,claude-haiku-4-5",
-      "story": "claude,claude-haiku-4-5",
-      "scout": "claude,claude-haiku-4-5",
-      "dop": "claude,claude-haiku-4-5",
-      "planner": "claude,claude-haiku-4-5",
-      "learnings": "claude,claude-haiku-4-5",
-      "error_checker": "claude,claude-haiku-4-5",
-      "build_skill": "claude,claude-haiku-4-5",
-      "llm_functions": "gemma4:12b",
-      "executor_vision_model": "gemma4:12b"
-    },
-
-    "ollama": {
-      "host": "http://localhost:11434"
-    },
-
-    "anthropic": {
-      "model": "claude-haiku-4-5",
-      "max_tokens": 16384
-    },
-
-    "history_window": 12
-  }
+  "comfyui_user_dir": "D:\\ai\\ComfyUI\\user\\default"
 }

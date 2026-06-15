@@ -4,7 +4,7 @@ import json
 import subprocess
 import sys
 
-from strands import tool
+from src.tools._compat import tool
 
 
 @tool

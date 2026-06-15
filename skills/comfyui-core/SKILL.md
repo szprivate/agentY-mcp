@@ -1,7 +1,7 @@
 ---
 name: comfyui-core
 description: Core ComfyUI knowledge — workflow JSON format, node connection semantics, data types, pipeline patterns, and agentY tool usage. Activate whenever building or patching a workflow.
-allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, signal_workflow_ready, duplicate_workflow, get_node_schema, search_nodes, interrupt_execution, free_memory
+allowed-tools: get_workflow_catalog, get_workflow_template, update_workflow, execute_workflow, execute_workflows_batch, duplicate_workflow, get_node_schema, search_nodes, interrupt_execution, free_memory
 ---
 
 # ComfyUI Core Knowledge
@@ -168,9 +168,14 @@ SetLatentNoiseMask (samples, mask) → LATENT → KSampler.latent_image
 
 **If `update_workflow` returns an error:** read the message, fix the patches, and retry immediately.
 
-### Signalling Completion
+### Running the workflow
 
-- **`signal_workflow_ready(workflow_path)`** — call as the **final** tool call once the workflow is fully assembled and validated. This hands off to the Executor. Never call this before all patches are applied.
+- **`execute_workflow(workflow_path, brainbriefing_json)`** — call once the workflow
+  is fully assembled and validated. It submits the workflow to ComfyUI, waits for
+  completion, and returns the output image(s) (or sampled video frames) so you can QA
+  the result directly. Never call it before all patches are applied and validation passes.
+- **`execute_workflows_batch([...paths...], brainbriefing_json)`** — run several
+  workflow copies (batch/variations) in one call. See the `batch-handoff` skill.
 - **`duplicate_workflow(source_path)`** — create a copy of a workflow with a fresh random seed. Use for batch/variation runs before patching each copy independently.
 
 ### Node Inspection
@@ -205,4 +210,4 @@ SetLatentNoiseMask (samples, mask) → LATENT → KSampler.latent_image
 3. **Missing VAE**: CheckpointLoaderSimple has 3 outputs — MODEL(0), CLIP(1), VAE(2)
 4. **Wrong output index**: Verify the node's output order with `get_node_schema` before wiring
 5. **Patching unknown node IDs**: Cross-reference node IDs against `io.nodes` from `get_workflow_template` — never guess IDs
-6. **Calling `signal_workflow_ready` too early**: All patches must be applied and `update_workflow` must return success before signalling
+6. **Calling `execute_workflow` too early**: All patches must be applied and `update_workflow` / `validate_workflow` must return success before executing

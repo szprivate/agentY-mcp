@@ -37,7 +37,7 @@ from tqdm import tqdm
 from src.utils.model_node_mapping import NODE_TO_FOLDER, get_storage_path
 from src.utils.progress_signal import push as _push_progress
 from src.utils.secrets import get_secret
-from strands import tool
+from src.tools._compat import tool
 
 logger = logging.getLogger(__name__)
 

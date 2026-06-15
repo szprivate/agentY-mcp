@@ -1,84 +1,51 @@
 ---
 name: feedback-loop
-description: Handle follow-up requests when triage routes directly to Brain (no Researcher pass). Activated for param_tweak, chain, and correction intents.
-allowed-tools: 
+description: Handle a follow-up request that refines, tweaks, chains from, or corrects a generation you produced earlier in the conversation. Activate when the user reacts to a previous result (e.g. "make it darker", "higher resolution", "different seed", "now upscale it", "turn it into a video", "that's the wrong style") instead of starting a brand-new task.
 ---
 
-# Feedback Loop — Follow-up Request Handler
+# Follow-up request handler
 
-Activate this skill whenever the incoming prompt starts with:
-> **Follow-up request (intent: `param_tweak` | `chain` | `feedback`)**
+A follow-up builds on something you already generated in this conversation. You
+already have the prior workflow path, the brainbriefing, the input paths, and the
+output paths from your earlier tool calls — reuse them instead of starting over.
 
-The conversation summary block at the top of your context provides:
-- `TASK` — what was done in the prior round
-- `TEMPLATE` — the workflow template used
-- `WORKFLOW_FILE` — the archived final workflow JSON (full path on disk)
-- `INPUT_PATHS` — original input images/videos
-- `OUTPUT_PATHS` — generated outputs from the prior round
-- `STATUS` / `ERRORS` — outcome of the prior round
+## Tweak (adjust parameters of the last run)
 
----
+The user wants to change style, resolution, seed, strength, steps, cfg, prompt, LoRA,
+etc., without changing the overall task.
 
-## Intent: `param_tweak`
+1. Reuse the prior workflow file on disk (the path your earlier `get_workflow_template`
+   / `save_workflow` / `update_workflow` returned). Do NOT reload the template fresh.
+2. Identify exactly which parameter(s) to change from the user's message.
+3. `patch_workflow(workflow_path, patches)` with only the targeted changes.
+4. `validate_workflow(workflow_path)` and fix any errors.
+5. `execute_workflow(workflow_path, brainbriefing_json)` and inspect the returned image(s).
 
-The user wants to adjust one or more parameters of the last run (style, resolution, seed, strength, steps, cfg, prompt, LoRA, etc.) without changing the overall task.
+Examples: "more saturated" → cfg/prompt; "different seed" → seed node; "higher
+resolution" → width/height nodes; "add a LoRA" → patch/add a LoRA loader node.
 
-**Steps:**
+## Chain (pipe the last output into a new workflow)
 
-1. Read `WORKFLOW_FILE` from the summary — this is the patched workflow on disk, ready to re-use.
-2. Identify exactly which parameter(s) the user wants to change from their message.
-3. Call `patch_workflow(WORKFLOW_FILE, patches)` with only the targeted changes.
-   - Do NOT reload the template from scratch — patch the existing archived workflow.
-4. Call `validate_workflow(WORKFLOW_FILE)` and fix any errors.
-5. Call `submit_prompt(WORKFLOW_FILE)` → `get_prompt_status_by_id(prompt_id)` once.
-6. Vision QA runs automatically via the pipeline executor.
+"Now upscale it", "turn it into a video", "make a 3D model from it".
 
-**Example tweaks:**
-- "make it more saturated" → adjust cfg or prompt
-- "use a different seed" → patch the seed node
-- "higher resolution" → patch width/height nodes
-- "add a LoRA" → patch or add LoRA loader node
+1. Use the previous run's output file(s) as input: `upload_image(file_path=<prior output>)`.
+2. Select the new template (`workflow-templates` skill) and build a fresh brainbriefing
+   for the new task, following `comfyui-generate` steps 1–6, with the uploaded files as
+   `input_nodes`.
+3. Execute and inspect the result.
 
----
+## Correction (fix a mistake you made)
 
-## Intent: `chain`
+Wrong template, wrong model, bad output, or a failed tool call.
 
-The user wants to pipe the last output into a new workflow (e.g., "now upscale it", "turn it into a video", "make a 3D model from it").
+1. From the conversation + `get_logs` (for execution errors), identify the root cause.
+2. Apply the minimum fix — don't redo steps that already succeeded:
+   - Wrong template → re-select and rebuild from step 2 of `comfyui-generate`.
+   - Patch/validation error → re-patch the existing workflow → re-validate → re-execute.
+   - Quality/QA failure → re-run with a different seed or adjusted parameters.
+3. Execute and inspect the result.
 
-**Steps:**
-
-1. Read `OUTPUT_PATHS` from the summary — these are the files to use as input.
-2. Identify the new task type from the user's message.
-3. Activate the **workflow-templates** skill to select the appropriate new template.
-4. Call `get_workflow_template(template_name)` to get the new workflow file path.
-5. Upload input files and assemble the new workflow as normal (follow the Brain's main steps 3–8).
-   - Set INPUT_PATHS from `OUTPUT_PATHS` of the prior round.
-6. Vision QA runs automatically via the pipeline executor.
-
-**No Researcher pass is needed** — the task is unambiguous from context.
-
----
-
-## Intent: `correction`
-
-The user is correcting a mistake the agent made (wrong template, wrong model, bad output, failed tool call, etc.).
-
-**Steps:**
-
-1. Read `ERRORS` and `STATUS` from the summary, plus the user's correction message, to identify the root cause.
-2. Determine the minimum fix:
-   - **Wrong template** → re-select with **workflow-templates** skill and restart from step 2 of the Brain's main flow.
-   - **Patch/validation error** → re-patch `WORKFLOW_FILE` with corrected parameters → re-validate → re-submit.
-   - **Quality failure** → re-run with different seed or adjusted parameters.
-   - **QA failure** → retry from step 7 (Vision QA) using `OUTPUT_PATHS`.
-3. Apply the minimum fix — do not redo steps that succeeded.
-4. Vision QA runs automatically via the pipeline executor.
-
----
-
-## General rules
-
-- Always acknowledge the intent and the prior context briefly (one line) before acting.
+## Rules
+- Briefly acknowledge what you're changing (one line) before acting.
 - Never ask "should I proceed?" — act immediately.
-- Keep status messages concise and include the intent type, e.g. `[param_tweak] patching seed…`.
-- If the summary is missing or `STATUS: error` for unrecoverable reasons, ask the user one clarifying question then proceed.
+- Only ask a clarifying question if the prior context is genuinely unrecoverable.

@@ -1,18 +1,20 @@
 ---
 name: story-storyboard
-description: Mode C of the Story agent — turn a whole storyline into a production blueprint for a short film: a story bible plus the entire story split into Kling multi-shot SEQUENCES of <=10s each, ending with a single machine-readable JSON spec. Activate when the storyboard director (or the user) asks for a short-film / storyboard breakdown to be rendered as video sequences.
+description: Turn a whole storyline into a production blueprint for a short film: a story bible plus the entire story split into Kling multi-shot SEQUENCES of <=10s each, ending with a single machine-readable JSON spec. Activate when the user asks for a short-film / storyboard breakdown to be rendered as video sequences.
 allowed-tools:
 ---
 
-# Storyboard Breakdown — Mode C
+# Storyboard Breakdown
 
-Turn an entire storyline into the textual blueprint for a short film. The
-blueprint is consumed by a downstream director that generates a character sheet,
-a start-frame image per sequence, and a Kling multi-shot video per sequence.
+Turn an entire storyline into the textual blueprint for a short film. You then
+render the blueprint by generating a character sheet, a start-frame image per
+sequence, and a Kling multi-shot video per sequence (via the `comfyui-generate`
+and `kling-multishot` skills).
 
-You write **text only** — you never generate media. Your job is two things:
+First write **text only** — produce two things:
 1. A readable **story bible + prose breakdown**, then
-2. A **single trailing JSON block** (the machine contract the director parses).
+2. A **single trailing JSON block** (the machine-readable contract you act on when
+   rendering each sequence).
 
 This mode extends Mode B (`story-scene`): same consistency discipline, but the
 shots are additionally **grouped into Kling sequences** and emitted as JSON.
@@ -29,7 +31,7 @@ the element reappears (paraphrasing breaks visual consistency downstream):
   (approximate age, build, hair, skin, wardrobe, 1–2 distinguishing features).
   This exact string is the **character lock** — copy it, never reword it. Track
   how many **shots** each character appears in across the whole script (this
-  drives whether the director makes a multi-angle chart for them).
+  drives whether you make a multi-angle chart for them).
 - **Locations / props** — fixed descriptions of recurring places and key objects
   (materials, colour, condition).
 

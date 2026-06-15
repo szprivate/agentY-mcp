@@ -20,8 +20,10 @@ from __future__ import annotations
 import threading
 from collections import deque
 
+# Bounded so a long-running MCP server (whose consumer no longer drains this
+# buffer) cannot accumulate progress lines without limit.
 _lock: threading.Lock = threading.Lock()
-_lines: deque[str] = deque()
+_lines: deque[str] = deque(maxlen=200)
 
 
 def push(line: str) -> None:

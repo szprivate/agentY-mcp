@@ -1,6 +1,6 @@
 ---
 name: kling-multishot
-description: Kling 3.0 multi-shot storyboard (template Kling3_multiShot). Activate in the Researcher when the selected template is Kling3_multiShot — overrides the standard prompt-craft step. Activate in the Brain during assembly of the Kling3_multiShot template to patch storyboard nodes correctly.
+description: Kling 3.0 multi-shot storyboard (template Kling3_multiShot). Activate when the selected template is Kling3_multiShot — use its prompt-composition rules instead of the standard prompt-craft step, and its assembly rules to patch the storyboard nodes correctly.
 allowed-tools: update_workflow, get_workflow_template
 ---
 

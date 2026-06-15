@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agentY": {
+      "command": "D:\\AI\\agentY-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "src"],
+      "cwd": "D:\\AI\\agentY-mcp",
+      "env": {
+        "HF_TOKEN": "hf_your_token_here",
+        "COMFYUI_API_KEY": ""
+      }
+    }
+  }
+}

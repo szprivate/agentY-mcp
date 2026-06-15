@@ -18,26 +18,10 @@ from typing import TYPE_CHECKING, Literal, Optional
 
 import requests
 from PIL import Image
-from strands import Agent, tool
+from mcp.server.fastmcp import Image as MCPImage
 
+from src.tools._compat import tool
 from src.utils.comfyui_client import get_client
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Vision agent registry – injected by the pipeline at startup
-# ─────────────────────────────────────────────────────────────────────────────
-
-_vision_agent: Optional[Agent] = None
-
-
-def set_vision_agent(agent: Agent) -> None:
-    """Register the shared Vision :class:`~strands.Agent` used by :func:`analyze_image`.
-
-    Call this once during pipeline initialisation before any ``analyze_image``
-    invocations that use ``mode='describe'``.
-    """
-    global _vision_agent
-    _vision_agent = agent
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -378,31 +362,24 @@ def analyze_image(
     image_url: str = "",
     question: str = "",
     mode: Literal["describe", "full"] = "describe",
-) -> dict:
-    """Load an image from a local file or URL and analyse it.
+) -> object:
+    """Return an image so you can view and analyse it directly.
+
+    Provide either a local ``file_path`` or a public ``image_url`` (not both).
+    The image is auto-downsized to satisfy the 5 MB / 1568 px vision limits and
+    returned as image content you can see natively — use it to QA a generated
+    output against the request, compare an edit against its source, or read a
+    web/reference image.
 
     Supported formats: PNG, JPEG/JPG, GIF, WEBP.
-    Images are automatically downsized to satisfy Claude's 5 MB / 1568 px constraints.
-
-    Two analysis modes are available:
-
-    * ``mode='describe'`` **(default, recommended)**: The image is sent to an
-      isolated Vision Agent call that returns a plain-text description.  No image
-      bytes enter the Researcher's context window (~10K tokens vs ~600K).
-    * ``mode='full'``: Legacy behaviour – returns the raw image bytes so the
-      Researcher can reason over pixels directly (~600K tokens).  Use only when
-      precise spatial or identity comparison is needed.
 
     Args:
         file_path: Absolute or relative path to a local image file.
-                   Provide either this or ``image_url`` – not both.
         image_url: Public http/https URL of an image to download.
-        question:  Specific question or aspect to focus on when analysing the image.
-        mode:      ``'describe'`` (default) or ``'full'``.
-
-    Use ``mode='describe'`` unless you need pixel-level reasoning (e.g. comparing
-    two images for identical content, precise spatial positioning, or explicit
-    user request for raw pixel analysis).
+        question:  Optional note describing what to focus on; echoed back as a
+                   caption (you answer from the returned pixels).
+        mode:      Accepted for backward compatibility and ignored — you now view
+                   the image directly instead of delegating to a vision sub-model.
     """
     data: Optional[bytes] = None
     source_name = ""
@@ -465,77 +442,14 @@ def analyze_image(
             f"(final size: {len(data):,} bytes). Try a smaller or simpler image."
         )}]}
 
-    # ── describe mode: isolated Vision Agent call (token-efficient) ─────────
-    if mode == "describe":
-        print(
-            f"[analyze_image] mode=describe  src={source_name}  "
-            f"size={len(data):,}B  est_tokens=~{len(data)//400:,} (describe) "
-            f"vs ~{len(data)*4//100:,} (full)"
-        )
-        if _vision_agent is None:
-            # No vision agent registered – fall back to full mode with a warning.
-            print(
-                "[analyze_image] WARNING: no VisionAgent registered; "
-                "falling back to mode='full'. Call set_vision_agent() during pipeline init."
-            )
-        else:
-            try:
-                # Strands-native ContentBlock format for multimodal input.
-                # OllamaModel expects {"image": {"format": ..., "source": {"bytes": <raw bytes>}}}.
-                user_message = [
-                    {
-                        "image": {
-                            "format": img_fmt,
-                            "source": {"bytes": data},
-                        }
-                    },
-                    {"text": question or "Describe this image in detail."},
-                ]
-                # Wipe history so every invocation is fully independent.
-                _vision_agent.messages.clear()
-                vision_result = str(_vision_agent(user_message))
-                print(f"[analyze_image] describe result length: {len(vision_result):,} chars")
-                label = source_name if source_name else "provided image"
-                return {
-                    "status": "success",
-                    "content": [
-                        {
-                            "text": (
-                                f"Image analysis for {label}:\n\n{vision_result}"
-                            )
-                        }
-                    ],
-                }
-            except Exception as exc:
-                print(
-                    f"[analyze_image] WARNING: VisionAgent call failed ({exc}); "
-                    "falling back to mode='full'."
-                )
-                # Fall through to full mode below.
-
-    # ── full mode (or fallback): return bytes in context ─────────────────────
-    print(
-        f"[analyze_image] mode=full  src={source_name}  "
-        f"size={len(data):,}B  est_tokens=~{len(data)*4//100:,}"
-    )
-    info_parts = [
-        f"Image loaded from: {source_name}",
-        f"Format: {img_fmt.upper()}, Size: {len(data):,} bytes",
+    # Return the (downsized) image as MCP image content so the multimodal model
+    # can view it directly. ``mode`` is ignored — there is no vision sub-model.
+    caption_parts = [
+        f"Image from: {source_name}",
+        f"Format: {img_fmt.upper()}, {len(data):,} bytes",
     ]
     if downsized:
-        info_parts.append(f"(downsized from {original_size:,} bytes to fit API limits)")
+        caption_parts.append(f"(downsized from {original_size:,} bytes to fit vision limits)")
     if question:
-        info_parts.append(f"\nUser question: {question}")
-
-    return {
-        "status": "success",
-        "content": [
-            {"text": "\n".join(info_parts)},
-            {
-                "image": {
-                    "format": img_fmt,
-                    "source": {"bytes": data},
-                }
-            },
-        ],
-    }
+        caption_parts.append(f"Focus: {question}")
+    return ["\n".join(caption_parts), MCPImage(data=data, format=img_fmt)]

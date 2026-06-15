@@ -1,6 +1,6 @@
 ---
 name: prompt-craft
-description: ComfyUI prompt engineering — CLIP syntax, weight modifiers, model-specific strategies. Activate whenever the Researcher composes the generation prompt (step 7).
+description: ComfyUI prompt engineering — CLIP syntax, weight modifiers, model-specific strategies. Activate whenever you compose the generation prompt for a workflow.
 allowed-tools:
 ---
 

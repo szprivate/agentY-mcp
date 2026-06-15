@@ -1,6 +1,6 @@
 ---
 name: output-paths
-description: Static task-type â†’ output_path mapping for brainbriefing output_nodes. Activate during step 6 (Identify output nodes) to set the correct output_path for each output node.
+description: Static task-type to output_path mapping for brainbriefing output_nodes. Activate when setting the output_path for each output node in the brainbriefing.
 allowed-tools: get_workflow_template
 ---
 

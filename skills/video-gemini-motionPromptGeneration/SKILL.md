@@ -47,7 +47,7 @@ Always upload input files via `LoadVideo` before patching.
 
 1. Image video uploaded and patched into nodes `4`.
 
-If all pass → `signal_workflow_ready(workflow_path)`.
+If all pass → `validate_workflow(workflow_path)`, then `execute_workflow(workflow_path, brainbriefing_json)`.
 
 ---
 

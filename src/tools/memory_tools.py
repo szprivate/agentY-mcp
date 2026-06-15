@@ -13,7 +13,7 @@ requiring it as an argument in every LLM call.
 
 from __future__ import annotations
 
-from strands import tool
+from src.tools._compat import tool
 
 from src.utils.memory import format_memories, memory_add, memory_search
 

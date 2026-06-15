@@ -1,6 +1,6 @@
 ---
 name: upscale-ultimatesd
-description: Ultimate SD upscaler on Flux1-dev fp8 (template upscale_ultimateSD). Activate in the Researcher when the selected template is upscale_ultimateSD. Activate in the Brain during assembly of the upscale_ultimateSD template to patch the UltimateSDUpscale node, ensure the Flux1-dev fp8 checkpoint is present (download from HuggingFace if missing), and wire the LoadImage input + SaveImage output correctly.
+description: Ultimate SD upscaler on Flux1-dev fp8 (template upscale_ultimateSD). Activate when the selected template is upscale_ultimateSD — patch the UltimateSDUpscale node, ensure the Flux1-dev fp8 checkpoint is present (download from HuggingFace if missing), and wire the LoadImage input + SaveImage output correctly.
 allowed-tools: update_workflow, get_workflow_template, check_model, download_hf_model, search_huggingface_models, get_model_info
 ---
 

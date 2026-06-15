@@ -138,8 +138,8 @@ update_workflow(workflow_path, patches=<patches_json>, add_nodes=<add_nodes_json
 
 ## Rules
 
-- **Never guess model file names** — model paths come from the brainbriefing (Researcher-verified). Never look them up here.
+- **Never guess model file names** — use the model paths you verified with `check_model` for the brainbriefing. Don't re-resolve them here.
 - **Never reuse node IDs** that appear in `remove_nodes` — assign fresh IDs to all added nodes.
 - **Always wire output nodes** (`SaveImage`, `VHS_VideoCombine`, etc.) to the final IMAGE/LATENT/AUDIO output of the pipeline. An unconnected output node will cause a validation failure.
 - **All connections must be type-safe** — verify output index and type via `get_node_schema` when unsure. See `comfyui-core` references/common-nodes.md for standard node types.
-- **`signal_workflow_ready` is NOT called in this skill** — return `workflow_path` to the Brain, which handles handoff per its step 2 constraints.
+- **Execution is NOT done in this skill** — once the workflow is built and `save_workflow` returns a `workflow_path`, return to the `comfyui-generate` flow (validate, then `execute_workflow`).

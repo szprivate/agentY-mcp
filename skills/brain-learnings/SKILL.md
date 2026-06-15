@@ -53,11 +53,11 @@ If a matching entry exists, **apply the documented solution directly** instead o
 
 2026-06-08 | LoadImage validation fails when filename lacks subfolder prefix in ComfyUI | Qualify the filename with its full subfolder path (e.g., 'agent/image_generation_00003_.png') when patching LoadImage nodes to match ComfyUI input directory structure.
 
-2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-shot template | Non-blocking validation error; multi-shot Kling nodes embed prompts directly. Skip apply_brainbriefing for positive prompt and proceed to signal_workflow_ready if node 12 multi_shot fields are patched.
+2026-06-08 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-shot template | Non-blocking validation error; multi-shot Kling nodes embed prompts directly. Skip apply_brainbriefing for positive prompt and proceed to execute_workflow if node 12 multi_shot fields are patched.
 
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Inspect workflow with get_workflow_node_info to locate the prompt injection node, then use update_workflow to patch the positive prompt directly into that node's value field.
 
-2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Kling multi-shot templates | For Kling nodes with embedded prompts, skip apply_brainbriefing for positive prompts. Instead, patch multi_shot.storyboard_N_prompt fields directly via update_workflow before calling signal_workflow_ready.
+2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Kling multi-shot templates | For Kling nodes with embedded prompts, skip apply_brainbriefing for positive prompts. Instead, patch multi_shot.storyboard_N_prompt fields directly via update_workflow before calling execute_workflow.
 
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in Gemini-based templates | Identify the prompt node using get_workflow_node_info, then patch the positive prompt directly into that node's value field via update_workflow instead of relying on apply_brainbriefing.
 
@@ -69,7 +69,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 
 2026-06-09 | apply_brainbriefing fails when positive_prompt_node_id is null in multi-node prompt pipelines | Identify the prompt injection node using get_workflow_node_info, then patch it directly via update_workflow targeting the specific node's input field (e.g., node 5 value for grid prompts).
 
-2026-06-10 | apply_brainbriefing fails with null positive_prompt_node_id on Kling templates | For Kling3_multiShot, inject prompts directly into node 12 via update_workflow patches to multi_shot.storyboard_N_prompt fields; skip apply_brainbriefing positive prompt injection and proceed to signal_workflow_ready.
+2026-06-10 | apply_brainbriefing fails with null positive_prompt_node_id on Kling templates | For Kling3_multiShot, inject prompts directly into node 12 via update_workflow patches to multi_shot.storyboard_N_prompt fields; skip apply_brainbriefing positive prompt injection and proceed to execute_workflow.
 
 2026-06-11 | Multi-shot template apply_brainbriefing fails when positive_prompt_node_id is null | For Kling3_multiShot, patch shot prompts directly to node 12 via update_workflow before calling apply_brainbriefing. Skip positive prompt in apply_brainbriefing; it will report "no matching node found" but workflow remains valid.
 
@@ -78,7 +78,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 2026-06-11 | Kling multi-shot storyboard prompts require continuity cues between consecutive shots | Structure each shot prompt with explicit transition language (e.g., "Continuous from previous shot", "Immediately following") to ensure the model generates seamless multi-shot sequences without discontinuity.
 
 2026-06-11 | Shot 6 prompt exceeds 512-char limit in Kling multishot template | Condense narrative details while preserving spatial framing (foreground/midground/background composition) and core story beats; prioritize camera POV and action over descriptive flourish.
-2026-06-11 | apply_brainbriefing skips positive prompt when positive_prompt_node_id is null in Kling3_multiShot | For Kling multishot templates, patch individual shot prompts directly via update_workflow to multi_shot.storyboard_N_prompt fields; skip positive prompt patching in apply_brainbriefing and proceed to signal_workflow_ready.
+2026-06-11 | apply_brainbriefing skips positive prompt when positive_prompt_node_id is null in Kling3_multiShot | For Kling multishot templates, patch individual shot prompts directly via update_workflow to multi_shot.storyboard_N_prompt fields; skip positive prompt patching in apply_brainbriefing and proceed to execute_workflow.
 
 2026-06-11 | Kling API enforces 3-second minimum duration constraint, not 2 seconds | When targeting Kling i2v generation, verify API duration limits (min=3, max=15 seconds) early. Adjust brainbriefing duration expectations or inform user that requested 2-second duration will be rounded up to 3 seconds minimum.
 
@@ -91,7 +91,7 @@ If a matching entry exists, **apply the documented solution directly** instead o
 
 2026-06-11 | apply_brainbriefing fails when positive_prompt_node_id is null in template | Identify the prompt node using get_workflow_node_info, then use update_workflow to patch the positive prompt directly into that node's value field before validation.
 
-2026-06-11 | LoadImage validation fails when reference image files don't exist in dev environment but exist on production system | Proceed with workflow handoff via signal_workflow_ready even if LoadImage validation fails in dev; the files will load correctly on the production system where they exist at the specified absolute paths.
+2026-06-11 | LoadImage validation fails when reference image files don't exist in dev environment but exist on production system | Proceed with workflow handoff via execute_workflow even if LoadImage validation fails in dev; the files will load correctly on the production system where they exist at the specified absolute paths.
 
 2026-06-11 | CLIPLoader model paths require full subfolder prefix in validation | Use get_node_schema to identify correct model paths (e.g., 'FLUX2\qwen_3_4b.safetensors' not 'qwen_3_4b.safetensors') before patching via update_workflow.
 

@@ -9,7 +9,7 @@ provides simple alternatives that work with any Strands-compatible model.
 import json
 from pathlib import Path
 
-from strands import tool
+from src.tools._compat import tool
 
 
 @tool
