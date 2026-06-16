@@ -1,0 +1,13 @@
+{
+  "name": "agentY",
+  "description": "agentY - ComfyUI image/video tools + skills, as a self-contained Claude plugin (vendored Python runtime).",
+  "owner": { "name": "szprivate", "url": "https://github.com/szprivate/agentY-mcp" },
+  "plugins": [
+    {
+      "name": "agenty",
+      "source": "./dist/agentY-plugin/agenty",
+      "description": "agentY MCP server (49 ComfyUI tools) + all agentY skills, self-contained with a vendored Python runtime.",
+      "category": "media"
+    }
+  ]
+}
