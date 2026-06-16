@@ -66,29 +66,45 @@ def _write_catalog(path: Path, obj: dict) -> None:
 def register_workflow_template(workflow_file: str, index_path: str = "") -> str:
     """Register a custom ComfyUI workflow JSON as a reusable template.
 
-    In-process equivalent of ``scripts/add_workflow.ps1``. It:
-      1. Parses the workflow file and appends/updates its entry (name, models,
-         io) in the custom-templates ``index.json``.
-      2. Adds the template name — the workflow file's stem — as a key in
+    In-process equivalent of ``scripts/add_workflow.ps1``, extended so a workflow
+    can be registered directly from any location (e.g. a file just pasted/saved
+    by the user) without manually placing it first. It:
+      1. Loads the workflow and, if it is in ComfyUI **graph/export format**
+         (rather than API format), auto-converts it to API format using the same
+         converter as ``_load_workflow`` (``_convert_graph_to_api``).
+      2. Copies the (converted) workflow JSON into the custom-templates directory
+         as ``<name>.json`` so ``get_workflow_template`` can load it later.
+      3. Parses it and appends/updates its entry (name, models, io) in the
+         custom-templates ``index.json``.
+      4. Adds the template name — the workflow file's stem — as a key in
          ``config/workflow_templates.json`` (the catalog) with an empty
          description, so it appears in ``get_workflow_catalog()``.
 
     The template name is always the file stem (e.g. ``my_flow`` for
     ``my_flow.json``). Registering a name that already exists is refused, exactly
-    like the script. The workflow JSON file itself is **not** copied — place it in
-    the custom-templates directory so ``get_workflow_template`` can load it later.
+    like the script.
+
+    Note: graph→API conversion maps widget values to named inputs using the live
+    ComfyUI node schema. If ComfyUI is unreachable the conversion still succeeds
+    but raw widget values are kept under ``__widgets_values`` — re-register once
+    ComfyUI is running for a fully named API workflow.
 
     Args:
         workflow_file: Path to the ComfyUI workflow ``.json`` (API or graph
             format). Relative paths resolve against the repository root.
         index_path: Optional override for the ``index.json`` path. Empty (default)
-            uses the configured custom-templates index.
+            uses the configured custom-templates index. The JSON is copied next to
+            this index.
 
     Returns:
-        JSON summary with the parsed entry, the index path written, and whether
-        the catalog was updated — or ``{"error": ...}``.
+        JSON summary with the parsed entry, the index path written, the path the
+        JSON was copied to, whether it was converted from graph format, and
+        whether the catalog was updated — or ``{"error": ...}``.
     """
     try:
+        # Lazy import to avoid import-time side effects / any cycle.
+        from src.tools.comfyui import _convert_graph_to_api, _is_graph_format
+
         root = _project_root()
         p = Path(workflow_file)
         if not p.is_absolute():
@@ -108,6 +124,27 @@ def register_workflow_template(workflow_file: str, index_path: str = "") -> str:
                 workflow = json.load(f)
         except json.JSONDecodeError as e:
             return json.dumps({"error": f"Invalid workflow JSON: {e}"})
+
+        # Auto-convert graph/export format → API format.
+        converted = False
+        if _is_graph_format(workflow):
+            workflow = _convert_graph_to_api(workflow)
+            converted = True
+
+        # Copy the (converted) workflow into the custom-templates directory so
+        # get_workflow_template / _fetch_template can load it by name.
+        dest_dir = idx.parent
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{name}.json"
+        if converted:
+            # Persist the converted API-format workflow.
+            dest.write_text(
+                json.dumps(workflow, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        elif p.resolve() != dest.resolve():
+            # Already API format and not already in place — copy verbatim.
+            shutil.copy2(p, dest)
 
         entry = parse_workflow(
             workflow,
@@ -129,11 +166,15 @@ def register_workflow_template(workflow_file: str, index_path: str = "") -> str:
             {
                 "registered": name,
                 "index_path": str(idx),
+                "copied_to": str(dest),
+                "converted_from_graph_format": converted,
                 "entry": entry,
                 "catalog_updated": catalog_updated,
                 "catalog_path": str(catalog_path),
                 "message": (
-                    f"Registered '{name}'. "
+                    f"Registered '{name}'"
+                    + (" (converted graph→API format)" if converted else "")
+                    + f". Copied workflow to {dest}. "
                     + (
                         "Added to catalog with an empty description — set a description in "
                         "config/workflow_templates.json so get_workflow_catalog() describes it."
