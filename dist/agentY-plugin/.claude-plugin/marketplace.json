@@ -1,0 +1,13 @@
+{
+  "name": "agentY",
+  "description": "agentY plugin marketplace (single self-contained plugin: agenty).",
+  "owner": { "name": "szprivate", "url": "https://github.com/szprivate/agentY" },
+  "plugins": [
+    {
+      "name": "agenty",
+      "source": "./agenty",
+      "description": "agentY MCP server (49 ComfyUI tools) + all agentY skills, self-contained with a vendored Python runtime.",
+      "category": "media"
+    }
+  ]
+}

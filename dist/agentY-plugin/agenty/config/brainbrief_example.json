@@ -1,0 +1,52 @@
+{
+  "status": "ready | blocked",
+  "blockers": [],
+  "task": {
+    "type": "image edit | image generation | video flf | video i2v | video v2v | audi | ",
+    "description": "one sentence"
+  },
+  "template": {
+    "name": "... or null"
+  },
+  "input_images": [
+    {
+      "filename": "..."
+    }
+  ],
+  "input_nodes": [
+    {
+      "node_id": "25",
+      "filename": "...",
+      "role": "master_image | reference_image | mask | depth_map | control_image",
+      "node": "VHS_LoadImagePath",
+      "slot": "image",
+      "path": "path to the image"
+    }
+  ],
+  "input_image_count": 0,
+  "output_nodes": [
+    {
+      "node_id": "42",
+      "node": "SaveImage",
+      "output_path": "./agentOut/image_generation"
+    }
+  ],
+  "resolution_width": "width", 
+  "resolution_height": "height",
+  "prompt": {
+    "positive": "...",
+    "negative": "... or null"
+  },
+  "prompt_nodes": [
+    {
+      "node_id": "6",
+      "role": "positive | negative",
+      "slot": "text",
+      "node": "CLIPTextEncode"
+    }
+  ],
+  "count_iter": 1,
+  "variations": false,
+  "positive_prompt_node_id": "6",
+  "notes_for_executor": "..."
+}

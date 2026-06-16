@@ -23,7 +23,7 @@
     "type": "python",
     "entry_point": "src/mcp_server.py",
     "mcp_config": {
-      "command": "python",
+      "command": "${__dirname}\\runtime\\python.exe",
       "args": [
         "-m",
         "src"
