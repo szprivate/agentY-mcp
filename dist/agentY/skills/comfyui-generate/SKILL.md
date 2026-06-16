@@ -24,6 +24,11 @@ tool call.
 - **Batch / variations** (same workflow run N times) → set `count_iter > 1`;
   for distinct prompts per run set `variations: true` and use the `image-batch`
   skill, then `execute_workflows_batch`.
+- **Bulk over many inputs** (a folder of files, or several attached images/videos
+  run through one workflow or a chain of workflows — "process this folder", "do
+  the same to each", "upscale all of these") → use the `batch-process` skill. It
+  assembles each stage once and hands the whole set to a headless background
+  worker you poll for progress, instead of running steps 1–6 per file.
 - **Annotated image** (user drew/circled/marked on an image) → activate the
   `annotation` skill instead of the normal input/template steps.
 - **Follow-up on a previous result** ("make it darker", "now 16:9") → reuse the

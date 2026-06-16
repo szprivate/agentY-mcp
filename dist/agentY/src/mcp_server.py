@@ -64,11 +64,19 @@ _TOOLS = [
     T.replace_node,
     T.apply_brainbriefing,
     T.duplicate_workflow,
+    # ── Template registry (add / remove custom templates) ─────────────────
+    T.register_workflow_template,
+    T.unregister_workflow_template,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────
     T.execute_workflow,
     T.execute_workflows_batch,
+    # ── Headless batch jobs (detached worker, pollable status) ────────────
+    T.start_batch_job,
+    T.get_batch_status,
+    T.stop_batch_job,
+    T.list_batch_jobs,
     T.submit_prompt,
     T.queue,
     T.get_history,

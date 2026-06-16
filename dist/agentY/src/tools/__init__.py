@@ -68,3 +68,13 @@ from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
 from src.tools.web_search import web_search, web_search_images  # noqa: F401
 from src.tools.execution import execute_workflow, execute_workflows_batch  # noqa: F401
+from src.tools.batch import (  # noqa: F401
+    start_batch_job,
+    get_batch_status,
+    stop_batch_job,
+    list_batch_jobs,
+)
+from src.tools.workflow_registry import (  # noqa: F401
+    register_workflow_template,
+    unregister_workflow_template,
+)

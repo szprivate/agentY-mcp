@@ -86,6 +86,10 @@
       "description": "Free GPU/system memory in ComfyUI by unloading models and clearing caches."
     },
     {
+      "name": "get_batch_status",
+      "description": "Return the live progress of a batch job started with start_batch_job."
+    },
+    {
       "name": "get_comfyui_dirs",
       "description": "Return the authoritative ComfyUI server directory paths."
     },
@@ -134,6 +138,10 @@
       "description": "Immediately stop the currently running ComfyUI workflow execution."
     },
     {
+      "name": "list_batch_jobs",
+      "description": "List recent batch jobs (most recent first) with their state and progress."
+    },
+    {
       "name": "memory_read",
       "description": "Search long-term memory for facts relevant to the current task."
     },
@@ -152,6 +160,10 @@
     {
       "name": "read_text_file",
       "description": "Read a text file from disk and return its contents as a plain string."
+    },
+    {
+      "name": "register_workflow_template",
+      "description": "Register a custom ComfyUI workflow JSON as a reusable template (parse into index.json + add to the catalog)."
     },
     {
       "name": "remove_workflow_node",
@@ -178,8 +190,20 @@
       "description": "Search ComfyUI nodes by keyword across names, descriptions, and categories."
     },
     {
+      "name": "start_batch_job",
+      "description": "Launch a headless batch run over many inputs and return its job_id immediately."
+    },
+    {
+      "name": "stop_batch_job",
+      "description": "Stop a running batch job (graceful stop.flag + process terminate fallback)."
+    },
+    {
       "name": "submit_prompt",
       "description": "Submit a workflow to the ComfyUI execution queue. Returns prompt_id and client_id on success."
+    },
+    {
+      "name": "unregister_workflow_template",
+      "description": "Unregister a custom workflow template by name (remove from index.json + catalog, delete its skills/<kebab> dir)."
     },
     {
       "name": "update_workflow",
