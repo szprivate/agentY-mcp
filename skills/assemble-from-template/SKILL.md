@@ -4,7 +4,7 @@ description: Assembles a workfow on the basis of a brainbriefing JSON and a pre-
 allowed-tools: update_workflow, get_workflow_template
 ---
 
-This skill is used whenever the brain agent needs to assemble and patch a workflow from a workflow template pre-selected by the researcher agent. Uses the brainbriefing JSON to retrieve input- and output nodes.
+This skill is used whenever you need to assemble and patch a workflow from a workflow template you have already selected. Uses the brainbriefing JSON to retrieve input- and output nodes.
 
 **General constraints:**
 - Before every tool call, state what you are doing and why.
@@ -37,7 +37,47 @@ Load the workflow template specified in the brainbriefing.
 - You MUST NOT call `save_workflow()` — that tool is only for building entirely new workflows from scratch.
 - `patches` MUST cover: positive prompt, negative prompt, resolution (width/height), input image nodes, output nodes, sampler settings, seed, steps, cfg. Each patch: `{"node_id": "6", "input_name": "text", "value": "..."}`.
   - `width` and `height` MUST come from `brainbriefing.resolution` — never guess.
-- If the workflow contains a **ModelSamplingFlux** node: you MUST activate the `flux-sampling` skill and include all four required inputs in `patches`.
+- If the workflow contains a **ModelSamplingFlux** node: you MUST include all four required inputs in `patches` — see **ModelSamplingFlux patch requirements** at the end of this skill.
 - If `update_workflow` returns `status: "error"`: you MUST read the reported problems, fix the patches, and call `update_workflow` again.
-- If `count_iter > 1` AND `variations == true`: you MUST activate the `image-batch` skill to generate distinct prompts before patching. This corresponds to a **`batch_request`**: the **same workflow template** is executed N times with substituted parameters only — the workflow structure does not change between iterations.
+- If `count_iter > 1` AND `variations == true`: you MUST activate the `batch-handoff` skill (Mode A) to generate distinct prompts before patching. This corresponds to a **`batch_request`**: the **same workflow template** is executed N times with substituted parameters only — the workflow structure does not change between iterations.
 - If you find a `BatchImagesNode` in the workflow template -- call `replace_node(workflow_path, <node_id>, "ImageBatch")` immediately. This tool preserves all connections automatically.
+
+---
+
+## ModelSamplingFlux patch requirements
+
+When the workflow contains a `ModelSamplingFlux` node, all **four inputs** are required. Omitting any one will cause a ComfyUI validation failure.
+
+### Required inputs
+
+| input_name   | required value                                         |
+|--------------|--------------------------------------------------------|
+| `max_shift`  | `1.15`                                                 |
+| `base_shift` | `0.5`                                                  |
+| `width`      | from `brainbriefing.resolution_width`                  |
+| `height`     | from `brainbriefing.resolution_height`                 |
+
+### Patch template
+
+Include these four patches in the `patches` array passed to `update_workflow`:
+
+```json
+[
+  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "max_shift",  "value": 1.15 },
+  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "base_shift", "value": 0.5  },
+  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "width",      "value": <resolution_width>  },
+  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "height",     "value": <resolution_height> }
+]
+```
+
+Replace `<ModelSamplingFlux_node_id>` with the actual node ID from the workflow template. Replace `<resolution_width>` and `<resolution_height>` with the integer values from the brainbriefing.
+
+### How to find the node ID
+
+The `ModelSamplingFlux` node is typically listed in the `io.nodes` array returned by `get_workflow_template`. Look for `class_type: "ModelSamplingFlux"` and note its `nodeId`. If it is not in `io.nodes`, inspect the full workflow JSON for a node with `class_type: "ModelSamplingFlux"`.
+
+### Rules
+
+- You MUST include all four inputs in every `update_workflow` call that patches a ModelSamplingFlux node.
+- Values are **not optional** — ComfyUI will reject the workflow if any of the four are absent.
+- `width` and `height` MUST come from `brainbriefing.resolution_width` / `brainbriefing.resolution_height` — never hard-code or guess them.

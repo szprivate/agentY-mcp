@@ -1,8 +1,8 @@
 {
   "comfyui_url": "http://127.0.0.1:8188",
-  "comfyui_models_dir": "L:\\software\\comfyui\\Models",
+  "comfyui_models_dir": "",
   "comfyui_custom_templates_dir": "./comfyui_workflow_templates_custom/templates/",
   "output_dir": "./output_images/",
   "output_workflows_dir": "./output_workflows/",
-  "comfyui_user_dir": "D:\\ai\\ComfyUI\\user\\default"
+  "comfyui_user_dir": ""
 }

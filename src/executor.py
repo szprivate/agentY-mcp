@@ -1,7 +1,7 @@
 """
-agentY – Post-Brain workflow executor.
+agentY – workflow executor.
 
-After the Brain assembles and validates a ComfyUI workflow it calls
+After a ComfyUI workflow is assembled and validated, the orchestrator calls
 ``signal_workflow_ready(workflow_path)``.  The pipeline then calls
 ``execute_workflow()`` (single) or ``execute_workflows_batch()`` (batch), which:
 
@@ -12,11 +12,11 @@ After the Brain assembles and validates a ComfyUI workflow it calls
    Batch: polls each prompt_id in submission order; earlier jobs are
    typically already done by the time we reach them.
 3. Copies every output file from ComfyUI's configured output directory to
-   the path specified in the researcher's brainbriefing (``output_nodes[].output_path``).
+   the path specified in the brainbriefing (``output_nodes[].output_path``).
    Falls back to downloading via ``/view`` when the output directory cannot be
    determined from the ComfyUI API.
-4. Runs a Vision QA pass with an Ollama multimodal model, comparing the
-   output against the original brainbriefing.
+4. Returns the output image(s) (or sampled video frames) so the host model
+   (Claude) can inspect the result against the original brainbriefing.
 
 Usage
 -----
@@ -251,7 +251,7 @@ def _resolve_output_path(
        the agent's ``output_dir`` (from settings.json) as a last resort.
 
     This means ``OUTPUT_PATHS`` in the compressed summary are always real,
-    accessible paths that the next session's Researcher can pass directly to
+    accessible paths that the next session can pass directly to
     ``upload_image()``.
     """
     # --- try the ComfyUI output dir on disk ------------------------------------
@@ -316,8 +316,8 @@ async def _process_completed_job(
         return
 
     # Build a node_id → fallback_dir map from the brainbriefing output_nodes so
-    # that downloaded outputs land in the task-specific directory the Researcher
-    # chose, rather than the generic agent output_dir.
+    # that downloaded outputs land in the task-specific directory chosen in the
+    # brainbriefing, rather than the generic agent output_dir.
     _bb_output_dirs: dict[str, Path] = {}
     try:
         for on in brainbriefing.get("output_nodes", []):

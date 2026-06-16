@@ -103,36 +103,10 @@ Write like a film director giving scene instructions, not like an image prompt.
 ---
 
 ### Kling 3.0 — Multishot
-**Prompt formula per shot:** `[CHARACTER LOCK] + [ENVIRONMENT] + [TRANSITION CUE] + [SUBJECT MOTION] + [CAMERA MOVE] + [END STATE] + [STYLE]`  
-Label shots explicitly: `Shot 1: … Shot 2: …` up to 6 shots per generation.
-
-**Hard limits (API-enforced):** entire multi-shot prompt ≤ 2500 characters total · negative prompt ≤ 2500 characters. With 6 shots this leaves ~400 characters per shot — keep each shot description tight.
-
-**Character lock:** Paste the **exact same** character description at the start of every shot. Never paraphrase — Kling anchors identity to this string.
-
-**Transition cues (shot 2+):** Open each shot with one of: `Continuous from previous shot:` / `Immediately following:` / `Moments later:` / `Reverse angle:`
-
-**Motion rules:**
-- Write subject motion and camera motion as separate sentences.
-- Be specific: `"she slowly raises her right hand"` not `"she moves"`.
-- One gesture OR one camera move per 5s shot — not both.
-
-**Camera vocabulary:** `slow push-in` · `pull-back reveal` · `static locked` · `orbit/arc shot` · `crane up` · `handheld drift` · `rack focus`
-
-**End-frame handoff:** Describe the subject's final position at the end of each shot. Open the next shot referencing that state — this is what creates continuity across separate generations.
-
-**Negative prompt (apply to all shots):** `blurry, deformed hands, morphing face, identity change, flickering, jerky motion, warped background, two people`
-
-**Failure modes:**
-
-| Problem | Fix |
-|---|---|
-| Face changes between shots | Verbatim character lock + use last-frame input image |
-| Camera drifts on locked shot | Add `"camera does not move under any circumstances"` |
-| Lighting inconsistency | Copy-paste lighting string — don't paraphrase it |
-| Motion doesn't complete | One action per shot; extend to 8–10s if needed |
-| Shots feel disconnected | Missing end-frame handoff |
-| Accessories disappear | Name them in the character lock phrase every shot |
+For multi-shot storyboards (template `Kling3_multiShot`), do **not** use the rules
+here — use the dedicated **`kling-multishot`** skill, which owns the per-shot prompt
+formula, character-lock discipline, transition cues, the hard per-shot 512-character
+limit, and the node-12 patching procedure.
 
 ---
 

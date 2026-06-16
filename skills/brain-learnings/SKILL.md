@@ -7,7 +7,7 @@ allowed-tools:
 # Brain Self-Learnings
 
 > **This file is automatically maintained by the learnings agent.**
-> It is appended after any session where the Brain used more than 5 tool calls.
+> It is appended after any session that used more than 5 tool calls.
 > Do **not** edit the "Learnings Log" section manually.
 
 ## When to activate this skill

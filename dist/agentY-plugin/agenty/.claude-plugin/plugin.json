@@ -1,9 +1,0 @@
-{
-  "name": "agenty",
-  "version": "1.0.0",
-  "description": "agentY - turn natural language into ComfyUI image/video workflows. Bundles the agentY MCP server (49 tools) and all agentY skills.",
-  "author": { "name": "szprivate", "url": "https://github.com/szprivate/agentY" },
-  "homepage": "https://github.com/szprivate/agentY",
-  "license": "MIT",
-  "keywords": ["comfyui", "image-generation", "video-generation", "flux", "stable-diffusion"]
-}

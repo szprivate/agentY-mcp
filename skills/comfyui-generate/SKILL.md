@@ -22,8 +22,8 @@ tool call.
   steps 1–6 for each stage, feeding each step's output file(s) into the next as
   inputs (`upload_image`).
 - **Batch / variations** (same workflow run N times) → set `count_iter > 1`;
-  for distinct prompts per run set `variations: true` and use the `image-batch`
-  skill, then `execute_workflows_batch`.
+  for distinct prompts per run set `variations: true` and use the `batch-handoff`
+  skill (Mode A), then `execute_workflows_batch`.
 - **Bulk over many inputs** (a folder of files, or several attached images/videos
   run through one workflow or a chain of workflows — "process this folder", "do
   the same to each", "upscale all of these") → use the `batch-process` skill. It
@@ -49,12 +49,12 @@ an example. Fill every field from tool results:
   use `get_image_resolution` for a provided master image; otherwise pick a sensible
   size for the model/aspect.
 - **Output nodes**: call `get_comfyui_dirs()` for `output_dir`; set each output
-  node's `output_path` to `<output_dir>/<task_subfolder>` (see the `output-paths`
-  skill for `task_subfolder` naming).
+  node's `output_path` to `<output_dir>/<task_subfolder>` — see **Output path /
+  task-subfolder mapping** at the end of this skill for `task_subfolder` naming.
 
 ## 2. Select a template
 
-Use the `workflow-templates` skill for matching rules. Never guess names — call
+See **Selecting a Template** in the `comfyui-core` skill for matching rules. Never guess names — call
 `get_workflow_catalog` then `get_workflow_template`. Priority: exact name > similar
 name > task-type > model-family. If nothing matches, set `template.name = "build_new"`
 and follow the `assemble-new-workflow` skill. Don't stop to ask — pick a sensible
@@ -79,7 +79,8 @@ back to `search_huggingface_models` + `get_model_info`. Never hallucinate model 
   `apply_brainbriefing(workflow_path, brainbriefing_json)` (one call patches inputs,
   prompts, outputs, resolution). Use the `assemble-from-template` skill for the
   details and the special-case node fixes (e.g. `BatchImagesNode` → `replace_node`
-  to `ImageBatch`; `ModelSamplingFlux` → `flux-sampling` skill).
+  to `ImageBatch`; `ModelSamplingFlux` → the ModelSamplingFlux patch requirements
+  in `assemble-from-template`).
 - **Build-new path**: follow `assemble-new-workflow`, then `save_workflow`.
 - If `apply_brainbriefing` returns `status: "error"`, read `problems`/`server_errors`
   and apply ONE corrective `update_workflow(workflow_path, patches)` pass.
@@ -88,8 +89,8 @@ back to `search_huggingface_models` + `get_model_info`. Never hallucinate model 
 ## 6. Execute & QA
 
 - **Single run**: `execute_workflow(workflow_path, brainbriefing_json)`.
-- **Batch / variations**: `duplicate_workflow` per iteration (or the `image-batch`
-  skill for per-variation prompts), then `execute_workflows_batch([...paths...])`.
+- **Batch / variations**: `duplicate_workflow` per iteration (or `batch-handoff`
+  Mode A for per-variation prompts), then `execute_workflows_batch([...paths...])`.
   See `batch-handoff`.
 
 `execute_workflow` submits, waits, and **returns the output image(s)** (or sampled
@@ -103,3 +104,44 @@ re-run. Report the saved output paths to the user.
 At the start of a task you MAY `memory_read` for relevant user preferences. After
 learning something durable (a preferred resolution, a model that worked well, a
 recurring subject), `memory_write` one concise sentence. See `brain-learnings`.
+
+## Output path / task-subfolder mapping
+
+Set `output_path` for each entry in `output_nodes` as `<output_dir>/<task_subfolder>`,
+using the `task_subfolder` from this table.
+
+### Primary mapping (by task type)
+
+| Task type          | task_subfolder      |
+|--------------------|---------------------|
+| `image_generation` | `image_generation`  |
+| `image_edit`       | `image_edit`        |
+| `video_i2v`        | `video_i2v`         |
+| `video_flf`        | `video_flf`         |
+| `video_v2v`        | `video_v2v`         |
+| `audio`            | `audio`             |
+| `3d`               | `model`             |
+
+### Inference rules for ambiguous cases
+
+If the task type is not explicitly determinable from the user request, infer it from the output node's `class_type`:
+
+| Output node class_type        | Inferred task type  | task_subfolder      |
+|-------------------------------|---------------------|---------------------|
+| `SaveImage`, `PreviewImage`   | `image_generation`  | `image_generation`  |
+| `VHS_VideoCombine`            | check input nodes — if has image input → `video_i2v`, else `video_v2v` |
+| `SaveAudio`, `VHS_SaveAudio`  | `audio`             | `audio`             |
+| `Save3DModel`, `TripoSG_*`    | `3d`                | `model`             |
+
+**Image edit vs image generation**: if the workflow has any `LoadImage`, `VHS_LoadImagePath`, or similar input node AND the primary output is `SaveImage`, check the template name or user request for the word "edit" / "inpaint" / "modify". If found → `image_edit`. Otherwise → `image_generation`.
+
+**VHS_VideoCombine ambiguity**:
+- Input nodes include a LoadImage / VHS_LoadImagePath → `video_i2v`
+- Input nodes are text-only → check if template name contains `flf` (first-last-frame) → `video_flf`
+- Otherwise → `video_v2v`
+
+### Rules
+
+- Every entry in `output_nodes` MUST have an `output_path`.
+- If there are multiple output nodes of the same type (e.g. two SaveImage nodes), they share the same `output_path`.
+- Never guess a custom path — use only the task-subfolders listed above.

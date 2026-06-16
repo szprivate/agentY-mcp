@@ -7,28 +7,28 @@ allowed-tools: update_workflow, get_workflow_template, check_model, download_hf_
 # Ultimate SD Upscale — Flux1-dev fp8 Skill
 
 ## When to activate
-- **Researcher** (step 2): user asks for image upscaling with creative detail / re-generation / tile-based upscaling / "fix textures" / higher factor than a plain ESRGAN pass can deliver → select template `upscale_ultimateSD`. For a plain model-only upscale (no diffusion pass) use `upscale_using_model` instead.
-- **Brain** (step 1.1 assembly): loaded template is `upscale_ultimateSD`.
+- **At template selection (step 2):** user asks for image upscaling with creative detail / re-generation / tile-based upscaling / "fix textures" / higher factor than a plain ESRGAN pass can deliver → select template `upscale_ultimateSD`. For a plain model-only upscale (no diffusion pass) use `upscale_using_model` instead.
+- **At assembly (step 5):** the loaded template is `upscale_ultimateSD`.
 - Do **not** activate for API upscalers (Magnific, Topaz) — those have their own templates.
 
 ---
 
-## Researcher — Template selection and brainbriefing
+## Template selection and brainbriefing
 
 Set `task.type` to `image_edit` (UltimateSD re-samples the image, it is not a pure generation).
 
 Input / output contract:
 - `input_nodes`: exactly **1** image (node `8`, `LoadImage`). If the user supplies more than one image, keep only the first and add a WARNING blocker.
-- `output_nodes`: exactly **1** (node `7`, `SaveImage`), `output_path` = `./agentOut/image_edit` (per `output-paths` skill).
+- `output_nodes`: exactly **1** (node `7`, `SaveImage`), `task_subfolder` = `image_edit` (per the output-path mapping in `comfyui-generate`).
 - `prompt.positive`: a short descriptor of the **target look** — what the upscaler should reinforce (materials, textures, lighting), NOT a re-description of the subject. Default template prompt is a photoreal detail prompt — keep it unless the user asks for a specific style (anime / painterly / matte).
 - `prompt.negative`: keep the template default (blur / artifacts / plastic skin / cartoon etc.) unless the user requests otherwise.
 - `resolution_width` / `resolution_height`: **do not set** — UltimateSD derives output size from `upscale_by` × input image size. Leave out of the brainbriefing.
 
-Note any non-default upscale factor, denoise, or tile size as a WARNING in `blockers` so the Brain picks it up.
+Note any non-default upscale factor, denoise, or tile size as a WARNING in `blockers` so you apply it during assembly.
 
 ---
 
-## Brain — Template patching (step 1.1)
+## Template patching (during assembly)
 
 ### Template node map (upscale_ultimateSD)
 
@@ -44,9 +44,9 @@ Note any non-default upscale factor, denoise, or tile size as a WARNING in `bloc
 
 ### Assembly steps
 
-**1. Ensure the diffusion checkpoint is on disk** *(Researcher step)*
+**1. Ensure the diffusion checkpoint is on disk** *(during model resolution)*
 
-The Researcher MUST call `check_model(["flux1-dev-fp8.safetensors"])` during step 8.
+You MUST call `check_model(["flux1-dev-fp8.safetensors"])` during step 4 (model resolution).
 - If it returns a path → put that path in the brainbriefing verbatim.
 - If it returns `"False"` → download via:
 
@@ -58,7 +58,7 @@ download_hf_model(
 )
 ```
 
-Do not proceed to handoff until the file is confirmed present.
+Do not proceed to execution until the file is confirmed present.
 
 **2. Patch input node (node 8 LoadImage)**
 
@@ -112,7 +112,7 @@ Apply only the parameters the user / brainbriefing overrides. The template defau
 | `4x-UltraSharp.pth`                 | If user wants a 4× pass driven by the ESRGAN model itself            |
 | `4x_foolhardy_Remacri.pth`          | Illustration / anime source                                          |
 
-If the user requests a different upscale model, the Researcher must call `check_model(["model_name.pth"])` to verify it exists before putting it in the brainbriefing. Do not fabricate a filename.
+If the user requests a different upscale model, call `check_model(["model_name.pth"])` to verify it exists before putting it in the brainbriefing. Do not fabricate a filename.
 
 ---
 
@@ -140,7 +140,7 @@ Minimal patch set (2× upscale, default prompts, denoise 0.15):
 
 | Problem                                                    | Fix                                                                                               |
 |------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| `checkpoint not found: flux1-dev-fp8.safetensors`          | Researcher error — `check_model` should have caught this. Researcher must re-run and download via `download_hf_model`.  |
+| `checkpoint not found: flux1-dev-fp8.safetensors`          | `check_model` should have caught this earlier — re-run it and download via `download_hf_model`.  |
 | Output looks identical to input                            | `denoise` too low — raise to `0.15`–`0.25`.                                                       |
 | Output drifts / faces change                               | `denoise` too high — drop to `0.1`–`0.15`; Flux is very sensitive at the upscaler stage.          |
 | Visible tile seams                                         | Increase `mask_blur` to `16`, `tile_padding` to `64`, or switch `mode_type` to `Chess`.           |
@@ -153,17 +153,17 @@ Minimal patch set (2× upscale, default prompts, denoise 0.15):
 
 ## Checklist
 
-**Researcher:**
+**Planning / brainbriefing:**
 - [ ] Template set to `upscale_ultimateSD`
 - [ ] `task.type` set to `image_edit`
 - [ ] Exactly 1 input image in `input_nodes`
-- [ ] Exactly 1 output node (SaveImage, node `7`, path `./agentOut/image_edit`)
+- [ ] Exactly 1 output node (SaveImage, node `7`, `task_subfolder` = `image_edit`)
 - [ ] `prompt.positive` describes target texture/look, not subject
 - [ ] No `resolution_width` / `resolution_height` set in brainbriefing
 - [ ] Non-default upscale factor / denoise / tile size flagged as WARNING
 
-**Brain:**
-- [ ] Brain receives confirmed model path from brainbriefing (verified by Researcher via `check_model`)
+**Assembly:**
+- [ ] Confirmed model path carried from the brainbriefing (verified via `check_model`)
 - [ ] Input image uploaded to ComfyUI input directory
 - [ ] Node `8` `image` patched to uploaded filename
 - [ ] Node `7` `filename_prefix` patched from brainbriefing output

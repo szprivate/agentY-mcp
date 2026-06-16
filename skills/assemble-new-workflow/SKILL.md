@@ -62,7 +62,7 @@ For any node class you are not certain about:
 - **`search_nodes(query)`** — use when you need to find the right `class_type` for a capability (e.g., `"video combine"`, `"load image path"`).
 
 Verify model paths:
-- Model paths come from the brainbriefing. Do NOT look up models here — the Researcher has already verified them via `check_model`.
+- Model paths come from the brainbriefing. Do NOT look up models here — you already verified them via `check_model` when building the brainbriefing.
 
 ---
 

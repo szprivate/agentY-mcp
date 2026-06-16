@@ -15,7 +15,7 @@ Typical trigger signals (any of these is sufficient):
 
 ---
 
-## Researcher — Annotation handling
+## Planning the annotation (brainbriefing)
 
 Follow these steps **instead of** the normal template-selection and input-image steps for the current turn:
 
@@ -49,11 +49,11 @@ Call `get_workflow_template(<chosen_template_name>)` to load the template and re
 - `prompt.positive`: describe the desired change based on the annotation and user message. Be explicit about what area or element the annotation targets.
 
 ### E. Normal steps continue
-After setting the above: continue with standard steps 6–9 of the researcher (output nodes, parameters, blockers). Do NOT re-run template selection or input-image steps — they are already resolved above.
+After setting the above: continue with the standard brainbriefing steps 6–9 (output nodes, parameters, blockers). Do NOT re-run template selection or input-image steps — they are already resolved above.
 
 ---
 
-## Brain — Annotation workflow assembly
+## Assembling the annotation workflow
 
 When the brainbriefing contains an annotation-based task (`input_image_count == 2` with `role: control_image` on the second input), follow these additional constraints during `assemble-from-template`:
 

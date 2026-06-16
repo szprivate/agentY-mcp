@@ -30,8 +30,8 @@ which nodes carry inputs, prompts, and outputs, and where to save results.
 - `prompt_nodes[]` — `{node_id, role, slot, node}` per prompt-receiving node;
   `role` ∈ positive | negative; `slot` is usually `"text"`.
 - `count_iter` — number of iterations (1 = single run; 2–20 = batch).
-- `variations` — `true` when each iteration uses a distinct prompt (needs the
-  `image-batch` skill); else `false`.
+- `variations` — `true` when each iteration uses a distinct prompt (needs
+  `batch-handoff` Mode A); else `false`.
 - `positive_prompt_node_id` — node id of the positive prompt node when
   `variations == true` and `count_iter > 1`; otherwise `null`.
 

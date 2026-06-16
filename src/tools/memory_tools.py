@@ -1,8 +1,8 @@
 """
 agentY – Strands @tool wrappers for the local FAISS memory layer.
 
-These two tools are injected into both the Researcher and Brain agents so
-they can read from and write to long-term memory during a run.
+These two tools let the orchestrator read from and write to long-term memory
+during a run.
 
 Session binding
 ---------------

@@ -26,5 +26,8 @@
     "Wan22Vace_VID2VID": "[Local] image editing via Wan. 3 image inputs → 1 image output. Performs advanced image-to-image editing and transformations.",
     "image_z_image_turbo": "[Local] text-to-image via Z-Image-Turbo. 1 text input → 1 image output. High-speed image generation from text prompts.",
     "video_gemini_motionPromptGeneration": "[API] motion prompt generation via Gemini, analyses a video and output a desscription of the motion in it. 1 video input → 1 output. Generates descriptive motion prompts for video generation.",
-    "image_flux2_klein_image_edit_9b_distilled": "[Local] image editing via Flux. 1 image input → 1 image output. Performs image editing using the Flux 2 Klein distilled model."
+    "image_flux2_klein_image_edit_9b_distilled": "[Local] image editing via Flux. 1 image input → 1 image output. Performs image editing using the Flux 2 Klein distilled model.",
+    "api_seedance2_t2v": "API text-to-video via Seedance 2.0 (ByteDance). Text prompt only → 1 video output. Generates high-quality video from a text description using the Seedance 2.0 model.",
+    "api_seedance2_i2v_flf": "API first-last-frame-to-video via Seedance 2.0 (ByteDance). 1 first frame image + 1 optional last frame image → 1 video output. Generates video interpolated between keyframes with precise motion control.",
+    "api_seedance2_reference2v": "API reference-to-video via Seedance 2.0 (ByteDance). 1 reference image + 1 reference video → 1 video output. Generates, edits, or extends video using multimodal references for subject consistency, video editing, and video extension."
 }

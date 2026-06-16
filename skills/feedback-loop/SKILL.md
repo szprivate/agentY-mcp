@@ -29,7 +29,7 @@ resolution" → width/height nodes; "add a LoRA" → patch/add a LoRA loader nod
 "Now upscale it", "turn it into a video", "make a 3D model from it".
 
 1. Use the previous run's output file(s) as input: `upload_image(file_path=<prior output>)`.
-2. Select the new template (`workflow-templates` skill) and build a fresh brainbriefing
+2. Select the new template (see **Selecting a Template** in `comfyui-core`) and build a fresh brainbriefing
    for the new task, following `comfyui-generate` steps 1–6, with the uploaded files as
    `input_nodes`.
 3. Execute and inspect the result.

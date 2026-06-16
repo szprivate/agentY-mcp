@@ -1,7 +1,7 @@
 ---
 name: batch-handoff
 description: Procedure for running a multi-iteration batch (count_iter > 1) — building the per-iteration workflow copies and executing them together. Activate after assembly when count_iter > 1.
-allowed-tools: duplicate_workflow, update_workflow, execute_workflows_batch, read_text_file
+allowed-tools: duplicate_workflow, update_workflow, execute_workflows_batch, read_text_file, write_text_file
 ---
 
 # Batch execution — multi-iteration procedure
@@ -19,9 +19,24 @@ Two modes — determine from the brainbriefing:
 
 ## Mode A: Variations (distinct prompt per iteration)
 
-Each iteration gets a unique prompt from `output_workflows/multiprompt.json`, produced
-by the `image-batch` skill (run it first if not already done).
+Each iteration gets a unique prompt from `output_workflows/multiprompt.json`.
 
+0. **Generate the variation prompts** (do this first if the file doesn't exist yet).
+   Produce `count_iter` distinct, creative variations of the `prompt` from the
+   brainbriefing and write them with `write_text_file` in a **single** call:
+   - `path`: `output_workflows/multiprompt.json`
+   - `content`: a JSON string with keys `prompt1` … `promptN`, where N equals
+     `count_iter`. Keys MUST be named `prompt1` … `promptN` in order, and the number
+     of keys MUST equal `count_iter`.
+
+   Example for `count_iter = 3`:
+   ```json
+   {
+     "prompt1": "full positive prompt for variation 1",
+     "prompt2": "full positive prompt for variation 2",
+     "prompt3": "full positive prompt for variation 3"
+   }
+   ```
 1. Read `output_workflows/multiprompt.json` via `read_text_file`.
 2. **Iteration 1 (base):** `update_workflow(base_workflow_path, patches=[{"node_id": "<positive_prompt_node_id>", "input_name": "text", "value": "<prompt1>"}])`.
    Start a `paths` list with `base_workflow_path`.

@@ -145,7 +145,7 @@ Restart Claude Desktop — the **agentY** tools should appear.
 
 In Claude Desktop, **Settings → Capabilities → Skills → Upload skill**, then upload
 each skill folder (zip the folder so `SKILL.md` is at the zip root). The key one is
-**`comfyui-generate`**; the others (`comfyui-core`, `prompt-craft`, `workflow-templates`,
+**`comfyui-generate`**; the others (`comfyui-core`, `prompt-craft`,
 `assemble-from-template`, `assemble-new-workflow`, `cinematography`, `reference-scout`,
 `batch-process` (bulk runs over a folder / many files), the `story-*` skills, etc.) are
 activated by `comfyui-generate` as needed.

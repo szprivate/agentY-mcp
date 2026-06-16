@@ -7,8 +7,8 @@ allowed-tools: update_workflow, get_workflow_template
 # Kling 3.0 — Multi-Shot Storyboard Skill
 
 ## When to activate
-- **Researcher** (step 2 + step 7): selected template is `Kling3_multiShot`, OR user asks for a multi-shot video, storyboard, scene sequence, or narrative clip with more than one camera cut
-- **Brain** (step 1.1 assembly): loaded template is `Kling3_multiShot`
+- **At template selection (step 2) and prompt writing (step 3):** the selected template is `Kling3_multiShot`, OR the user asks for a multi-shot video, storyboard, scene sequence, or narrative clip with more than one camera cut
+- **At assembly (step 5):** the loaded template is `Kling3_multiShot`
 - Do **not** activate for single-shot I2V or T2V requests
 
 ---
@@ -19,13 +19,13 @@ allowed-tools: update_workflow, get_workflow_template
 
 This is a hard limit of the Kling `storyboard_N_prompt` input: a prompt of 512 characters or more is rejected by ComfyUI (`storyboard_N_prompt cannot be longer than 512 characters`) and fails the entire workflow.
 
-- Applies to **both** the Researcher (when composing prompts) and the Brain (when patching node 12).
+- Applies **both** when composing prompts and when patching node 12.
 - Applies even to prompts handed over **verbatim** by the Storyboard director: if a supplied prompt is ≥ 512 characters, trim it (drop style tags and camera adjectives first, keep the character lock intact) until it is shorter than 512 — **never patch an over-length prompt**.
 - **Count the characters of every shot prompt before finalising.** If any prompt is ≥ 512, shorten it until it is < 512.
 
 ---
 
-## Researcher — Template selection and prompt composition
+## Template selection and prompt composition
 
 ### Template selection (step 2)
 Select the `Kling3_multiShot` template when any of these are true:
@@ -35,7 +35,7 @@ Select the `Kling3_multiShot` template when any of these are true:
 
 Set `task.type` to `video i2v`.
 
-### Prompt composition (replaces prompt-craft step 7)
+### Prompt composition (replaces the standard prompt-craft step)
 Count the number of shots the user asked for (max 6, default 2). Generate that many **DISTINCT** shot prompts following the formula below. Do not repeat the same prompt across shots.
 
 > **Storyboard director hand-off:** when the request already supplies an explicit
@@ -66,7 +66,7 @@ Add a note in `blockers` (WARNING level) with:
 
 ---
 
-## Brain — Template patching (step 1.1)
+## Template patching (during assembly)
 
 ### Template node map (Kling3_multiShot)
 
@@ -187,13 +187,13 @@ Shot 4: A tall woman with short copper hair, steel-blue lab coat, early 40s, sli
 | Motion doesn't complete | One action per shot; increase duration or simplify |
 | Shots feel disconnected | Missing end-frame handoff — add final position description |
 | Accessories disappear | Name them in character lock every shot |
-| `storyboard_N_prompt cannot be longer than 512 characters` | Researcher wrote a shot prompt that exceeds 512 characters. Shorten the affected shot prompt — trim camera description or style tags first — and re-patch node 12. |
+| `storyboard_N_prompt cannot be longer than 512 characters` | A shot prompt exceeds 512 characters. Shorten the affected shot prompt — trim camera description or style tags first — and re-patch node 12. |
 
 ---
 
 ## Checklist
 
-**Researcher:**
+**When composing prompts:**
 - [ ] Template set to `Kling3_multiShot`
 - [ ] `task.type` set to `video i2v`
 - [ ] Shot count confirmed (max 6)
@@ -202,7 +202,7 @@ Shot 4: A tall woman with short copper hair, steel-blue lab coat, early 40s, sli
 - [ ] `prompt.negative` populated
 - [ ] Shot count + duration noted in `blockers` as WARNING
 
-**Brain:**
+**When patching node 12:**
 - [ ] Shot prompts parsed from `prompt.positive` JSON array
 - [ ] `multi_shot` enum matches shot count exactly
 - [ ] Shot prompts patched directly into `multi_shot.storyboard_N_prompt` inputs on node 12

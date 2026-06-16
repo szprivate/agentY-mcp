@@ -59,12 +59,6 @@ def _settings_get(*path: str, default: str = "") -> str:
     return str(node) if node and not isinstance(node, dict) else default
 
 
-def _parse_provider_model(value: str) -> tuple[str, str]:
-    """Split 'provider,model' into (provider, model). Same logic as agent.py."""
-    provider, _, model = value.partition(",")
-    return provider.strip().lower(), model.strip()
-
-
 # ---------------------------------------------------------------------------
 # workflow_templates.json lookup
 # ---------------------------------------------------------------------------
@@ -513,12 +507,12 @@ def _build_analysis(
 # ---------------------------------------------------------------------------
 
 def _call_llm_prose(analysis_summary: dict, skill_name: str) -> dict:
-    """Make ONE LLM call for description, troubleshooting, notes_overrides.
+    """Make ONE Claude call for description, troubleshooting, notes_overrides.
 
-    Provider and model are read from ``llm.pipeline.build_skill`` in
-    settings.json (format: ``'provider,model'``, e.g. ``'ollama,gemma4:26b'``
-    or ``'claude,claude-haiku-4-5'``).  Falls back to deterministic template
-    prose if the call fails or the response cannot be parsed.
+    The model is read from ``llm.anthropic.model`` in settings.json (default
+    ``claude-haiku-4-5``).  Claude is the only LLM provider.  Falls back to
+    deterministic template prose if the call fails or the response cannot be
+    parsed.
     """
     template_name = analysis_summary.get("template_name") or skill_name
     known_desc = analysis_summary.get("known_description", "")
@@ -551,38 +545,24 @@ def _call_llm_prose(analysis_summary: dict, skill_name: str) -> dict:
         "Omit the key entirely if empty."
     )
 
-    # Resolve provider + model from settings.json (same pattern as agent.py)
-    raw_setting = _settings_get("llm", "pipeline", "build_skill", default="ollama,gemma4:26b")
-    provider, model_id = _parse_provider_model(raw_setting)
-
+    # Generate the prose with Claude (the only LLM provider).
+    _model = _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
     raw_text: str | None = None
-
-    if provider == "claude":
-        _model = model_id or _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
-        api_key = get_secret("ANTHROPIC_API_KEY")
-        if not api_key:
-            print("[build_skill] ANTHROPIC_API_KEY not set — falling back to Ollama.", file=sys.stderr)
-        else:
-            try:
-                import anthropic as _anthropic
-                client = _anthropic.Anthropic(api_key=api_key)
-                msg = client.messages.create(
-                    model=_model,
-                    max_tokens=600,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                raw_text = msg.content[0].text
-            except Exception as exc:
-                print(f"[build_skill] Claude call failed: {exc}. Falling back to Ollama.", file=sys.stderr)
-
-    # Ollama (primary when provider=='ollama', or fallback from Claude)
-    if raw_text is None:
-        _model = model_id if provider == "ollama" else _settings_get("llm", "pipeline", "llm_functions", default="gemma4:26b")
-        _host = _settings_get("llm", "ollama", "host", default="http://localhost:11434")
+    api_key = get_secret("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("[build_skill] ANTHROPIC_API_KEY not set — using template fallback.", file=sys.stderr)
+    else:
         try:
-            raw_text = _ollama_chat_sync(prompt, model=_model, host=_host)
+            import anthropic as _anthropic
+            client = _anthropic.Anthropic(api_key=api_key)
+            msg = client.messages.create(
+                model=_model,
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw_text = msg.content[0].text
         except Exception as exc:
-            print(f"[build_skill] Ollama call failed: {exc}. Using template fallback.", file=sys.stderr)
+            print(f"[build_skill] Claude call failed: {exc}. Using template fallback.", file=sys.stderr)
 
     if raw_text:
         try:
@@ -906,38 +886,22 @@ def _generate_workflow_template_description(workflow: dict, workflow_name: str) 
         "Return ONLY the description string, no quotes, no preamble."
     )
     
-    # Resolve provider + model
-    raw_setting = _settings_get("llm", "pipeline", "build_skill", default="ollama,gemma4:26b")
-    provider, model_id = _parse_provider_model(raw_setting)
-    
+    # Resolve the Claude model (Claude is the only LLM provider)
+    _model = _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
     raw_text: str | None = None
-    
-    # Try Claude first if configured
-    if provider == "claude":
-        _model = model_id or _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
-        api_key = get_secret("ANTHROPIC_API_KEY")
-        if api_key:
-            try:
-                import anthropic as _anthropic
-                client = _anthropic.Anthropic(api_key=api_key)
-                msg = client.messages.create(
-                    model=_model,
-                    max_tokens=300,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                raw_text = msg.content[0].text.strip()
-            except Exception as exc:
-                print(f"[generate_description] Claude call failed: {exc}. Falling back to Ollama.", file=sys.stderr)
-    
-    # Try Ollama (primary when provider=='ollama', or fallback from Claude)
-    if raw_text is None:
-        _model = model_id if provider == "ollama" else _settings_get("llm", "pipeline", "llm_functions", default="gemma4:26b")
-        _host = _settings_get("llm", "ollama", "host", default="http://localhost:11434")
+    api_key = get_secret("ANTHROPIC_API_KEY")
+    if api_key:
         try:
-            raw_text = _ollama_chat_sync(prompt, model=_model, host=_host)
+            import anthropic as _anthropic
+            client = _anthropic.Anthropic(api_key=api_key)
+            msg = client.messages.create(
+                model=_model,
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw_text = msg.content[0].text.strip()
         except Exception as exc:
-            print(f"[generate_description] Ollama call failed: {exc}. Using template fallback.", file=sys.stderr)
-            raw_text = None
+            print(f"[generate_description] Claude call failed: {exc}. Using template fallback.", file=sys.stderr)
     
     # Use LLM response if available
     if raw_text:
@@ -967,20 +931,6 @@ def _workflow_purpose(analysis: dict) -> str:
     if "image" in inputs:
         return "image editing"
     return "text-to-image"
-
-
-def _ollama_chat_sync(prompt: str, model: str, host: str) -> str:
-    """Synchronous Ollama /api/chat call via httpx (works inside and outside async loops)."""
-    import httpx
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False,
-    }
-    with httpx.Client(timeout=120.0) as client:
-        resp = client.post(f"{host}/api/chat", json=payload)
-    resp.raise_for_status()
-    return resp.json()["message"]["content"]
 
 
 # ---------------------------------------------------------------------------
@@ -1027,8 +977,9 @@ All patches go through `patch_workflow({{node_id, input_name, value}})`.
 {model_loader_rows}
 
 Use `check_model` to verify each file is present locally and resolve its full path
-before patching the node. Missing models are handled upstream by the Researcher
-(HuggingFace download) — the Brain's job is path resolution, not availability checking.
+before patching the node. Missing models should be resolved earlier, during model
+resolution (HuggingFace download) — at this step your job is path resolution, not
+availability checking.
 
 ### Locked structural nodes
 
@@ -1548,8 +1499,8 @@ def main() -> None:
     else:
         print(f"[build_skill] Template not in workflow_templates.json — using filename stem: '{template_name}'")
 
-    _llm_setting = _settings_get("llm", "pipeline", "build_skill", default="ollama,gemma4:26b")
-    print(f"[build_skill] Calling LLM for prose (one-shot) — {_llm_setting}")
+    _llm_model = _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
+    print(f"[build_skill] Calling Claude for prose (one-shot) — {_llm_model}")
     llm_prose = _call_llm_prose(analysis, skill_name)
 
     content = _build_skill_md(
@@ -1585,12 +1536,12 @@ def main() -> None:
     skill_md.write_text(content, encoding="utf-8")
 
     rel_path = skill_md.relative_to(PROJECT_ROOT)
-    _llm_label = _settings_get("llm", "pipeline", "build_skill", default="ollama,gemma4:26b")
+    _llm_model = _settings_get("llm", "anthropic", "model", default="claude-haiku-4-5")
     sys.stdout.buffer.write(f"\n\u2713  {rel_path}\n".encode("utf-8"))
     sys.stdout.buffer.write(f"   Patchable : {len(bucket_a)} nodes\n".encode("utf-8"))
     sys.stdout.buffer.write(f"   Locked    : {len(bucket_c)} nodes\n".encode("utf-8"))
     sys.stdout.buffer.write(f"   Models    : {len(bucket_b)} (check_model required)\n".encode("utf-8"))
-    sys.stdout.buffer.write(f"   LLM call  : 1 ({_llm_label}, prose only)\n".encode("utf-8"))
+    sys.stdout.buffer.write(f"   LLM call  : 1 (claude:{_llm_model}, prose only)\n".encode("utf-8"))
 
 
 if __name__ == "__main__":

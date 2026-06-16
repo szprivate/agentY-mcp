@@ -49,7 +49,7 @@ assembly with the existing skills, but build it as a **reusable template** — t
 worker swaps the input file and output name per item, so use any one input as
 the stand-in:
 
-1. `get_workflow_catalog` → `get_workflow_template(name)` (see `workflow-templates`).
+1. `get_workflow_catalog` → `get_workflow_template(name)` (see **Selecting a Template** in `comfyui-core`).
 2. Assemble with `apply_brainbriefing` / `update_workflow` (see
    `assemble-from-template`): set the prompt, resolve models with `check_model`,
    set resolution. **Leave the input file and output prefix as placeholders** —

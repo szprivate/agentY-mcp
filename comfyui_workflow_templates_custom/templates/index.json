@@ -1093,5 +1093,88 @@
         }
       }
     ]
+  },
+  {
+    "templates": [
+      {
+        "name": "api_seedance2_t2v",
+        "models": [],
+        "io": {
+          "inputs": [],
+          "outputs": [
+            {
+              "nodeId": 3,
+              "nodeType": "VHS_VideoCombine",
+              "file": "",
+              "mediaType": "video"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "api_seedance2_i2v_flf",
+        "models": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 1,
+              "nodeType": "LoadImage",
+              "file": "first_frame.png",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 2,
+              "nodeType": "LoadImage",
+              "file": "last_frame.png",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 5,
+              "nodeType": "VHS_VideoCombine",
+              "file": "",
+              "mediaType": "video"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "templates": [
+      {
+        "name": "api_seedance2_reference2v",
+        "models": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 1,
+              "nodeType": "LoadImage",
+              "file": "reference_image.png",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 2,
+              "nodeType": "LoadVideo",
+              "file": "reference_video.mp4",
+              "mediaType": "video"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 5,
+              "nodeType": "VHS_VideoCombine",
+              "file": "",
+              "mediaType": "video"
+            }
+          ]
+        }
+      }
+    ]
   }
 ]

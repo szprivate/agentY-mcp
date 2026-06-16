@@ -1,0 +1,76 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "first_frame.png"
+    },
+    "_meta": {
+      "title": "Load First Frame"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "last_frame.png"
+    },
+    "_meta": {
+      "title": "Load Last Frame"
+    }
+  },
+  "3": {
+    "class_type": "ByteDance2FirstLastFrameNode",
+    "inputs": {
+      "model": "seedance-v2",
+      "seed": 0,
+      "watermark": false,
+      "first_frame": [
+        "1",
+        0
+      ],
+      "last_frame": [
+        "2",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Seedance 2.0 First-Last-Frame to Video"
+    }
+  },
+  "4": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Get Video Components"
+    }
+  },
+  "5": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "4",
+        0
+      ],
+      "audio": [
+        "4",
+        1
+      ],
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "seedance2/flf",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "pingpong": false,
+      "save_output": true
+    },
+    "_meta": {
+      "title": "Save Video"
+    }
+  }
+}

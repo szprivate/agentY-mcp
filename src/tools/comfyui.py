@@ -54,7 +54,7 @@ _tool_template_results: dict[str, str] = {}     # cached get_workflow_template()
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def reset_patch_workflow_guard() -> None:
-    """Reset the patch_workflow failure counter.  Call once per brain session."""
+    """Reset the patch_workflow failure counter.  Call once per orchestration session."""
     global _patch_fail_count, _patch_last_workflow_path
     _patch_fail_count = 0
     _patch_last_workflow_path = None
@@ -988,7 +988,7 @@ def search_nodes(query: str, limit: int = 10) -> str:
 def get_workflow_catalog() -> str:
     """Return the workflow template catalog as a flat {name: description} dictionary.
 
-    This is the cheapest way for the Researcher to discover available templates.
+    This is the cheapest way to discover available templates.
     The dictionary keys are the exact names to pass to get_workflow_template().
 
     Results are cached for up to 1 hour per session (``clear_tool_caches()`` resets
@@ -1722,7 +1722,8 @@ def apply_brainbriefing(workflow_path: str, brainbriefing_json: str) -> str:
 
     # ── 5. ModelSamplingFlux: auto-inject required inputs ─────────────────────
     # This node fails ComfyUI validation if any of the four inputs are missing.
-    # Defaults match the flux-sampling skill; width/height come from brainbriefing.
+    # Defaults match the ModelSamplingFlux requirements in the assemble-from-template
+    # skill; width/height come from brainbriefing.
     _MSF_DEFAULTS = {"max_shift": 1.15, "base_shift": 0.5, "width": 1024, "height": 1024}
     for nid, node in workflow.items():
         if not isinstance(node, dict):

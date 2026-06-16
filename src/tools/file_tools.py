@@ -1,9 +1,9 @@
 """
-Lightweight file I/O tools that always work with plain text.
+Lightweight file I/O tools that always return plain text.
 
-`strands_tools.file_read` can return Bedrock-style ``document`` content
-blocks, which the Ollama model handler does not support.  This module
-provides simple alternatives that work with any Strands-compatible model.
+These avoid the Bedrock-style ``document`` content blocks that some file-read
+helpers emit, returning simple strings instead so the result passes cleanly
+back to the host model over MCP.
 """
 
 import json
