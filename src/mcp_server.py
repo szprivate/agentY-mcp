@@ -72,6 +72,11 @@ _TOOLS = [
     # ── Execution ─────────────────────────────────────────────────────────
     T.execute_workflow,
     T.execute_workflows_batch,
+    # ── Headless batch jobs (detached worker, pollable status) ────────────
+    T.start_batch_job,
+    T.get_batch_status,
+    T.stop_batch_job,
+    T.list_batch_jobs,
     T.submit_prompt,
     T.queue,
     T.get_history,

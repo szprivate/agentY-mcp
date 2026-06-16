@@ -147,7 +147,8 @@ In Claude Desktop, **Settings → Capabilities → Skills → Upload skill**, th
 each skill folder (zip the folder so `SKILL.md` is at the zip root). The key one is
 **`comfyui-generate`**; the others (`comfyui-core`, `prompt-craft`, `workflow-templates`,
 `assemble-from-template`, `assemble-new-workflow`, `cinematography`, `reference-scout`,
-the `story-*` skills, etc.) are activated by `comfyui-generate` as needed.
+`batch-process` (bulk runs over a folder / many files), the `story-*` skills, etc.) are
+activated by `comfyui-generate` as needed.
 
 ---
 
