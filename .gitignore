@@ -1,27 +1,15 @@
 # Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.venv/
-.env
-
-# Official Comfy-Org workflow templates (cloned repo — large)
-comfyui_workflow_templates_official_deprecated/
-
-# Chainlit datalayer (cloned by install_agent.ps1)
-/chainlit-datalayer/
-
-
-#Logs and outputs
-.logs/
-output_images/
-output_workflows/
-/.files
-/memory
-
-#other
 .claude
-config/models.json
+.venv
 .vscode
+temp
+output_workflows
+
+# Secrets / local env (never commit real tokens)
+.env
+.env.*
+!.env_example
+
+# Python build artifacts
+__pycache__/
+*.pyc

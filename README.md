@@ -47,7 +47,38 @@ Docker, Postgres, or MinIO.
 
 ---
 
-## Installation
+## Install — Option A: the `.mcpb` bundle (one-click, recommended)
+
+agentY ships as a self-contained **MCP Bundle** (`.mcpb`) — the server plus all its
+Python dependencies vendored in — that Claude Desktop installs in one step.
+
+1. **Build it** (or use a prebuilt `dist/agentY.mcpb`):
+
+   ```powershell
+   .\scripts\build_mcpb.ps1
+   ```
+
+   This stages the runtime files, vendors the dependencies into `lib/`, and packs
+   `dist\agentY.mcpb`. Build it with the **same Python** Claude Desktop will run
+   (binary wheels like Pillow/pywin32 are version- and platform-specific). The bundle
+   is **Windows + Python 3.11+** only.
+
+2. **Install it:** in Claude Desktop, **Settings → Extensions → Install Extension…**
+   (or drag-and-drop) and pick `dist\agentY.mcpb`.
+
+3. **Configure it:** in the extension's settings, set your **HuggingFace token**,
+   optional **ComfyUI API key**, and **ComfyUI URL** (defaults to `http://127.0.0.1:8188`).
+
+4. **Install the Skills** (see [step 5 below](#5-install-the-skills)) — the bundle
+   provides the *tools*; the Skills (the procedural know-how) are uploaded separately.
+
+> The bundle runs `python -m src` from the extracted package, so a `python` matching
+> the build must be on PATH. If you'd rather manage the environment yourself, use
+> Option B.
+
+---
+
+## Install — Option B: run the MCP server directly
 
 ### 1. Clone and create a virtual environment
 

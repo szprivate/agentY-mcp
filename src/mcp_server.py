@@ -64,6 +64,9 @@ _TOOLS = [
     T.replace_node,
     T.apply_brainbriefing,
     T.duplicate_workflow,
+    # ── Template registry (add / remove custom templates) ─────────────────
+    T.register_workflow_template,
+    T.unregister_workflow_template,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────

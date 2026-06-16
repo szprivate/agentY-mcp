@@ -5,6 +5,7 @@
       "args": ["-m", "src"],
       "cwd": "D:\\AI\\agentY-mcp",
       "env": {
+        "PYTHONPATH": "D:\\AI\\agentY-mcp",
         "HF_TOKEN": "hf_your_token_here",
         "COMFYUI_API_KEY": ""
       }
