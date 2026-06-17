@@ -1,0 +1,123 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "input_image.png"
+    },
+    "_meta": { "title": "Load Input Image" }
+  },
+  "2": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": ["1", 0]
+    },
+    "_meta": { "title": "Get Image Size" }
+  },
+  "3": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Load Diffusion Model" }
+  },
+  "4": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "FLUX2\\qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "_meta": { "title": "Load CLIP" }
+  },
+  "5": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "FLUX1\\ae.safetensors"
+    },
+    "_meta": { "title": "Load VAE" }
+  },
+  "6": {
+    "class_type": "TextEncodeZImageOmni",
+    "inputs": {
+      "clip": ["4", 0],
+      "prompt": "A photorealistic image.",
+      "auto_resize_images": true,
+      "vae": ["5", 0],
+      "image1": ["1", 0]
+    },
+    "_meta": { "title": "Positive Conditioning (Z-Image Omni)" }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["4", 0],
+      "text": ""
+    },
+    "_meta": { "title": "Empty Text (for Negative)" }
+  },
+  "8": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": ["7", 0]
+    },
+    "_meta": { "title": "Negative Conditioning (Zero Out)" }
+  },
+  "9": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["1", 0],
+      "vae": ["5", 0]
+    },
+    "_meta": { "title": "VAE Encode Input Image" }
+  },
+  "10": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": ["2", 0],
+      "height": ["2", 1],
+      "batch_size": 1
+    },
+    "_meta": { "title": "Empty Latent (size from input)" }
+  },
+  "11": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": ["3", 0],
+      "shift": 3
+    },
+    "_meta": { "title": "ModelSamplingAuraFlow" }
+  },
+  "12": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["11", 0],
+      "seed": 0,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "denoise": 0.75,
+      "positive": ["6", 0],
+      "negative": ["8", 0],
+      "latent_image": ["9", 0]
+    },
+    "_meta": { "title": "KSampler" }
+  },
+  "13": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["12", 0],
+      "vae": ["5", 0]
+    },
+    "_meta": { "title": "VAE Decode" }
+  },
+  "14": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["13", 0],
+      "filename_prefix": "z-image-turbo-i2i"
+    },
+    "_meta": { "title": "Save Image" }
+  }
+}

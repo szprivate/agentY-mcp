@@ -1176,5 +1176,35 @@
         }
       }
     ]
+  },
+  {
+    "templates": [
+      {
+        "name": "image_z_image_turbo_i2i",
+        "models": [
+          "z_image_turbo_bf16",
+          "qwen_3_4b",
+          "ae"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 1,
+              "nodeType": "LoadImage",
+              "file": "input_image.png",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 14,
+              "nodeType": "SaveImage",
+              "file": "",
+              "mediaType": "image"
+            }
+          ]
+        }
+      }
+    ]
   }
 ]

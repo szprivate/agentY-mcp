@@ -16,8 +16,16 @@ from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+
+# Anchor the shared agenty_core tool layer on this repo's root (it now lives in
+# a sibling package, so it can't resolve config/ and output_workflows/ from its
+# own __file__). Must run before the tool modules are imported below.
+from agenty_core import set_project_root
+
+set_project_root(Path(__file__).resolve().parent.parent)
 
 from src import tools as T
 
