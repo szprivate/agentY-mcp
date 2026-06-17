@@ -13,5 +13,3 @@ output_workflows
 # Python build artifacts
 __pycache__/
 *.pyc
-src/__pycache__/*
-/src/__pycache__
