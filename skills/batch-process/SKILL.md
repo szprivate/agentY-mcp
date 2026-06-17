@@ -1,6 +1,6 @@
 ---
 name: batch-process
-description: Run one workflow — or a chain of workflows — over MANY inputs (a folder of images/videos, or several attached files) as a single headless background job. Activate when the user wants to process/convert/upscale/restyle/animate a whole directory or a set of files in bulk, especially "run this over all of them", "process this folder", "do the same to each", or a multi-stage pipeline applied to every input. The job runs independently of the conversation and reports a pollable progress bar.
+description: Run a ComfyUI image/video workflow — or a fixed chain of ComfyUI workflows — over MANY image/video inputs (a folder, or several files) as one headless background job via the agentY MCP server. Each stage is a validated ComfyUI workflow whose load node receives each input and whose save node produces the output; the detached worker drives ComfyUI and reports a pollable progress bar. Activate only for bulk ComfyUI generation/editing of images or videos (e.g. "upscale every image in this folder", "turn each still into a clip", "background-removal then upscale on all of them"). NOT for non-ComfyUI batch work (file renaming, ffmpeg outside ComfyUI, text/data processing), and NOT for a single generation (use comfyui-generate).
 allowed-tools: start_batch_job get_batch_status stop_batch_job list_batch_jobs get_workflow_catalog get_workflow_template apply_brainbriefing update_workflow validate_workflow get_comfyui_dirs check_model run_script read_text_file
 ---
 

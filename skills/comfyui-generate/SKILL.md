@@ -1,6 +1,6 @@
 ---
 name: comfyui-generate
-description: End-to-end procedure for turning a natural-language request into a generated or edited image/video via the agentY ComfyUI MCP server. Activate whenever the user asks to generate, create, render, edit, upscale, restyle, or animate an image or video (text-to-image, image-to-image, inpaint, image-to-video, batches, variations, multi-step pipelines). Orchestrates template selection, prompt writing, model resolution, workflow assembly, validation, execution, and visual QA.
+description: End-to-end procedure for turning a natural-language request into a generated or edited image/video by building and running a ComfyUI workflow through the agentY ComfyUI MCP server. Activate only when the generation/edit will run on ComfyUI via agentY (its tools — get_workflow_catalog, get_workflow_template, update_workflow, execute_workflow — are available): text-to-image, image-to-image, inpaint, image-to-video, batches, variations, multi-step pipelines. Orchestrates template selection, prompt writing, model resolution, workflow assembly, validation, execution, and visual QA. Do NOT activate for image/video generation routed through a different backend or MCP (e.g. Magnific) — use that backend's own skill.
 ---
 
 # agentY — ComfyUI generation orchestrator

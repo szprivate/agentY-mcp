@@ -1,6 +1,6 @@
 ---
 name: brain-learnings
-description: Auto-populated learnings from past high-iteration problem-solving sessions. Activate this skill when you notice you are making repeated tool calls to solve the same sub-problem, or when the same error keeps appearing. The entries below document past problems and proven solutions — consult them before retrying a failing pattern.
+description: Auto-maintained log of proven fixes from past agentY ComfyUI workflow-assembly sessions. Use ONLY while building, validating, executing, or debugging a ComfyUI workflow through the agentY MCP server — i.e. when its tools (apply_brainbriefing, update_workflow, get_node_schema, validate_workflow, execute_workflow, LoadImage/CLIPLoader patching, etc.) are in play and a recurring ComfyUI tool error or the same assembly sub-problem appears. Consult the log before retrying a failing ComfyUI pattern. This is NOT a general-purpose "repeated tool calls" helper — do not activate for non-agentY or non-ComfyUI work.
 allowed-tools: 
 ---
 
@@ -12,10 +12,18 @@ allowed-tools:
 
 ## When to activate this skill
 
-Activate and consult this skill when you observe any of the following:
-- You have already made **3 or more tool calls** attempting to fix the same issue.
-- A tool call fails and you are about to retry with the same approach.
-- You are uncertain how to proceed and the task feels repetitive.
+**Scope:** only while assembling, validating, executing, or debugging a ComfyUI
+workflow through the agentY MCP server. If you are not working on an agentY
+ComfyUI workflow, do **not** activate this skill — its entries are ComfyUI-specific
+and irrelevant to other work.
+
+Within that scope, activate and consult it when you observe any of the following:
+- A **ComfyUI tool call** (apply_brainbriefing, update_workflow, validate_workflow,
+  execute_workflow, LoadImage / CLIPLoader patching, …) fails and you are about to
+  retry with the same approach.
+- You have already made **3 or more tool calls** trying to fix the same ComfyUI
+  workflow issue.
+- The same ComfyUI validation/assembly error keeps appearing.
 
 Scan the learnings log below for entries that match your current situation.
 If a matching entry exists, **apply the documented solution directly** instead of re-discovering it.
