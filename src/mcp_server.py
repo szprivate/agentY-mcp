@@ -59,6 +59,9 @@ _TOOLS = [
     # ── Workflow templates & catalog ──────────────────────────────────────
     T.get_workflow_catalog,
     T.get_workflow_template,
+    # ── Workflow recipes (task -> model -> node clusters knowledge base) ──
+    T.list_workflow_recipes,
+    T.get_workflow_recipe,
     # ── Node inspection ───────────────────────────────────────────────────
     T.get_node_schema,
     T.get_workflow_node_info,

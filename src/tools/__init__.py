@@ -34,6 +34,9 @@ from src.tools.comfyui import (  # noqa: F401
     # Workflow templates
     get_workflow_catalog,
     get_workflow_template,
+    # Workflow recipes (task -> model -> node clusters knowledge base)
+    list_workflow_recipes,
+    get_workflow_recipe,
     # Workflow modification
     save_workflow,
     patch_workflow,
