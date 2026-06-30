@@ -1,9 +1,9 @@
 {
   "generated_from": {
-    "workflow_count": 49,
-    "node_class_count": 126,
+    "workflow_count": 142,
+    "node_class_count": 230,
     "custom_classes": 20,
-    "unresolved_classes": 0
+    "unresolved_classes": 9
   },
   "nodes": [
     {
@@ -46,6 +46,97 @@
       "occurrences": 2
     },
     {
+      "class": "AudioMerge",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "audio1",
+          "audio2",
+          "merge_method"
+        ],
+        "optional": [],
+        "types": {
+          "audio1": "AUDIO",
+          "audio2": "AUDIO",
+          "merge_method": "COMBO"
+        }
+      },
+      "outputs": [
+        "AUDIO"
+      ],
+      "used_in_type_ids": [
+        "video_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "BasicGuider",
+      "role": "guidance",
+      "role_description": "guider / sigma / scheduler",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "conditioning",
+          "model"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "conditioning": "CONDITIONING"
+        }
+      },
+      "outputs": [
+        "GUIDER"
+      ],
+      "used_in_type_ids": [
+        "image_edit__flux_2",
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "text_to_image__flux_2",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 6
+    },
+    {
+      "class": "BasicScheduler",
+      "role": "guidance",
+      "role_description": "guider / sigma / scheduler",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "denoise",
+          "model",
+          "scheduler",
+          "steps"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "scheduler": "COMBO",
+          "steps": "INT",
+          "denoise": "FLOAT"
+        }
+      },
+      "outputs": [
+        "SIGMAS"
+      ],
+      "used_in_type_ids": [
+        "character__wan",
+        "image_edit__wan_2_2",
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "video_inpaint__sam3",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 10
+    },
+    {
       "class": "BatchImagesNode",
       "role": "other",
       "role_description": "unclassified node role",
@@ -65,9 +156,29 @@
       ],
       "used_in_type_ids": [
         "api_partner_nodes_image_edit__nano_banana",
-        "video_to_video__wan_vace"
+        "image_tools__generic",
+        "video_to_video__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 3
+      "occurrences": 6
+    },
+    {
+      "class": "BerniniConditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "image_edit__wan_2_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 2
     },
     {
       "class": "ByteDance2FirstLastFrameNode",
@@ -231,9 +342,12 @@
         "first_last_frame_to_video__ltx_2",
         "image_edit__flux_2_klein",
         "image_to_video__ltx_2",
-        "text_to_image__flux_2_klein"
+        "text_to_image__flux_2_klein",
+        "text_to_video__ltx_2",
+        "video_inpaint__sam3",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 5
+      "occurrences": 20
     },
     {
       "class": "CFGNorm",
@@ -259,9 +373,39 @@
         "MODEL"
       ],
       "used_in_type_ids": [
+        "image_edit__firered",
         "image_edit__qwen_image"
       ],
-      "occurrences": 2
+      "occurrences": 6
+    },
+    {
+      "class": "CFGOverride",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "cfg",
+          "end_percent",
+          "model",
+          "start_percent"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "cfg": "FLOAT",
+          "start_percent": "FLOAT",
+          "end_percent": "FLOAT"
+        }
+      },
+      "outputs": [
+        "MODEL"
+      ],
+      "used_in_type_ids": [
+        "text_to_image__ideogram"
+      ],
+      "occurrences": 1
     },
     {
       "class": "CLIPLoader",
@@ -287,19 +431,35 @@
         "CLIP"
       ],
       "used_in_type_ids": [
+        "audio__qwen_image",
+        "character__wan",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__longcat",
         "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
+        "text_to_image__ideogram",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "text_to_video__wan_2_2",
+        "upscale__z_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 14
+      "occurrences": 56
     },
     {
       "class": "CLIPTextEncode",
@@ -322,21 +482,95 @@
         "CONDITIONING"
       ],
       "used_in_type_ids": [
+        "audio__qwen_image",
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
+        "inpaint_outpaint__flux",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__sam3",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
+        "text_to_image__flux_krea",
+        "text_to_image__ideogram",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "text_to_video__ltx_2",
+        "text_to_video__wan_2_2",
         "upscale__flux",
+        "upscale__z_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 28
+      "occurrences": 111
+    },
+    {
+      "class": "CLIPVisionEncode",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip_vision",
+          "crop",
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "clip_vision": "CLIP_VISION",
+          "image": "IMAGE",
+          "crop": "COMBO"
+        }
+      },
+      "outputs": [
+        "CLIP_VISION_OUTPUT"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d",
+        "character__wan"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "CLIPVisionLoader",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip_name"
+        ],
+        "optional": [],
+        "types": {
+          "clip_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "CLIP_VISION"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat",
+        "character__wan"
+      ],
+      "occurrences": 3
     },
     {
       "class": "Canny",
@@ -363,7 +597,7 @@
       "used_in_type_ids": [
         "image_edit_with_controlnet__z_image"
       ],
-      "occurrences": 1
+      "occurrences": 2
     },
     {
       "class": "CheckpointLoaderSimple",
@@ -386,11 +620,74 @@
         "VAE"
       ],
       "used_in_type_ids": [
+        "audio__qwen_image",
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
         "image_to_video__ltx_2",
-        "upscale__flux"
+        "preprocessors_estimation__sam3",
+        "preprocessors_estimation__sdpose",
+        "text_to_image__lumina",
+        "text_to_video__ltx_2",
+        "upscale__flux",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 3
+      "occurrences": 22
+    },
+    {
+      "class": "ColorToRGBInt",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "color"
+        ],
+        "optional": [],
+        "types": {
+          "color": "COLOR"
+        }
+      },
+      "outputs": [
+        "INT"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "ColorTransfer",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image_ref",
+          "image_target",
+          "method",
+          "source_stats",
+          "strength"
+        ],
+        "optional": [],
+        "types": {
+          "image_target": "IMAGE",
+          "image_ref": "IMAGE",
+          "method": "COMBO",
+          "source_stats": "COMFY_DYNAMICCOMBO_V3",
+          "strength": "FLOAT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "character__wan"
+      ],
+      "occurrences": 1
     },
     {
       "class": "ComfyMathExpression",
@@ -415,10 +712,87 @@
         "BOOLEAN"
       ],
       "used_in_type_ids": [
+        "3d__moge",
+        "audio__qwen_image",
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "image_tools__generic",
+        "preprocessors_estimation__moge",
+        "text_to_image__ideogram",
+        "text_to_video__ltx_2",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 4
+      "occurrences": 49
+    },
+    {
+      "class": "ComfyNumberConvert",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "value"
+        ],
+        "optional": [],
+        "types": {
+          "value": "INT,FLOAT,STRING,BOOLEAN"
+        }
+      },
+      "outputs": [
+        "FLOAT",
+        "INT"
+      ],
+      "used_in_type_ids": [
+        "text_to_image__ideogram"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "ComfySwitchNode",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "on_false",
+          "on_true",
+          "switch"
+        ],
+        "optional": [],
+        "types": {
+          "switch": "BOOLEAN",
+          "on_false": "COMFY_MATCHTYPE_V3",
+          "on_true": "COMFY_MATCHTYPE_V3"
+        }
+      },
+      "outputs": [
+        "COMFY_MATCHTYPE_V3"
+      ],
+      "used_in_type_ids": [
+        "3d__moge",
+        "3d__triposplat",
+        "audio__qwen_image",
+        "character__wan",
+        "image_edit__firered",
+        "image_edit__flux_2",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
+        "preprocessors_estimation__mediapipe",
+        "preprocessors_estimation__moge",
+        "text_to_image__ernie",
+        "text_to_image__flux_2",
+        "text_to_image__qwen_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__wan_2_2",
+        "video_tools__generic"
+      ],
+      "occurrences": 52
     },
     {
       "class": "ConditioningZeroOut",
@@ -439,12 +813,82 @@
         "CONDITIONING"
       ],
       "used_in_type_ids": [
+        "audio__ace_step",
         "image_edit__flux_2_klein",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
+        "inpaint_outpaint__flux",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_krea",
+        "text_to_image__ideogram",
+        "text_to_image__qwen_image",
         "text_to_image__z_image"
       ],
-      "occurrences": 4
+      "occurrences": 16
+    },
+    {
+      "class": "ControlNetInpaintingAliMamaApply",
+      "role": "controlnet",
+      "role_description": "controlnet / guidance conditioning",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "control_net",
+          "end_percent",
+          "image",
+          "mask",
+          "negative",
+          "positive",
+          "start_percent",
+          "strength",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "control_net": "CONTROL_NET",
+          "vae": "VAE",
+          "image": "IMAGE",
+          "mask": "MASK",
+          "strength": "FLOAT",
+          "start_percent": "FLOAT",
+          "end_percent": "FLOAT"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "ControlNetLoader",
+      "role": "controlnet",
+      "role_description": "controlnet / guidance conditioning",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "control_net_name"
+        ],
+        "optional": [],
+        "types": {
+          "control_net_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "CONTROL_NET"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 2
     },
     {
       "class": "CreateVideo",
@@ -475,11 +919,132 @@
         "first_last_frame_to_video__wan_vace",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
+        "text_to_video__ltx_2",
+        "text_to_video__wan_2_2",
         "text_tools__gemini",
+        "upscale__generic",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
-        "video_to_video__wan_vace"
+        "video_to_video__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 11
+      "occurrences": 30
+    },
+    {
+      "class": "CurveEditor",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "curve"
+        ],
+        "optional": [
+          "histogram"
+        ],
+        "types": {
+          "curve": "CURVE",
+          "histogram": "HISTOGRAM"
+        }
+      },
+      "outputs": [
+        "CURVE"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "CustomCombo",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "choice"
+        ],
+        "optional": [],
+        "types": {
+          "choice": "COMBO"
+        }
+      },
+      "outputs": [
+        "STRING",
+        "INT"
+      ],
+      "used_in_type_ids": [
+        "audio__qwen_image",
+        "image_edit__wan_2_2",
+        "image_tools__generic",
+        "text_to_image__ideogram",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 12
+    },
+    {
+      "class": "DA3Inference",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "preprocessors_estimation__depth_anything"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "DA3Render",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "preprocessors_estimation__depth_anything"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "DifferentialDiffusion",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model"
+        ],
+        "optional": [
+          "strength"
+        ],
+        "types": {
+          "model": "MODEL",
+          "strength": "FLOAT"
+        }
+      },
+      "outputs": [
+        "MODEL"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__flux"
+      ],
+      "occurrences": 1
     },
     {
       "class": "DiffusionModelLoaderKJ",
@@ -541,6 +1106,144 @@
       "occurrences": 2
     },
     {
+      "class": "DisableNoise",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [
+        "NOISE"
+      ],
+      "used_in_type_ids": [
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "DualCLIPLoader",
+      "role": "clip_loader",
+      "role_description": "text encoder / CLIP loader",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip_name1",
+          "clip_name2",
+          "type"
+        ],
+        "optional": [
+          "device"
+        ],
+        "types": {
+          "clip_name1": "COMBO",
+          "clip_name2": "COMBO",
+          "type": "COMBO",
+          "device": "COMBO"
+        }
+      },
+      "outputs": [
+        "CLIP"
+      ],
+      "used_in_type_ids": [
+        "audio__ace_step",
+        "inpaint_outpaint__flux",
+        "text_to_image__flux",
+        "text_to_image__flux_krea"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "DualModelGuider",
+      "role": "guidance",
+      "role_description": "guider / sigma / scheduler",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "cfg",
+          "model",
+          "positive"
+        ],
+        "optional": [
+          "model_negative",
+          "negative"
+        ],
+        "types": {
+          "model": "MODEL",
+          "positive": "CONDITIONING",
+          "cfg": "FLOAT",
+          "model_negative": "MODEL",
+          "negative": "CONDITIONING"
+        }
+      },
+      "outputs": [
+        "GUIDER"
+      ],
+      "used_in_type_ids": [
+        "text_to_image__ideogram"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "EmptyAceStep1.5LatentAudio",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "seconds"
+        ],
+        "optional": [],
+        "types": {
+          "seconds": "FLOAT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "audio__ace_step"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "EmptyAudio",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "channels",
+          "duration",
+          "sample_rate"
+        ],
+        "optional": [],
+        "types": {
+          "duration": "FLOAT",
+          "sample_rate": "INT",
+          "channels": "INT"
+        }
+      },
+      "outputs": [
+        "AUDIO"
+      ],
+      "used_in_type_ids": [
+        "video_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
       "class": "EmptyFlux2LatentImage",
       "role": "other",
       "role_description": "unclassified node role",
@@ -563,10 +1266,43 @@
         "LATENT"
       ],
       "used_in_type_ids": [
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
-        "text_to_image__flux_2_klein"
+        "text_to_image__ernie",
+        "text_to_image__flux_2",
+        "text_to_image__flux_2_klein",
+        "text_to_image__ideogram"
       ],
-      "occurrences": 2
+      "occurrences": 8
+    },
+    {
+      "class": "EmptyHunyuanLatentVideo",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "length",
+          "width"
+        ],
+        "optional": [],
+        "types": {
+          "width": "INT",
+          "height": "INT",
+          "length": "INT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "text_to_video__wan_2_2"
+      ],
+      "occurrences": 1
     },
     {
       "class": "EmptyLTXVLatentVideo",
@@ -594,9 +1330,61 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 9
+    },
+    {
+      "class": "EmptyLatentAudio",
+      "role": "latent_source",
+      "role_description": "empty latent / canvas",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "seconds"
+        ],
+        "optional": [],
+        "types": {
+          "seconds": "FLOAT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "audio__qwen_image"
       ],
       "occurrences": 2
+    },
+    {
+      "class": "EmptyLatentHunyuan3Dv2",
+      "role": "latent_source",
+      "role_description": "empty latent / canvas",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "resolution"
+        ],
+        "optional": [],
+        "types": {
+          "resolution": "INT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d"
+      ],
+      "occurrences": 1
     },
     {
       "class": "EmptyLatentImage",
@@ -614,6 +1402,36 @@
         "types": {
           "width": "INT",
           "height": "INT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "image_edit__qwen_image",
+        "text_to_image__anima"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "EmptyQwenImageLayeredLatentImage",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "layers",
+          "width"
+        ],
+        "optional": [],
+        "types": {
+          "width": "INT",
+          "height": "INT",
+          "layers": "INT",
           "batch_size": "INT"
         }
       },
@@ -650,9 +1468,13 @@
       "used_in_type_ids": [
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
+        "text_to_image__flux",
+        "text_to_image__flux_krea",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
         "text_to_image__z_image"
       ],
-      "occurrences": 3
+      "occurrences": 15
     },
     {
       "class": "Flux2Scheduler",
@@ -677,10 +1499,178 @@
         "SIGMAS"
       ],
       "used_in_type_ids": [
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein"
       ],
-      "occurrences": 2
+      "occurrences": 5
+    },
+    {
+      "class": "FluxGuidance",
+      "role": "guidance",
+      "role_description": "guider / sigma / scheduler",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "conditioning",
+          "guidance"
+        ],
+        "optional": [],
+        "types": {
+          "conditioning": "CONDITIONING",
+          "guidance": "FLOAT"
+        }
+      },
+      "outputs": [
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "image_edit__flux_2",
+        "image_edit__longcat",
+        "inpaint_outpaint__flux",
+        "text_to_image__flux_2"
+      ],
+      "occurrences": 5
+    },
+    {
+      "class": "FluxKontextImageScale",
+      "role": "upscale",
+      "role_description": "upscale / resize",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_edit__qwen_image",
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "FluxKontextMultiReferenceLatentMethod",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "conditioning",
+          "reference_latents_method"
+        ],
+        "optional": [],
+        "types": {
+          "conditioning": "CONDITIONING",
+          "reference_latents_method": "COMBO"
+        }
+      },
+      "outputs": [
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "image_edit__longcat",
+        "image_edit__qwen_image"
+      ],
+      "occurrences": 6
+    },
+    {
+      "class": "FrameInterpolate",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "images",
+          "interp_model",
+          "multiplier"
+        ],
+        "optional": [],
+        "types": {
+          "interp_model": "INTERP_MODEL",
+          "images": "IMAGE",
+          "multiplier": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "video_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "FrameInterpolationModelLoader",
+      "role": "model_loader",
+      "role_description": "diffusion model / UNET loader",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model_name"
+        ],
+        "optional": [],
+        "types": {
+          "model_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "INTERP_MODEL"
+      ],
+      "used_in_type_ids": [
+        "video_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "GLSLShader",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "bools",
+          "curves",
+          "floats",
+          "fragment_shader",
+          "images",
+          "ints",
+          "size_mode"
+        ],
+        "optional": [],
+        "types": {
+          "fragment_shader": "STRING",
+          "size_mode": "COMFY_DYNAMICCOMBO_V3",
+          "images": "COMFY_AUTOGROW_V3",
+          "floats": "COMFY_AUTOGROW_V3",
+          "ints": "COMFY_AUTOGROW_V3",
+          "bools": "COMFY_AUTOGROW_V3",
+          "curves": "COMFY_AUTOGROW_V3"
+        }
+      },
+      "outputs": [
+        "IMAGE",
+        "IMAGE",
+        "IMAGE",
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 14
     },
     {
       "class": "GeminiImage2Node",
@@ -805,9 +1795,10 @@
       "used_in_type_ids": [
         "api_partner_nodes_character__nano_banana",
         "api_partner_nodes_image_edit__nano_banana",
-        "text_tools__gemini"
+        "text_tools__gemini",
+        "text_tools__generic"
       ],
-      "occurrences": 4
+      "occurrences": 7
     },
     {
       "class": "GetImageSize",
@@ -830,12 +1821,23 @@
         "INT"
       ],
       "used_in_type_ids": [
+        "3d__moge",
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__qwen_image",
         "image_edit__z_image",
-        "image_edit_with_controlnet__z_image"
+        "image_edit_with_controlnet__z_image",
+        "image_to_video__ltx_2",
+        "image_tools__generic",
+        "preprocessors_estimation__moge",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_tools__generic"
       ],
-      "occurrences": 4
+      "occurrences": 30
     },
     {
       "class": "GetVideoComponents",
@@ -869,16 +1871,110 @@
         "api_partner_nodes_text_to_video__wan_2_6",
         "api_partner_nodes_video_to_video__generic",
         "api_partner_nodes_video_to_video__kling",
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
+        "preprocessors_estimation__depth_anything",
+        "preprocessors_estimation__mediapipe",
+        "preprocessors_estimation__moge",
+        "preprocessors_estimation__sam3",
+        "preprocessors_estimation__sdpose",
         "text_tools__gemini",
+        "upscale__generic",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
-        "video_to_video__wan_vace"
+        "video_to_video__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 25
+      "occurrences": 44
+    },
+    {
+      "class": "GrowMask",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "expand",
+          "mask",
+          "tapered_corners"
+        ],
+        "optional": [],
+        "types": {
+          "mask": "MASK",
+          "expand": "INT",
+          "tapered_corners": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "MASK"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image",
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "Hunyuan3Dv2Conditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip_vision_output"
+        ],
+        "optional": [],
+        "types": {
+          "clip_vision_output": "CLIP_VISION_OUTPUT"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "Ideogram4Scheduler",
+      "role": "api_node",
+      "role_description": "external API generation node",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "height",
+          "mu",
+          "std",
+          "steps",
+          "width"
+        ],
+        "optional": [],
+        "types": {
+          "steps": "INT",
+          "width": "INT",
+          "height": "INT",
+          "mu": "FLOAT",
+          "std": "FLOAT"
+        }
+      },
+      "outputs": [
+        "SIGMAS"
+      ],
+      "used_in_type_ids": [
+        "text_to_image__ideogram"
+      ],
+      "occurrences": 1
     },
     {
       "class": "IdeogramV3",
@@ -1011,6 +2107,176 @@
       "occurrences": 4
     },
     {
+      "class": "ImageBlur",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "blur_radius",
+          "image",
+          "sigma"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "blur_radius": "INT",
+          "sigma": "FLOAT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "ImageCompositeMasked",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "destination",
+          "resize_source",
+          "source",
+          "x",
+          "y"
+        ],
+        "optional": [
+          "mask"
+        ],
+        "types": {
+          "destination": "IMAGE",
+          "source": "IMAGE",
+          "x": "INT",
+          "y": "INT",
+          "resize_source": "BOOLEAN",
+          "mask": "MASK"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image",
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "ImageCropV2",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "crop_region",
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "crop_region": "BOUNDING_BOX"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 13
+    },
+    {
+      "class": "ImageFromBatch",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_index",
+          "image",
+          "length"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "batch_index": "INT",
+          "length": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "character__wan",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_tools__generic"
+      ],
+      "occurrences": 10
+    },
+    {
+      "class": "ImageHistogram",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "HISTOGRAM",
+        "HISTOGRAM",
+        "HISTOGRAM",
+        "HISTOGRAM",
+        "HISTOGRAM"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "ImageInvert",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 4
+    },
+    {
       "class": "ImageListToImageBatch",
       "role": "other",
       "role_description": "unclassified node role",
@@ -1032,6 +2298,31 @@
         "api_partner_nodes_image_edit__nano_banana"
       ],
       "occurrences": 2
+    },
+    {
+      "class": "ImageOnlyCheckpointLoader",
+      "role": "model_loader",
+      "role_description": "diffusion model / UNET loader",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "ckpt_name"
+        ],
+        "optional": [],
+        "types": {
+          "ckpt_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "MODEL",
+        "CLIP_VISION",
+        "VAE"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d"
+      ],
+      "occurrences": 1
     },
     {
       "class": "ImagePadForOutpaint",
@@ -1063,9 +2354,10 @@
         "MASK"
       ],
       "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 1
+      "occurrences": 2
     },
     {
       "class": "ImageResizeKJv2",
@@ -1113,6 +2405,62 @@
       "occurrences": 1
     },
     {
+      "class": "ImageScaleBy",
+      "role": "upscale",
+      "role_description": "upscale / resize",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image",
+          "scale_by",
+          "upscale_method"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "upscale_method": "COMBO",
+          "scale_by": "FLOAT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_to_video__ltx_2",
+        "upscale__z_image",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "ImageScaleToMaxDimension",
+      "role": "upscale",
+      "role_description": "upscale / resize",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image",
+          "largest_size",
+          "upscale_method"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "upscale_method": "COMBO",
+          "largest_size": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 2
+    },
+    {
       "class": "ImageScaleToTotalPixels",
       "role": "upscale",
       "role_description": "upscale / resize",
@@ -1137,9 +2485,12 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "image_edit__flux_2_klein"
+        "image_edit__flux_2_klein",
+        "image_edit__longcat",
+        "image_edit_with_controlnet__z_image",
+        "upscale__z_image"
       ],
-      "occurrences": 1
+      "occurrences": 6
     },
     {
       "class": "ImageStitch",
@@ -1171,9 +2522,10 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "video_to_video__wan_vace"
+        "video_to_video__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 1
+      "occurrences": 2
     },
     {
       "class": "ImageToMask",
@@ -1197,9 +2549,12 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__moge",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 2
+      "occurrences": 8
     },
     {
       "class": "ImageUpscaleWithModel",
@@ -1222,7 +2577,43 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "upscale__generic"
+        "upscale__generic",
+        "upscale__z_image"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "InpaintModelConditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "mask",
+          "negative",
+          "noise_mask",
+          "pixels",
+          "positive",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "vae": "VAE",
+          "pixels": "IMAGE",
+          "mask": "MASK",
+          "noise_mask": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__flux"
       ],
       "occurrences": 1
     },
@@ -1248,6 +2639,83 @@
         "video_to_video__wan_vace"
       ],
       "occurrences": 1
+    },
+    {
+      "class": "InvertMask",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "mask"
+        ],
+        "optional": [],
+        "types": {
+          "mask": "MASK"
+        }
+      },
+      "outputs": [
+        "MASK"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat",
+        "image_tools__birefnet",
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 5
+    },
+    {
+      "class": "JoinImageWithAlpha",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "alpha",
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "alpha": "MASK"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat",
+        "image_tools__birefnet"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "JsonExtractString",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "json_string",
+          "key"
+        ],
+        "optional": [],
+        "types": {
+          "json_string": "STRING",
+          "key": "STRING"
+        }
+      },
+      "outputs": [
+        "STRING"
+      ],
+      "used_in_type_ids": [
+        "audio__qwen_image",
+        "text_to_image__ideogram"
+      ],
+      "occurrences": 6
     },
     {
       "class": "KSampler",
@@ -1286,14 +2754,30 @@
         "LATENT"
       ],
       "used_in_type_ids": [
+        "3d__hunyuan3d",
+        "3d__triposplat",
+        "audio__ace_step",
+        "audio__qwen_image",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__longcat",
         "image_edit__qwen_image",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
+        "inpaint_outpaint__flux",
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_krea",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "upscale__z_image",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 8
+      "occurrences": 41
     },
     {
       "class": "KSamplerAdvanced",
@@ -1340,10 +2824,11 @@
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_2_2",
         "image_to_video__wan_2_2",
+        "text_to_video__wan_2_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 8
+      "occurrences": 14
     },
     {
       "class": "KSamplerSelect",
@@ -1364,11 +2849,21 @@
         "SAMPLER"
       ],
       "used_in_type_ids": [
+        "character__wan",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__wan_2_2",
+        "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
-        "text_to_image__flux_2_klein"
+        "preprocessors_estimation__lotus",
+        "text_to_image__flux_2",
+        "text_to_image__flux_2_klein",
+        "text_to_image__ideogram",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2"
       ],
-      "occurrences": 4
+      "occurrences": 26
     },
     {
       "class": "KlingOmniProEditVideoNode",
@@ -1580,9 +3075,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVAddGuide",
@@ -1622,9 +3119,11 @@
         "LATENT"
       ],
       "used_in_type_ids": [
-        "first_last_frame_to_video__ltx_2"
+        "first_last_frame_to_video__ltx_2",
+        "image_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVAudioVAEDecode",
@@ -1648,9 +3147,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVAudioVAELoader",
@@ -1672,9 +3173,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVConcatAVLatent",
@@ -1698,9 +3201,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 3
+      "occurrences": 15
     },
     {
       "class": "LTXVConditioning",
@@ -1727,9 +3232,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVCropGuides",
@@ -1757,9 +3264,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVEmptyLatentAudio",
@@ -1787,9 +3296,11 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
     },
     {
       "class": "LTXVImgToVideoInplace",
@@ -1818,9 +3329,11 @@
         "LATENT"
       ],
       "used_in_type_ids": [
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 12
     },
     {
       "class": "LTXVLatentUpsampler",
@@ -1845,9 +3358,11 @@
         "LATENT"
       ],
       "used_in_type_ids": [
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 1
+      "occurrences": 6
     },
     {
       "class": "LTXVPreprocess",
@@ -1871,7 +3386,43 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2"
+      ],
+      "occurrences": 9
+    },
+    {
+      "class": "LTXVScheduler",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "base_shift",
+          "max_shift",
+          "steps",
+          "stretch",
+          "terminal"
+        ],
+        "optional": [
+          "latent"
+        ],
+        "types": {
+          "steps": "INT",
+          "max_shift": "FLOAT",
+          "base_shift": "FLOAT",
+          "stretch": "BOOLEAN",
+          "terminal": "FLOAT",
+          "latent": "LATENT"
+        }
+      },
+      "outputs": [
+        "SIGMAS"
+      ],
+      "used_in_type_ids": [
+        "image_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
       "occurrences": 3
     },
@@ -1896,9 +3447,38 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 3
+      "occurrences": 15
+    },
+    {
+      "class": "LatentCutToBatch",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "dim",
+          "samples",
+          "slice_size"
+        ],
+        "optional": [],
+        "types": {
+          "samples": "LATENT",
+          "dim": "COMBO",
+          "slice_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "image_edit__qwen_image"
+      ],
+      "occurrences": 1
     },
     {
       "class": "LatentUpscaleModelLoader",
@@ -1919,9 +3499,52 @@
         "LATENT_UPSCALE_MODEL"
       ],
       "used_in_type_ids": [
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 1
+      "occurrences": 6
+    },
+    {
+      "class": "LoadBackgroundRemovalModel",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "bg_removal_name"
+        ],
+        "optional": [],
+        "types": {
+          "bg_removal_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "BACKGROUND_REMOVAL"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat",
+        "image_tools__birefnet"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "LoadDA3Model",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "preprocessors_estimation__depth_anything"
+      ],
+      "occurrences": 2
     },
     {
       "class": "LoadImage",
@@ -1970,12 +3593,60 @@
         "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
+        "text_to_video__ltx_2",
         "upscale__flux",
         "upscale__generic",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 52
+      "occurrences": 53
+    },
+    {
+      "class": "LoadMediaPipeFaceLandmarker",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model_name"
+        ],
+        "optional": [],
+        "types": {
+          "model_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "FACE_DETECTION_MODEL"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__mediapipe"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "LoadMoGeModel",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model_name"
+        ],
+        "optional": [],
+        "types": {
+          "model_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "MOGE_MODEL"
+      ],
+      "used_in_type_ids": [
+        "3d__moge",
+        "preprocessors_estimation__moge"
+      ],
+      "occurrences": 3
     },
     {
       "class": "LoadVideo",
@@ -2063,10 +3734,45 @@
         "MODEL"
       ],
       "used_in_type_ids": [
+        "character__wan",
+        "image_edit__firered",
+        "image_edit__flux_2",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
+        "image_to_video__wan_2_2",
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__flux_2",
+        "text_to_image__qwen_image",
+        "text_to_video__ltx_2",
+        "text_to_video__wan_2_2",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 3
+      "occurrences": 36
+    },
+    {
+      "class": "LotusConditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 4
     },
     {
       "class": "LtxvApiImageToVideo",
@@ -2274,9 +3980,61 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 3
+      "occurrences": 12
+    },
+    {
+      "class": "MarkdownNote",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
+        "image_to_video__ltx_2",
+        "image_to_video__wan_2_2",
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
+        "text_to_video__wan_2_2",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 18
+    },
+    {
+      "class": "MaskPreview",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "mask"
+        ],
+        "optional": [],
+        "types": {
+          "mask": "MASK"
+        }
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 4
     },
     {
       "class": "MaskToImage",
@@ -2298,9 +4056,70 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace",
+        "inpaint_outpaint__qwen_image",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 3
+      "occurrences": 9
+    },
+    {
+      "class": "MediaPipeFaceLandmarker",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "detector_variant",
+          "face_detection_model",
+          "image",
+          "min_confidence",
+          "missing_frame_fallback",
+          "num_faces"
+        ],
+        "optional": [],
+        "types": {
+          "face_detection_model": "FACE_DETECTION_MODEL",
+          "image": "IMAGE",
+          "detector_variant": "COMBO",
+          "num_faces": "INT",
+          "min_confidence": "FLOAT",
+          "missing_frame_fallback": "COMBO"
+        }
+      },
+      "outputs": [
+        "FACE_LANDMARKS",
+        "BOUNDING_BOX"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__mediapipe"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "MediaPipeFaceMask",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "face_landmarks",
+          "regions"
+        ],
+        "optional": [],
+        "types": {
+          "face_landmarks": "FACE_LANDMARKS",
+          "regions": "COMFY_DYNAMICCOMBO_V3"
+        }
+      },
+      "outputs": [
+        "MASK"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__mediapipe"
+      ],
+      "occurrences": 2
     },
     {
       "class": "MeshyImageToModelNode",
@@ -2417,6 +4236,99 @@
       "occurrences": 1
     },
     {
+      "class": "MoGeInference",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "apply_mask",
+          "batch_size",
+          "force_projection",
+          "fov_x_degrees",
+          "image",
+          "moge_model",
+          "resolution_level"
+        ],
+        "optional": [],
+        "types": {
+          "moge_model": "MOGE_MODEL",
+          "image": "IMAGE",
+          "resolution_level": "INT",
+          "fov_x_degrees": "FLOAT",
+          "batch_size": "INT",
+          "force_projection": "BOOLEAN",
+          "apply_mask": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "MOGE_GEOMETRY"
+      ],
+      "used_in_type_ids": [
+        "3d__moge",
+        "preprocessors_estimation__moge"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "MoGePointMapToMesh",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_index",
+          "decimation",
+          "discontinuity_threshold",
+          "moge_geometry",
+          "texture"
+        ],
+        "optional": [],
+        "types": {
+          "moge_geometry": "MOGE_GEOMETRY",
+          "batch_index": "INT",
+          "decimation": "INT",
+          "discontinuity_threshold": "FLOAT",
+          "texture": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "MESH"
+      ],
+      "used_in_type_ids": [
+        "3d__moge"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "MoGeRender",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "moge_geometry",
+          "output"
+        ],
+        "optional": [],
+        "types": {
+          "moge_geometry": "MOGE_GEOMETRY",
+          "output": "COMBO"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "3d__moge",
+        "preprocessors_estimation__moge"
+      ],
+      "occurrences": 8
+    },
+    {
       "class": "ModelPatchLoader",
       "role": "lora_loader",
       "role_description": "LoRA / model patch loader",
@@ -2437,7 +4349,7 @@
       "used_in_type_ids": [
         "image_edit_with_controlnet__z_image"
       ],
-      "occurrences": 1
+      "occurrences": 5
     },
     {
       "class": "ModelSamplingAuraFlow",
@@ -2460,12 +4372,19 @@
         "MODEL"
       ],
       "used_in_type_ids": [
+        "3d__hunyuan3d",
+        "audio__ace_step",
+        "image_edit__firered",
         "image_edit__qwen_image",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
-        "text_to_image__z_image"
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
+        "text_to_image__z_image",
+        "upscale__z_image"
       ],
-      "occurrences": 5
+      "occurrences": 25
     },
     {
       "class": "ModelSamplingSD3",
@@ -2488,13 +4407,60 @@
         "MODEL"
       ],
       "used_in_type_ids": [
+        "character__wan",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
         "image_to_video__wan_2_2",
+        "text_to_video__wan_2_2",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 12
+      "occurrences": 22
+    },
+    {
+      "class": "Note",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "image_edit__qwen_image",
+        "image_to_video__wan_2_2",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__sam3",
+        "text_to_video__wan_2_2"
+      ],
+      "occurrences": 7
+    },
+    {
+      "class": "OpticalFlowLoader",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model_name"
+        ],
+        "optional": [],
+        "types": {
+          "model_name": "COMBO"
+        }
+      },
+      "outputs": [
+        "OPTICAL_FLOW"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 1
     },
     {
       "class": "PreviewAny",
@@ -2516,9 +4482,14 @@
       ],
       "used_in_type_ids": [
         "api_partner_nodes_image_edit__nano_banana",
-        "image_to_video__ltx_2"
+        "audio__qwen_image",
+        "image_edit__wan_2_2",
+        "image_to_video__ltx_2",
+        "text_to_image__ernie",
+        "text_tools__generic",
+        "video_to_video__wan_2_2"
       ],
-      "occurrences": 2
+      "occurrences": 15
     },
     {
       "class": "PreviewImage",
@@ -2537,11 +4508,16 @@
       },
       "outputs": [],
       "used_in_type_ids": [
+        "3d__triposplat",
         "api_partner_nodes_image_edit__nano_banana",
+        "character__wan",
         "first_last_frame_to_video__wan_vace",
+        "image_edit_with_controlnet__z_image",
+        "inpaint_outpaint__qwen_image",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 5
+      "occurrences": 15
     },
     {
       "class": "PrimitiveBoolean",
@@ -2562,9 +4538,87 @@
         "BOOLEAN"
       ],
       "used_in_type_ids": [
-        "image_to_video__ltx_2"
+        "audio__qwen_image",
+        "character__wan",
+        "image_edit__firered",
+        "image_edit__flux_2",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
+        "image_to_video__ltx_2",
+        "image_tools__generic",
+        "text_to_image__ernie",
+        "text_to_image__flux_2",
+        "text_to_image__qwen_image",
+        "text_to_video__ltx_2",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__wan_2_2",
+        "video_tools__generic"
       ],
-      "occurrences": 1
+      "occurrences": 25
+    },
+    {
+      "class": "PrimitiveBoundingBox",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "height",
+          "width",
+          "x",
+          "y"
+        ],
+        "optional": [],
+        "types": {
+          "x": "INT",
+          "y": "INT",
+          "width": "INT",
+          "height": "INT"
+        }
+      },
+      "outputs": [
+        "BOUNDING_BOX"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 13
+    },
+    {
+      "class": "PrimitiveFloat",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "value"
+        ],
+        "optional": [],
+        "types": {
+          "value": "FLOAT"
+        }
+      },
+      "outputs": [
+        "FLOAT"
+      ],
+      "used_in_type_ids": [
+        "audio__ace_step",
+        "audio__qwen_image",
+        "character__wan",
+        "image_edit__firered",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
+        "image_to_video__ltx_2",
+        "image_tools__generic",
+        "text_to_image__qwen_image",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 63
     },
     {
       "class": "PrimitiveInt",
@@ -2585,13 +4639,47 @@
         "INT"
       ],
       "used_in_type_ids": [
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__flux_2",
+        "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
+        "image_tools__generic",
+        "inpaint_outpaint__qwen_image",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
-        "video_to_video__wan_vace"
+        "text_to_image__ideogram",
+        "text_to_image__qwen_image",
+        "text_to_video__ltx_2",
+        "text_tools__generic",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_to_video__wan_2_2",
+        "video_to_video__wan_vace",
+        "video_tools__generic"
       ],
-      "occurrences": 17
+      "occurrences": 87
+    },
+    {
+      "class": "PrimitiveNode",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "audio__ace_step"
+      ],
+      "occurrences": 1
     },
     {
       "class": "PrimitiveStringMultiline",
@@ -2614,10 +4702,16 @@
       "used_in_type_ids": [
         "api_partner_nodes_character__nano_banana",
         "api_partner_nodes_image_edit__nano_banana",
+        "audio__qwen_image",
+        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
-        "text_to_image__flux_2_klein"
+        "text_to_image__ernie",
+        "text_to_image__flux_2_klein",
+        "text_to_image__lumina",
+        "text_to_video__ltx_2",
+        "video_to_video__wan_2_2"
       ],
-      "occurrences": 5
+      "occurrences": 17
     },
     {
       "class": "QwenImageDiffsynthControlnet",
@@ -2651,7 +4745,38 @@
       "used_in_type_ids": [
         "image_edit_with_controlnet__z_image"
       ],
-      "occurrences": 1
+      "occurrences": 5
+    },
+    {
+      "class": "RTDETR_detect",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "class_name",
+          "image",
+          "max_detections",
+          "model",
+          "threshold"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "image": "IMAGE",
+          "threshold": "FLOAT",
+          "class_name": "COMBO",
+          "max_detections": "INT"
+        }
+      },
+      "outputs": [
+        "BOUNDING_BOX"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__sdpose"
+      ],
+      "occurrences": 2
     },
     {
       "class": "RandomNoise",
@@ -2673,11 +4798,42 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_to_video__ltx_2",
-        "text_to_image__flux_2_klein"
+        "text_to_image__flux_2",
+        "text_to_image__flux_2_klein",
+        "text_to_image__ideogram",
+        "text_to_video__ltx_2",
+        "video_inpaint__sam3",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 5
+      "occurrences": 22
+    },
+    {
+      "class": "RebatchImages",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "images"
+        ],
+        "optional": [],
+        "types": {
+          "images": "IMAGE",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 1
     },
     {
       "class": "ReferenceLatent",
@@ -2701,7 +4857,72 @@
         "CONDITIONING"
       ],
       "used_in_type_ids": [
-        "image_edit__flux_2_klein"
+        "image_edit__flux_2",
+        "image_edit__flux_2_klein",
+        "image_edit__qwen_image"
+      ],
+      "occurrences": 7
+    },
+    {
+      "class": "RegexExtract",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "case_insensitive",
+          "dotall",
+          "group_index",
+          "mode",
+          "multiline",
+          "regex_pattern",
+          "string"
+        ],
+        "optional": [],
+        "types": {
+          "string": "STRING",
+          "regex_pattern": "STRING",
+          "mode": "COMBO",
+          "case_insensitive": "BOOLEAN",
+          "multiline": "BOOLEAN",
+          "dotall": "BOOLEAN",
+          "group_index": "INT"
+        }
+      },
+      "outputs": [
+        "STRING"
+      ],
+      "used_in_type_ids": [
+        "image_edit__wan_2_2",
+        "text_tools__generic",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "RemoveBackground",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "bg_removal_model",
+          "image"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "bg_removal_model": "BACKGROUND_REMOVAL"
+        }
+      },
+      "outputs": [
+        "MASK"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat",
+        "image_tools__birefnet"
       ],
       "occurrences": 2
     },
@@ -2727,9 +4948,60 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 2
+      "occurrences": 3
+    },
+    {
+      "class": "Reroute",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 5
+    },
+    {
+      "class": "ResizeAndPadImage",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image",
+          "interpolation",
+          "padding_color",
+          "target_height",
+          "target_width"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "target_width": "INT",
+          "target_height": "INT",
+          "padding_color": "COMBO",
+          "interpolation": "COMBO"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "video_tools__generic"
+      ],
+      "occurrences": 1
     },
     {
       "class": "ResizeImageMaskNode",
@@ -2754,10 +5026,17 @@
         "COMFY_MATCHTYPE_V3"
       ],
       "used_in_type_ids": [
+        "character__wan",
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_edit__firered",
+        "image_to_video__ltx_2",
+        "preprocessors_estimation__sdpose",
+        "text_to_video__ltx_2",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
+        "video_tools__generic"
       ],
-      "occurrences": 3
+      "occurrences": 18
     },
     {
       "class": "ResizeImagesByLongerEdge",
@@ -2780,9 +5059,219 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "image_to_video__ltx_2"
+        "3d__moge",
+        "image_to_video__ltx_2",
+        "preprocessors_estimation__moge",
+        "text_to_video__ltx_2"
       ],
-      "occurrences": 1
+      "occurrences": 6
+    },
+    {
+      "class": "SAM3_Detect",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image",
+          "individual_masks",
+          "model",
+          "refine_iterations",
+          "threshold"
+        ],
+        "optional": [
+          "bboxes",
+          "conditioning",
+          "negative_coords",
+          "positive_coords"
+        ],
+        "types": {
+          "model": "MODEL",
+          "image": "IMAGE",
+          "threshold": "FLOAT",
+          "refine_iterations": "INT",
+          "individual_masks": "BOOLEAN",
+          "conditioning": "CONDITIONING",
+          "bboxes": "BOUNDING_BOX",
+          "positive_coords": "STRING",
+          "negative_coords": "STRING"
+        }
+      },
+      "outputs": [
+        "MASK",
+        "BOUNDING_BOX"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__sam3",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "SAM3_VideoTrack",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "detect_interval",
+          "detection_threshold",
+          "images",
+          "max_objects",
+          "model"
+        ],
+        "optional": [
+          "conditioning",
+          "initial_mask"
+        ],
+        "types": {
+          "images": "IMAGE",
+          "model": "MODEL",
+          "detection_threshold": "FLOAT",
+          "max_objects": "INT",
+          "detect_interval": "INT",
+          "initial_mask": "MASK",
+          "conditioning": "CONDITIONING"
+        }
+      },
+      "outputs": [
+        "SAM3_TRACK_DATA"
+      ],
+      "used_in_type_ids": [
+        "character__wan"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "SCAIL2ColoredMask",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": false,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [],
+      "used_in_type_ids": [
+        "character__wan"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "SDPoseDrawKeypoints",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "draw_body",
+          "draw_face",
+          "draw_feet",
+          "draw_hands",
+          "face_point_size",
+          "keypoints",
+          "score_threshold",
+          "stick_width"
+        ],
+        "optional": [],
+        "types": {
+          "keypoints": "POSE_KEYPOINT",
+          "draw_body": "BOOLEAN",
+          "draw_hands": "BOOLEAN",
+          "draw_face": "BOOLEAN",
+          "draw_feet": "BOOLEAN",
+          "stick_width": "INT",
+          "face_point_size": "INT",
+          "score_threshold": "FLOAT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__sdpose"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "SDPoseKeypointExtractor",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "image",
+          "model",
+          "vae"
+        ],
+        "optional": [
+          "bboxes"
+        ],
+        "types": {
+          "model": "MODEL",
+          "vae": "VAE",
+          "image": "IMAGE",
+          "batch_size": "INT",
+          "bboxes": "BOUNDING_BOX"
+        }
+      },
+      "outputs": [
+        "POSE_KEYPOINT"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__sdpose"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "SamplerCustom",
+      "role": "sampler",
+      "role_description": "diffusion sampler / denoiser",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "add_noise",
+          "cfg",
+          "latent_image",
+          "model",
+          "negative",
+          "noise_seed",
+          "positive",
+          "sampler",
+          "sigmas"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "add_noise": "BOOLEAN",
+          "noise_seed": "INT",
+          "cfg": "FLOAT",
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "sampler": "SAMPLER",
+          "sigmas": "SIGMAS",
+          "latent_image": "LATENT"
+        }
+      },
+      "outputs": [
+        "LATENT",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "character__wan",
+        "image_edit__wan_2_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 6
     },
     {
       "class": "SamplerCustomAdvanced",
@@ -2813,11 +5302,19 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
-        "text_to_image__flux_2_klein"
+        "preprocessors_estimation__lotus",
+        "text_to_image__flux_2",
+        "text_to_image__flux_2_klein",
+        "text_to_image__ideogram",
+        "text_to_video__ltx_2",
+        "video_inpaint__sam3",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 5
+      "occurrences": 27
     },
     {
       "class": "SamplerEulerAncestral",
@@ -2842,7 +5339,7 @@
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2"
       ],
-      "occurrences": 1
+      "occurrences": 3
     },
     {
       "class": "SaveGLB",
@@ -2936,6 +5433,58 @@
       "occurrences": 3
     },
     {
+      "class": "SetFirstSigma",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "sigma",
+          "sigmas"
+        ],
+        "optional": [],
+        "types": {
+          "sigmas": "SIGMAS",
+          "sigma": "FLOAT"
+        }
+      },
+      "outputs": [
+        "SIGMAS"
+      ],
+      "used_in_type_ids": [
+        "image_edit_with_controlnet__z_image",
+        "preprocessors_estimation__lotus",
+        "video_to_video__ltx_2"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "SetLatentNoiseMask",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "mask",
+          "samples"
+        ],
+        "optional": [],
+        "types": {
+          "samples": "LATENT",
+          "mask": "MASK"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "inpaint_outpaint__qwen_image"
+      ],
+      "occurrences": 1
+    },
+    {
       "class": "SolidMask",
       "role": "other",
       "role_description": "unclassified node role",
@@ -2959,6 +5508,204 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "SplitImageToTileList",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "image",
+          "overlap",
+          "tile_height",
+          "tile_width"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "tile_width": "INT",
+          "tile_height": "INT",
+          "overlap": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "image_tools__generic"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "SplitSigmas",
+      "role": "guidance",
+      "role_description": "guider / sigma / scheduler",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "sigmas",
+          "step"
+        ],
+        "optional": [],
+        "types": {
+          "sigmas": "SIGMAS",
+          "step": "INT"
+        }
+      },
+      "outputs": [
+        "SIGMAS",
+        "SIGMAS"
+      ],
+      "used_in_type_ids": [
+        "image_edit__wan_2_2",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "StringConcatenate",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "delimiter",
+          "string_a",
+          "string_b"
+        ],
+        "optional": [],
+        "types": {
+          "string_a": "STRING",
+          "string_b": "STRING",
+          "delimiter": "STRING"
+        }
+      },
+      "outputs": [
+        "STRING"
+      ],
+      "used_in_type_ids": [
+        "image_edit__wan_2_2",
+        "text_to_image__lumina",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 4
+    },
+    {
+      "class": "StringReplace",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "find",
+          "replace",
+          "string"
+        ],
+        "optional": [],
+        "types": {
+          "string": "STRING",
+          "find": "STRING",
+          "replace": "STRING"
+        }
+      },
+      "outputs": [
+        "STRING"
+      ],
+      "used_in_type_ids": [
+        "audio__qwen_image",
+        "image_edit__wan_2_2",
+        "text_to_image__ernie",
+        "text_to_image__ideogram",
+        "text_tools__generic",
+        "video_to_video__wan_2_2"
+      ],
+      "occurrences": 16
+    },
+    {
+      "class": "TextEncodeAceStepAudio1.5",
+      "role": "text_encode",
+      "role_description": "prompt text encoding",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "bpm",
+          "cfg_scale",
+          "clip",
+          "duration",
+          "generate_audio_codes",
+          "keyscale",
+          "language",
+          "lyrics",
+          "min_p",
+          "seed",
+          "tags",
+          "temperature",
+          "timesignature",
+          "top_k",
+          "top_p"
+        ],
+        "optional": [],
+        "types": {
+          "clip": "CLIP",
+          "tags": "STRING",
+          "lyrics": "STRING",
+          "seed": "INT",
+          "bpm": "INT",
+          "duration": "FLOAT",
+          "timesignature": "COMBO",
+          "language": "COMBO",
+          "keyscale": "COMBO",
+          "generate_audio_codes": "BOOLEAN",
+          "cfg_scale": "FLOAT",
+          "temperature": "FLOAT",
+          "top_p": "FLOAT",
+          "top_k": "INT",
+          "min_p": "FLOAT"
+        }
+      },
+      "outputs": [
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "audio__ace_step"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "TextEncodeQwenImageEdit",
+      "role": "text_encode",
+      "role_description": "prompt text encoding",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip",
+          "prompt"
+        ],
+        "optional": [
+          "image",
+          "vae"
+        ],
+        "types": {
+          "clip": "CLIP",
+          "prompt": "STRING",
+          "vae": "VAE",
+          "image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "CONDITIONING"
+      ],
+      "used_in_type_ids": [
+        "image_edit__longcat"
       ],
       "occurrences": 2
     },
@@ -2992,9 +5739,10 @@
         "CONDITIONING"
       ],
       "used_in_type_ids": [
+        "image_edit__firered",
         "image_edit__qwen_image"
       ],
-      "occurrences": 2
+      "occurrences": 10
     },
     {
       "class": "TextEncodeZImageOmni",
@@ -3033,6 +5781,47 @@
         "image_edit__z_image"
       ],
       "occurrences": 1
+    },
+    {
+      "class": "TextGenerate",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip",
+          "max_length",
+          "prompt",
+          "sampling_mode"
+        ],
+        "optional": [
+          "audio",
+          "image",
+          "thinking",
+          "use_default_template",
+          "video"
+        ],
+        "types": {
+          "clip": "CLIP",
+          "prompt": "STRING",
+          "max_length": "INT",
+          "sampling_mode": "COMFY_DYNAMICCOMBO_V3",
+          "image": "IMAGE",
+          "video": "IMAGE",
+          "audio": "AUDIO",
+          "thinking": "BOOLEAN",
+          "use_default_template": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "STRING"
+      ],
+      "used_in_type_ids": [
+        "audio__qwen_image",
+        "text_to_image__ernie"
+      ],
+      "occurrences": 4
     },
     {
       "class": "TextGenerateLTX2Prompt",
@@ -3169,6 +5958,33 @@
       "occurrences": 1
     },
     {
+      "class": "TrimAudioDuration",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "audio",
+          "duration",
+          "start_index"
+        ],
+        "optional": [],
+        "types": {
+          "audio": "AUDIO",
+          "start_index": "FLOAT",
+          "duration": "FLOAT"
+        }
+      },
+      "outputs": [
+        "AUDIO"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 1
+    },
+    {
       "class": "TrimVideoLatent",
       "role": "other",
       "role_description": "unclassified node role",
@@ -3190,9 +6006,103 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 5
+      "occurrences": 7
+    },
+    {
+      "class": "TripoSplatConditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "clip_vision",
+          "image",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "clip_vision": "CLIP_VISION",
+          "vae": "VAE",
+          "image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "TripoSplatPreprocessImage",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "erode_radius",
+          "image",
+          "mask",
+          "size"
+        ],
+        "optional": [],
+        "types": {
+          "image": "IMAGE",
+          "mask": "MASK",
+          "erode_radius": "INT",
+          "size": "INT"
+        }
+      },
+      "outputs": [
+        "IMAGE"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "TripoSplatSamplingPreview",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "model",
+          "num_gaussians",
+          "octree_level",
+          "pitch",
+          "point_size",
+          "vae",
+          "yaw"
+        ],
+        "optional": [],
+        "types": {
+          "model": "MODEL",
+          "vae": "VAE",
+          "octree_level": "INT",
+          "num_gaussians": "INT",
+          "yaw": "FLOAT",
+          "pitch": "FLOAT",
+          "point_size": "INT"
+        }
+      },
+      "outputs": [
+        "MODEL"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat"
+      ],
+      "occurrences": 1
     },
     {
       "class": "UNETLoader",
@@ -3215,19 +6125,42 @@
         "MODEL"
       ],
       "used_in_type_ids": [
+        "3d__triposplat",
+        "audio__ace_step",
+        "character__wan",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__longcat",
         "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
+        "inpaint_outpaint__flux",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__lotus",
+        "preprocessors_estimation__sdpose",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
+        "text_to_image__flux_krea",
+        "text_to_image__ideogram",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "text_to_video__wan_2_2",
+        "upscale__z_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 16
+      "occurrences": 70
     },
     {
       "class": "UltimateSDUpscale",
@@ -3322,9 +6255,10 @@
       ],
       "used_in_type_ids": [
         "upscale__flux",
-        "upscale__generic"
+        "upscale__generic",
+        "upscale__z_image"
       ],
-      "occurrences": 2
+      "occurrences": 4
     },
     {
       "class": "VAEDecode",
@@ -3347,19 +6281,96 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
+        "character__wan",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__longcat",
         "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
+        "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
+        "inpaint_outpaint__flux",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__lotus",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
+        "text_to_image__flux_krea",
+        "text_to_image__ideogram",
+        "text_to_image__lumina",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "text_to_video__wan_2_2",
+        "upscale__z_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 14
+      "occurrences": 62
+    },
+    {
+      "class": "VAEDecodeAudio",
+      "role": "vae_decode",
+      "role_description": "latent -> pixel decode",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "samples",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "samples": "LATENT",
+          "vae": "VAE"
+        }
+      },
+      "outputs": [
+        "AUDIO"
+      ],
+      "used_in_type_ids": [
+        "audio__ace_step",
+        "audio__qwen_image"
+      ],
+      "occurrences": 3
+    },
+    {
+      "class": "VAEDecodeHunyuan3D",
+      "role": "vae_decode",
+      "role_description": "latent -> pixel decode",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "num_chunks",
+          "octree_resolution",
+          "samples",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "samples": "LATENT",
+          "vae": "VAE",
+          "num_chunks": "INT",
+          "octree_resolution": "INT"
+        }
+      },
+      "outputs": [
+        "VOXEL"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d"
+      ],
+      "occurrences": 1
     },
     {
       "class": "VAEDecodeTiled",
@@ -3391,9 +6402,40 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__ltx_2",
-        "image_to_video__ltx_2"
+        "image_to_video__ltx_2",
+        "text_to_video__ltx_2",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 9
+    },
+    {
+      "class": "VAEDecodeTripoSplat",
+      "role": "vae_decode",
+      "role_description": "latent -> pixel decode",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "num_gaussians",
+          "samples",
+          "seed",
+          "vae"
+        ],
+        "optional": [],
+        "types": {
+          "samples": "LATENT",
+          "vae": "VAE",
+          "num_gaussians": "INT",
+          "seed": "INT"
+        }
+      },
+      "outputs": [
+        "SPLAT"
+      ],
+      "used_in_type_ids": [
+        "3d__triposplat"
+      ],
+      "occurrences": 1
     },
     {
       "class": "VAEEncode",
@@ -3416,10 +6458,19 @@
         "LATENT"
       ],
       "used_in_type_ids": [
+        "image_edit__firered",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
-        "image_edit__z_image"
+        "image_edit__longcat",
+        "image_edit__qwen_image",
+        "image_edit__z_image",
+        "image_edit_with_controlnet__z_image",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__lotus",
+        "upscale__z_image",
+        "video_to_video__ltx_2"
       ],
-      "occurrences": 2
+      "occurrences": 17
     },
     {
       "class": "VAELoader",
@@ -3440,19 +6491,41 @@
         "VAE"
       ],
       "used_in_type_ids": [
+        "3d__triposplat",
+        "audio__ace_step",
+        "character__wan",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__firered",
+        "image_edit__flux_2",
         "image_edit__flux_2_klein",
+        "image_edit__longcat",
         "image_edit__qwen_image",
+        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
+        "inpaint_outpaint__flux",
+        "inpaint_outpaint__qwen_image",
+        "preprocessors_estimation__lotus",
+        "text_to_image__anima",
+        "text_to_image__ernie",
+        "text_to_image__flux",
+        "text_to_image__flux_2",
         "text_to_image__flux_2_klein",
+        "text_to_image__flux_krea",
+        "text_to_image__ideogram",
+        "text_to_image__qwen_image",
         "text_to_image__z_image",
+        "text_to_video__wan_2_2",
+        "upscale__z_image",
+        "video_inpaint__sam3",
+        "video_inpaint__wan_vace",
+        "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 14
+      "occurrences": 60
     },
     {
       "class": "VHS_LoadImagePath",
@@ -3619,6 +6692,122 @@
       "occurrences": 20
     },
     {
+      "class": "VOIDInpaintConditioning",
+      "role": "conditioning_op",
+      "role_description": "conditioning combine / edit",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "length",
+          "negative",
+          "positive",
+          "quadmask",
+          "vae",
+          "video",
+          "width"
+        ],
+        "optional": [],
+        "types": {
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "vae": "VAE",
+          "video": "IMAGE",
+          "quadmask": "MASK",
+          "width": "INT",
+          "height": "INT",
+          "length": "INT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "VOIDSampler",
+      "role": "sampler",
+      "role_description": "diffusion sampler / denoiser",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [],
+        "optional": [],
+        "types": {}
+      },
+      "outputs": [
+        "SAMPLER"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "VOIDWarpedNoise",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "length",
+          "optical_flow",
+          "video",
+          "width"
+        ],
+        "optional": [],
+        "types": {
+          "optical_flow": "OPTICAL_FLOW",
+          "video": "IMAGE",
+          "width": "INT",
+          "height": "INT",
+          "length": "INT",
+          "batch_size": "INT"
+        }
+      },
+      "outputs": [
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "VOIDWarpedNoiseSource",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "warped_noise"
+        ],
+        "optional": [],
+        "types": {
+          "warped_noise": "LATENT"
+        }
+      },
+      "outputs": [
+        "NOISE"
+      ],
+      "used_in_type_ids": [
+        "video_inpaint__sam3"
+      ],
+      "occurrences": 1
+    },
+    {
       "class": "Veo3VideoGenerationNode",
       "role": "api_node",
       "role_description": "external API generation node",
@@ -3659,6 +6848,63 @@
       ],
       "used_in_type_ids": [
         "api_partner_nodes_text_to_video__veo"
+      ],
+      "occurrences": 1
+    },
+    {
+      "class": "Video Slice",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "duration",
+          "start_time",
+          "strict_duration",
+          "video"
+        ],
+        "optional": [],
+        "types": {
+          "video": "VIDEO",
+          "start_time": "FLOAT",
+          "duration": "FLOAT",
+          "strict_duration": "BOOLEAN"
+        }
+      },
+      "outputs": [
+        "VIDEO"
+      ],
+      "used_in_type_ids": [
+        "preprocessors_estimation__depth_anything",
+        "preprocessors_estimation__mediapipe"
+      ],
+      "occurrences": 2
+    },
+    {
+      "class": "VoxelToMesh",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "algorithm",
+          "threshold",
+          "voxel"
+        ],
+        "optional": [],
+        "types": {
+          "voxel": "VOXEL",
+          "algorithm": "COMBO",
+          "threshold": "FLOAT"
+        }
+      },
+      "outputs": [
+        "MESH"
+      ],
+      "used_in_type_ids": [
+        "3d__hunyuan3d"
       ],
       "occurrences": 1
     },
@@ -3838,6 +7084,48 @@
       "occurrences": 1
     },
     {
+      "class": "WanImageToVideo",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "length",
+          "negative",
+          "positive",
+          "vae",
+          "width"
+        ],
+        "optional": [
+          "clip_vision_output",
+          "start_image"
+        ],
+        "types": {
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "vae": "VAE",
+          "width": "INT",
+          "height": "INT",
+          "length": "INT",
+          "batch_size": "INT",
+          "clip_vision_output": "CLIP_VISION_OUTPUT",
+          "start_image": "IMAGE"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "image_to_video__wan_2_2"
+      ],
+      "occurrences": 2
+    },
+    {
       "class": "WanImageToVideoApi",
       "role": "other",
       "role_description": "unclassified node role",
@@ -3882,6 +7170,56 @@
         "api_partner_nodes_image_to_video__wan_2_6"
       ],
       "occurrences": 1
+    },
+    {
+      "class": "WanSCAILToVideo",
+      "role": "other",
+      "role_description": "unclassified node role",
+      "resolved": true,
+      "is_custom": false,
+      "inputs": {
+        "required": [
+          "batch_size",
+          "height",
+          "length",
+          "negative",
+          "pose_end",
+          "pose_start",
+          "pose_strength",
+          "positive",
+          "vae",
+          "width"
+        ],
+        "optional": [
+          "clip_vision_output",
+          "pose_video",
+          "reference_image"
+        ],
+        "types": {
+          "positive": "CONDITIONING",
+          "negative": "CONDITIONING",
+          "vae": "VAE",
+          "width": "INT",
+          "height": "INT",
+          "length": "INT",
+          "batch_size": "INT",
+          "pose_strength": "FLOAT",
+          "pose_start": "FLOAT",
+          "pose_end": "FLOAT",
+          "clip_vision_output": "CLIP_VISION_OUTPUT",
+          "reference_image": "IMAGE",
+          "pose_video": "IMAGE"
+        }
+      },
+      "outputs": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "used_in_type_ids": [
+        "character__wan"
+      ],
+      "occurrences": 2
     },
     {
       "class": "WanTextToVideoApi",
@@ -3971,9 +7309,10 @@
       ],
       "used_in_type_ids": [
         "first_last_frame_to_video__wan_vace",
+        "video_inpaint__wan_vace",
         "video_to_video__wan_vace"
       ],
-      "occurrences": 5
+      "occurrences": 7
     },
     {
       "class": "bEpicReformat",
