@@ -13,3 +13,5 @@ output_workflows
 # Python build artifacts
 __pycache__/
 *.pyc
+# Large regenerable /object_info cache for the workflow_recipes generator
+config/workflow_recipes_object_info_cache.json
