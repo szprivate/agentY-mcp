@@ -74,6 +74,7 @@ _TOOLS = [
     T.remove_workflow_node,
     T.replace_node,
     T.apply_brainbriefing,
+    T.assemble_workflow_deterministic,
     T.duplicate_workflow,
     # ── Template registry (add / remove custom templates) ─────────────────
     T.register_workflow_template,

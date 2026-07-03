@@ -53,6 +53,8 @@ from src.tools.comfyui import (  # noqa: F401
     clear_tool_caches,
     reset_patch_workflow_guard,
 )
+# Fully deterministic (no-LLM) one-shot workflow assembly
+from src.tools.assembly_deterministic import assemble_workflow_deterministic  # noqa: F401
 from src.tools.image_handling import (  # noqa: F401
     upload_image,
     view_image,
