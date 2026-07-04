@@ -126,13 +126,13 @@
         "SIGMAS"
       ],
       "used_in_type_ids": [
-        "character__wan",
-        "image_edit__wan_2_2",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit_with_controlnet__z_image",
         "preprocessors_estimation__lotus",
         "video_inpaint__sam3",
-        "video_to_video__ltx_2",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything",
+        "video_to_video__ltx_2"
       ],
       "occurrences": 10
     },
@@ -175,8 +175,8 @@
       },
       "outputs": [],
       "used_in_type_ids": [
-        "image_edit__wan_2_2",
-        "video_to_video__wan_2_2"
+        "image_edit__bernini",
+        "video_to_video__depth_anything"
       ],
       "occurrences": 2
     },
@@ -432,15 +432,15 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_edit__longcat",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
@@ -456,6 +456,7 @@
         "upscale__z_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
@@ -483,14 +484,14 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
@@ -514,6 +515,7 @@
         "upscale__z_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
@@ -544,7 +546,7 @@
       ],
       "used_in_type_ids": [
         "3d__hunyuan3d",
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 3
     },
@@ -568,7 +570,7 @@
       ],
       "used_in_type_ids": [
         "3d__triposplat",
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 3
     },
@@ -621,7 +623,7 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "image_to_video__ltx_2",
         "preprocessors_estimation__sam3",
@@ -685,7 +687,7 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 1
     },
@@ -714,7 +716,7 @@
       "used_in_type_ids": [
         "3d__moge",
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "image_to_video__ltx_2",
         "image_tools__generic",
@@ -777,11 +779,11 @@
         "3d__moge",
         "3d__triposplat",
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "preprocessors_estimation__mediapipe",
         "preprocessors_estimation__moge",
         "text_to_image__ernie",
@@ -789,7 +791,7 @@
         "text_to_image__qwen_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
-        "video_to_video__wan_2_2",
+        "video_to_video__depth_anything",
         "video_tools__generic"
       ],
       "occurrences": 52
@@ -925,6 +927,7 @@
         "upscale__generic",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace",
@@ -979,10 +982,10 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "image_tools__generic",
         "text_to_image__ideogram",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 12
     },
@@ -1822,7 +1825,7 @@
       ],
       "used_in_type_ids": [
         "3d__moge",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
@@ -1871,7 +1874,7 @@
         "api_partner_nodes_text_to_video__wan_2_6",
         "api_partner_nodes_video_to_video__generic",
         "api_partner_nodes_video_to_video__kling",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
@@ -1886,6 +1889,7 @@
         "upscale__generic",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace",
@@ -2216,7 +2220,7 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
         "video_to_video__ltx_2",
@@ -2849,10 +2853,10 @@
         "SAMPLER"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
-        "image_edit__wan_2_2",
         "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
         "preprocessors_estimation__lotus",
@@ -2860,8 +2864,8 @@
         "text_to_image__flux_2_klein",
         "text_to_image__ideogram",
         "text_to_video__ltx_2",
-        "video_to_video__ltx_2",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything",
+        "video_to_video__ltx_2"
       ],
       "occurrences": 26
     },
@@ -3734,11 +3738,11 @@
         "MODEL"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
         "inpaint_outpaint__qwen_image",
@@ -3747,8 +3751,8 @@
         "text_to_video__ltx_2",
         "text_to_video__wan_2_2",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
-        "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
       ],
       "occurrences": 36
@@ -3999,8 +4003,8 @@
       },
       "outputs": [],
       "used_in_type_ids": [
+        "image_edit__bernini",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
         "image_to_video__wan_2_2",
         "inpaint_outpaint__qwen_image",
@@ -4008,8 +4012,8 @@
         "text_to_image__qwen_image",
         "text_to_video__wan_2_2",
         "video_inpaint__wan_vace",
-        "video_to_video__ltx_2",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything",
+        "video_to_video__ltx_2"
       ],
       "occurrences": 18
     },
@@ -4407,7 +4411,7 @@
         "MODEL"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
         "image_to_video__wan_2_2",
@@ -4483,11 +4487,11 @@
       "used_in_type_ids": [
         "api_partner_nodes_image_edit__nano_banana",
         "audio__qwen_image",
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "image_to_video__ltx_2",
         "text_to_image__ernie",
         "text_tools__generic",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 15
     },
@@ -4510,7 +4514,7 @@
       "used_in_type_ids": [
         "3d__triposplat",
         "api_partner_nodes_image_edit__nano_banana",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_vace",
         "image_edit_with_controlnet__z_image",
         "inpaint_outpaint__qwen_image",
@@ -4539,11 +4543,11 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
         "image_tools__generic",
         "text_to_image__ernie",
@@ -4552,7 +4556,7 @@
         "text_to_video__ltx_2",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
-        "video_to_video__wan_2_2",
+        "video_to_video__depth_anything",
         "video_tools__generic"
       ],
       "occurrences": 25
@@ -4607,16 +4611,16 @@
       "used_in_type_ids": [
         "audio__ace_step",
         "audio__qwen_image",
-        "character__wan",
+        "character__scail",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
         "image_tools__generic",
         "text_to_image__qwen_image",
         "video_inpaint__wan_vace",
-        "video_to_video__ltx_2",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything",
+        "video_to_video__ltx_2"
       ],
       "occurrences": 63
     },
@@ -4639,13 +4643,13 @@
         "INT"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_to_video__ltx_2",
         "image_tools__generic",
         "inpaint_outpaint__qwen_image",
@@ -4657,8 +4661,8 @@
         "text_tools__generic",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
-        "video_to_video__wan_2_2",
         "video_to_video__wan_vace",
         "video_tools__generic"
       ],
@@ -4703,13 +4707,13 @@
         "api_partner_nodes_character__nano_banana",
         "api_partner_nodes_image_edit__nano_banana",
         "audio__qwen_image",
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "image_to_video__ltx_2",
         "text_to_image__ernie",
         "text_to_image__flux_2_klein",
         "text_to_image__lumina",
         "text_to_video__ltx_2",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 17
     },
@@ -4894,9 +4898,9 @@
         "STRING"
       ],
       "used_in_type_ids": [
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "text_tools__generic",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 3
     },
@@ -5026,7 +5030,7 @@
         "COMFY_MATCHTYPE_V3"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__ltx_2",
         "image_edit__firered",
         "image_to_video__ltx_2",
@@ -5141,7 +5145,7 @@
         "SAM3_TRACK_DATA"
       ],
       "used_in_type_ids": [
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 4
     },
@@ -5158,7 +5162,7 @@
       },
       "outputs": [],
       "used_in_type_ids": [
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 2
     },
@@ -5267,9 +5271,9 @@
         "LATENT"
       ],
       "used_in_type_ids": [
-        "character__wan",
-        "image_edit__wan_2_2",
-        "video_to_video__wan_2_2"
+        "character__scail",
+        "image_edit__bernini",
+        "video_to_video__depth_anything"
       ],
       "occurrences": 6
     },
@@ -5562,8 +5566,8 @@
         "SIGMAS"
       ],
       "used_in_type_ids": [
-        "image_edit__wan_2_2",
-        "video_to_video__wan_2_2"
+        "image_edit__bernini",
+        "video_to_video__depth_anything"
       ],
       "occurrences": 2
     },
@@ -5590,9 +5594,9 @@
         "STRING"
       ],
       "used_in_type_ids": [
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "text_to_image__lumina",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 4
     },
@@ -5620,11 +5624,11 @@
       ],
       "used_in_type_ids": [
         "audio__qwen_image",
-        "image_edit__wan_2_2",
+        "image_edit__bernini",
         "text_to_image__ernie",
         "text_to_image__ideogram",
         "text_tools__generic",
-        "video_to_video__wan_2_2"
+        "video_to_video__depth_anything"
       ],
       "occurrences": 16
     },
@@ -6127,15 +6131,15 @@
       "used_in_type_ids": [
         "3d__triposplat",
         "audio__ace_step",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_edit__longcat",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
@@ -6156,6 +6160,7 @@
         "upscale__z_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
@@ -6281,15 +6286,15 @@
         "IMAGE"
       ],
       "used_in_type_ids": [
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_edit__longcat",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__ltx_2",
@@ -6311,6 +6316,7 @@
         "upscale__z_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
@@ -6493,15 +6499,15 @@
       "used_in_type_ids": [
         "3d__triposplat",
         "audio__ace_step",
-        "character__wan",
+        "character__scail",
         "first_last_frame_to_video__wan_2_2",
         "first_last_frame_to_video__wan_vace",
+        "image_edit__bernini",
         "image_edit__firered",
         "image_edit__flux_2",
         "image_edit__flux_2_klein",
         "image_edit__longcat",
         "image_edit__qwen_image",
-        "image_edit__wan_2_2",
         "image_edit__z_image",
         "image_edit_with_controlnet__z_image",
         "image_to_video__wan_2_2",
@@ -6521,6 +6527,7 @@
         "upscale__z_image",
         "video_inpaint__sam3",
         "video_inpaint__wan_vace",
+        "video_to_video__depth_anything",
         "video_to_video__ltx_2",
         "video_to_video__wan_2_2",
         "video_to_video__wan_vace"
@@ -7217,7 +7224,7 @@
         "LATENT"
       ],
       "used_in_type_ids": [
-        "character__wan"
+        "character__scail"
       ],
       "occurrences": 2
     },
