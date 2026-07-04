@@ -68,6 +68,7 @@ _TOOLS = [
     T.search_nodes,
     # ── Workflow assembly / modification ──────────────────────────────────
     T.save_workflow,
+    T.open_workflow_in_canvas,
     T.patch_workflow,
     T.update_workflow,
     T.add_workflow_node,

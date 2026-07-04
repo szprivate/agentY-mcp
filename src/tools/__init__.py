@@ -39,6 +39,7 @@ from src.tools.comfyui import (  # noqa: F401
     get_workflow_recipe,
     # Workflow modification
     save_workflow,
+    open_workflow_in_canvas,
     patch_workflow,
     add_workflow_node,
     remove_workflow_node,
