@@ -17,6 +17,8 @@
 #       runtime/  lib/                    <- vendored interpreter + deps (reused from the .mcpb build)
 #       src/  config/  comfyui_workflow_templates_custom/
 #       skills/<name>/                    <- every skill (skills + skills_story), folder == frontmatter name
+#       agents/<role>.md                  <- role subagents; each carries its model tier (LLM switch)
+#       commands/<name>.md                <- /agenty + /agenty-generate orchestrator commands
 #       README.md
 #
 # Prereq: run build_mcpb.ps1 first so dist/agentY/{runtime,lib} exist (this script
@@ -40,10 +42,18 @@ if (Test-Path $mkt) { Remove-Item -Recurse -Force $mkt }
 New-Item -ItemType Directory -Force -Path (Join-Path $plugin ".claude-plugin") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $mkt ".claude-plugin") | Out-Null
 
-Write-Host "[2/6] Copying server payload (src, config, templates)..."
+Write-Host "[2/6] Copying server payload (src, config, templates, agents, commands)..."
 Copy-Item -Recurse (Join-Path $root "src")    (Join-Path $plugin "src")
 Copy-Item -Recurse (Join-Path $root "config") (Join-Path $plugin "config")
 Copy-Item -Recurse (Join-Path $root "comfyui_workflow_templates_custom") (Join-Path $plugin "comfyui_workflow_templates_custom")
+# Subagents (the per-role LLM switch) and slash commands. Optional — copied only
+# when present so an older checkout without them still builds.
+foreach ($layer in @("agents", "commands")) {
+    $srcLayer = Join-Path $root $layer
+    if (Test-Path $srcLayer) {
+        Copy-Item -Recurse $srcLayer (Join-Path $plugin $layer)
+    }
+}
 
 Write-Host "[3/6] Reusing vendored runtime/ + lib/ from the .mcpb build..."
 robocopy $srcRuntime (Join-Path $plugin "runtime") /E /NFL /NDL /NJH /NJS /NP /NS /NC | Out-Null
@@ -87,8 +97,8 @@ function Write-Utf8NoBom($path, $content) {
 $pluginJson = @'
 {
   "name": "agenty",
-  "version": "1.0.0",
-  "description": "agentY - turn natural language into ComfyUI image/video workflows. Bundles the agentY MCP server (49 tools) and all agentY skills.",
+  "version": "1.1.0",
+  "description": "agentY - turn natural language into ComfyUI image/video workflows. Bundles the agentY MCP server (49 tools), all agentY skills, role subagents with a per-role model-tier LLM switch (cheap roles on Haiku, the workflow brain on Sonnet), and the /agenty orchestrator commands.",
   "author": { "name": "szprivate", "url": "https://github.com/szprivate/agentY" },
   "homepage": "https://github.com/szprivate/agentY",
   "license": "MIT",
@@ -161,6 +171,8 @@ if ($LASTEXITCODE -ne 0 -or ($probe -notmatch "SELFTEST_TOOLS=\d+")) {
     throw "Plugin self-test FAILED -- the vendored interpreter could not import the server."
 }
 $skillDirs = (Get-ChildItem -Directory -LiteralPath $skillsDest).Count
-Write-Host "[*] Self-test OK: $probe ; skills staged: $skillDirs"
+$agentCount = if (Test-Path (Join-Path $plugin "agents")) { (Get-ChildItem -File -LiteralPath (Join-Path $plugin "agents") -Filter *.md).Count } else { 0 }
+$cmdCount   = if (Test-Path (Join-Path $plugin "commands")) { (Get-ChildItem -File -LiteralPath (Join-Path $plugin "commands") -Filter *.md).Count } else { 0 }
+Write-Host "[*] Self-test OK: $probe ; skills staged: $skillDirs ; subagents: $agentCount ; commands: $cmdCount"
 $sizeMb = [Math]::Round(((Get-ChildItem -Recurse -Force $mkt | Measure-Object Length -Sum).Sum) / 1MB, 1)
 Write-Host "Done. Plugin marketplace at $mkt ($sizeMb MB)."

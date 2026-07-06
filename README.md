@@ -34,6 +34,45 @@ agentY MCP server  (python -m src, FastMCP over stdio)  ──HTTP/WS──►  
 
 ---
 
+## Claude Code plugin: role subagents + the LLM switch
+
+When installed as a **Claude Code plugin** (`scripts/build_plugin.ps1` →
+`dist/agentY-plugin`), agentY also ships **role subagents** and the **`/agenty`
+orchestrator commands** on top of the MCP tools + skills. This reproduces the
+original multi-agent pipeline **and its per-stage LLM switch** — but natively,
+using the models the Claude Code session already has instead of Ollama.
+
+**How the switch is reproduced.** The original app set a `"provider,model"` per
+role in `settings.json` (cheap local Ollama for the token-heavy/simple roles, a
+strong Claude model for the workflow "brain"). Here, each role is a subagent
+under `agents/` whose `model:` frontmatter is the switch:
+
+| Subagent (`agents/…`) | Original role | Model tier |
+|---|---|---|
+| `query-templates` | Researcher — resolve request → brainbriefing JSON | **haiku** |
+| `planner` | Multi-step decomposer | **haiku** |
+| `story` | Creative writing (synopsis/scene/storyboard) | **haiku** |
+| `cinematography` | Director of Photography pass | **haiku** |
+| `reference-scout` | Web reference gathering | **haiku** |
+| `info` | Read-only Q&A + image analysis | **haiku** |
+| `assemble-workflow` | Brain — assemble/patch/validate/execute/QA | **sonnet** |
+| `error-checker` | Post-failure log diagnosis | **sonnet** |
+
+Triage/routing is absorbed into the main session via the **`/agenty`** command
+(and **`/agenty-generate`** to skip triage and force the generation chain). The
+old `vision_agent` role is gone — Sonnet QAs outputs with its own vision.
+
+**Changing the switch.** Edit the `model:` line in any `agents/*.md`
+(`haiku` | `sonnet` | `opus` | `inherit`) — e.g. brain → `opus` for hard
+assembly, or set every subagent to `inherit` to flip the whole pipeline at the
+session level. Run `/agents` in Claude Code to inspect them.
+
+> These are Claude Code plugin constructs. In **Claude Desktop** (MCP host)
+> subagents/slash-commands don't apply — there the single Claude model
+> orchestrates via the skills, exactly as before.
+
+---
+
 ## Requirements
 
 - **Python 3.11+**
@@ -198,14 +237,15 @@ in `config/workflow_templates.json`.
 | Workflow execution + progress + output collection | ✅ Preserved (`execute_workflow`) |
 | HuggingFace model search/download | ✅ Preserved |
 | Web search + reference scouting | ✅ Preserved (`reference-scout`) |
-| Multi-step planning | ✅ Preserved (Claude plans natively) |
+| Multi-step planning | ✅ Preserved (Claude plans natively; `planner` subagent in the Claude Code plugin) |
+| Per-stage LLM switch (was Claude + Ollama) | ✅ Reproduced (Claude Code plugin) — per-role subagent `model:` tiers, cheap→Haiku / brain→Sonnet |
 | Story / synopsis / scene / storyboard / cinematography (DoP) | ✅ Preserved (skills) |
 | Long-term memory tools | ✅ Preserved — local file store (keyword search; no vector recall) |
 | Vision QA of outputs | ⚠️ Now Claude's native vision (no Ollama QA model) |
-| Triage routing | ⚠️ Absorbed into Claude's reasoning |
+| Triage routing | ⚠️ Absorbed into the main session (the `/agenty` command in the Claude Code plugin) |
 | Chainlit GUI, Postgres threads, MinIO storage, cost tracking | ❌ Removed — Claude Desktop is the UI |
 | ComfyUI → agentY Flask bridge | ❌ Removed |
-| Ollama (all stages) | ❌ Removed |
+| Ollama (all stages) | ❌ Removed — its per-role model switch is now Claude Code subagent model tiers (see [above](#claude-code-plugin-role-subagents--the-llm-switch)) |
 
 ---
 
