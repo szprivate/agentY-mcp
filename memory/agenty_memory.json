@@ -1,0 +1,22 @@
+{
+  "records": [
+    {
+      "id": "6685c854e8c247bf947cca49cc7773cf",
+      "session_id": "default",
+      "content": "The bEpic OIIO/OCIO node classes for color-managed image I/O are bepic_imageLoad (load EXR/PNG via OIIO), bepic_colorTransform (OCIO color convert, e.g. input \"ACES - ACEScg\" to output \"Output - sRGB\", clamp default true), and bEpic_imageSave (save via OIIO with file_format png/exr/etc); search_nodes only matches literal substrings, so search the \"bepic_\" prefix rather than terms like \"load\" or \"read\" to find them.",
+      "ts": 1781992350.4819553
+    },
+    {
+      "id": "cb14f60e4e7746ecb637c43fd419ffa6",
+      "session_id": "default",
+      "content": "The bEpic_imageSave node requires the audio_format input (\"wav\" is fine) even when saving a still image with no audio, or validation fails with \"missing required input audio_format\"; and its auto_version input must be set to false for stills, because when true it wraps each save in a versioned subfolder (e.g. prefix_00001\\) and bakes that version token into the filename instead of writing prefix.####.png directly into the target folder.",
+      "ts": 1781992355.942217
+    },
+    {
+      "id": "316bdf248e484332bdc21d539cf60d2f",
+      "session_id": "default",
+      "content": "A registered template \"acescg_to_srgb\" performs a 3-node bEpic OCIO conversion (load EXR -> ACES - ACEScg to Output - sRGB -> save 16-bit PNG); to batch it over a folder of non-contiguous EXR frames, run one submit_prompt per file (the load node's sequence mode only handles contiguous ranges), patching node 1 image_path and node 3 first_frame per frame, with auto_version false so PNGs land flat in the target folder.",
+      "ts": 1781992359.9904954
+    }
+  ]
+}
