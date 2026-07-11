@@ -62,7 +62,7 @@ default and note assumptions.
 
 ## 3. Write the prompt
 
-Activate the `prompt-craft` skill and follow its model-family rules. For the
+Activate the `prompting` skill and follow its model-family rules. For the
 `Kling3_multiShot` template, use the `kling-multishot` skill instead. No filler or
 generic quality tokens.
 

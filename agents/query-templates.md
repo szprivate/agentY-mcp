@@ -40,7 +40,7 @@ Follow **steps 1–4 of the `comfyui-generate` skill** to fill the brainbriefing
    exact name > similar name > task-type > model-family. If nothing fits, set
    `template.name = "build_new"` (assemble-workflow will follow
    `assemble-new-workflow`). See the `comfyui-core` skill's template-matching rules.
-3. **Prompt** — follow the `prompt-craft` skill's model-family rules (for
+3. **Prompt** — follow the `prompting` skill's model-family rules (for
    `Kling3_multiShot`, follow `kling-multishot`). No filler/quality tokens.
 4. **Models** — for every model the template references, `check_model([...])`
    and use the returned path verbatim. If missing: `find_hf_file` →

@@ -1,6 +1,6 @@
 ---
 name: kling-multishot
-description: Kling 3.0 multi-shot storyboard (template Kling3_multiShot). Activate when the selected template is Kling3_multiShot — use its prompt-composition rules instead of the standard prompt-craft step, and its assembly rules to patch the storyboard nodes correctly.
+description: Kling 3.0 multi-shot storyboard (template Kling3_multiShot). Activate when the selected template is Kling3_multiShot — use its prompt-composition rules instead of the standard prompting step, and its assembly rules to patch the storyboard nodes correctly.
 allowed-tools: update_workflow, get_workflow_template
 ---
 
@@ -35,7 +35,7 @@ Select the `Kling3_multiShot` template when any of these are true:
 
 Set `task.type` to `video i2v`.
 
-### Prompt composition (replaces the standard prompt-craft step)
+### Prompt composition (replaces the standard prompting step)
 Count the number of shots the user asked for (max 6, default 2). Generate that many **DISTINCT** shot prompts following the formula below. Do not repeat the same prompt across shots.
 
 > **Storyboard director hand-off:** when the request already supplies an explicit
