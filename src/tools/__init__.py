@@ -37,6 +37,9 @@ from src.tools.comfyui import (  # noqa: F401
     # Workflow recipes (task -> model -> node clusters knowledge base)
     list_workflow_recipes,
     get_workflow_recipe,
+    # Live canvas (the nodes the user has selected in the open ComfyUI page)
+    get_canvas_selection,
+    set_canvas_node_params,
     # Workflow modification
     save_workflow,
     open_workflow_in_canvas,

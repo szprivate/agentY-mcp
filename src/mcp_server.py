@@ -43,6 +43,10 @@ Typical flow (see the agentY Skills for full procedures):
      (update_workflow / replace_node), then validate_workflow.
   4. execute_workflow (or execute_workflows_batch for variations) — it returns
      the generated image(s) so you can QA them directly against the request.
+
+When the user points at their open ComfyUI canvas ("this node", "the prompt I
+have selected"), read it with get_canvas_selection and write changes back with
+set_canvas_node_params — do not guess from a workflow file on disk.
 """
 
 mcp = FastMCP("agentY", instructions=INSTRUCTIONS)
@@ -80,6 +84,9 @@ _TOOLS = [
     # ── Template registry (add / remove custom templates) ─────────────────
     T.register_workflow_template,
     T.unregister_workflow_template,
+    # ── Live canvas (what the user has selected in the open ComfyUI page) ──
+    T.get_canvas_selection,
+    T.set_canvas_node_params,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────
