@@ -65,12 +65,25 @@ from src.tools.image_handling import (  # noqa: F401
     get_image_resolution,
     analyze_image,
     download_image,
+    # The presigned-PUT half of every MCP creation flow. It existed only in
+    # agentY until the image tools moved into the shared layer; this host could
+    # start an upload and had nothing to finish it with.
+    upload_file_to_url,
 )
 from src.tools.huggingface import (  # noqa: F401
     search_huggingface_models,
     get_model_info,
     find_hf_file,
     download_hf_model,
+)
+# Per-project memory (this project only: characters, style, locked refs, delivery
+# specs). It lives in ComfyUI's own user directory, so these read and write the
+# same facts the agentY panel does against the same ComfyUI — which is the whole
+# reason it is in the shared layer rather than in one app.
+from agenty_core.tools.project_memory import (  # noqa: F401
+    project_memory_forget,
+    project_memory_read,
+    project_memory_write,
 )
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401

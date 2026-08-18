@@ -112,6 +112,7 @@ _TOOLS = [
     # ── Image handling ────────────────────────────────────────────────────
     T.upload_image,
     T.download_image,
+    T.upload_file_to_url,
     T.view_image,
     T.get_image_resolution,
     T.analyze_image,
@@ -129,6 +130,10 @@ _TOOLS = [
     T.run_script,
     T.memory_read,
     T.memory_write,
+    # Per-project facts, shared with the agentY panel through ComfyUI's user dir.
+    T.project_memory_read,
+    T.project_memory_write,
+    T.project_memory_forget,
 ]
 
 for _fn in _TOOLS:
