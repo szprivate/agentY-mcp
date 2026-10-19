@@ -85,6 +85,11 @@ from agenty_core.tools.project_memory import (  # noqa: F401
     project_memory_read,
     project_memory_write,
 )
+# Image / video generation on the user's own DashScope key (not Comfy credits).
+from agenty_core.tools.dashscope_generate import (  # noqa: F401
+    dashscope_generate,
+    dashscope_fetch,
+)
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
