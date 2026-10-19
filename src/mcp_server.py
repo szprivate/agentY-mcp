@@ -119,6 +119,8 @@ _TOOLS = [
     # ── Generation on the user's own DashScope key ────────────────────────
     T.dashscope_generate,
     T.dashscope_fetch,
+    # ── Show files in the bEpic viewer (focus, Edit panel) ────────────────
+    T.show_in_viewer,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
