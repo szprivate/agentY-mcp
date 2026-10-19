@@ -116,6 +116,9 @@ _TOOLS = [
     T.view_image,
     T.get_image_resolution,
     T.analyze_image,
+    # ── Generation on the user's own DashScope key ────────────────────────
+    T.dashscope_generate,
+    T.dashscope_fetch,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
