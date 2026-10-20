@@ -129,6 +129,8 @@ _TOOLS = [
     T.atlas_splat_to_mesh,
     T.atlas_fetch,
     T.atlas_list,
+    T.atlas_render_view,
+    T.atlas_open_in_viewer,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
