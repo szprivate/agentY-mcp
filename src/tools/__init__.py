@@ -92,6 +92,8 @@ from agenty_core.tools.dashscope_generate import (  # noqa: F401
 )
 # Show files in the bEpic viewer / open an edit in its Edit panel.
 from agenty_core.tools.show_in_viewer import show_in_viewer  # noqa: F401
+# Fly a camera through a 3D scene in the viewer and render the move.
+from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
