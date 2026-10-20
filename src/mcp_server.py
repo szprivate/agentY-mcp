@@ -122,6 +122,13 @@ _TOOLS = [
     # ── Show files in the bEpic viewer (focus, Edit panel) ────────────────
     T.show_in_viewer,
     T.render_camera_move,
+    # ── World Labs Atlas: picture / prompt -> 3D scene mesh (WORLDLABS_API_KEY) ──
+    T.atlas_create_world,
+    T.atlas_expand_world,
+    T.atlas_rebuild_world_mesh,
+    T.atlas_splat_to_mesh,
+    T.atlas_fetch,
+    T.atlas_list,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
