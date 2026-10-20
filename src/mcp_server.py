@@ -121,6 +121,7 @@ _TOOLS = [
     T.dashscope_fetch,
     # ── Show files in the bEpic viewer (focus, Edit panel) ────────────────
     T.show_in_viewer,
+    T.render_camera_move,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
