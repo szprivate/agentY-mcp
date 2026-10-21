@@ -25,4 +25,4 @@ config/workflow_recipes_report.md
 config/workflow_recipes_object_info_cache.json
 
 # downloaded helper programs (Brush, the splat trainer)
-tools/
+/tools/
