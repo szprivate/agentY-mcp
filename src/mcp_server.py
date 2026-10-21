@@ -134,6 +134,10 @@ _TOOLS = [
     T.atlas_capture_around,
     T.train_splat,
     T.splat_training_status,
+    # ── Deadline render farm (DEADLINE_* settings, all optional) ──
+    T.submit_to_deadline,
+    T.deadline_job_status,
+    T.deadline_farm_info,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,
