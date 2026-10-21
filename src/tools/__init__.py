@@ -102,6 +102,8 @@ from agenty_core.tools.atlas_render import atlas_render_view, atlas_open_in_view
 # All-round Atlas capture; a Gaussian splat trained locally from posed views (Brush).
 from agenty_core.tools.atlas_capture import atlas_capture_around  # noqa: F401
 from agenty_core.tools.splat_train import train_splat, splat_training_status  # noqa: F401
+# Send ComfyUI workflows to the on-prem Deadline render farm and follow them.
+from agenty_core.tools.deadline_farm import submit_to_deadline, deadline_job_status, deadline_farm_info  # noqa: F401
 from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
