@@ -252,3 +252,14 @@ in `config/workflow_templates.json`.
 ## License
 
 MIT
+
+## Talking to a running agentY host
+
+`agenty_turn`, `agenty_turn_status`, `agenty_conversations`, `agenty_reply` and
+`agenty_stop` hand a request to the **running agentY app itself** (its own
+orchestrator, skills and hooks) and return the finished turn as structured JSON,
+instead of driving the ComfyUI browser panel. Turns show live in the panel when it
+is open. The host URL is `AGENTY_HOST_URL` (default `http://127.0.0.1:5000`); the
+session token is read from `../agentY/.agenty_token` (or `AGENTY_SESSION_TOKEN`,
+`AGENTY_TOKEN_FILE`, `AGENTY_HOME`). Shell use: `python scripts/agenty_turn.py "message"`.
+Details and the HTTP API: `docs/turn-api.md` in agentY.
