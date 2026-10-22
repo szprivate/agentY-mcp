@@ -98,6 +98,10 @@ _TOOLS = [
     # ── Execution ─────────────────────────────────────────────────────────
     T.execute_workflow,
     T.execute_workflows_batch,
+    # ── One partner (API) node built from its schema and run directly ─────
+    T.partner_run,
+    # ── N independent variants of one workflow, duplicated + patched + queued together ──
+    T.run_variants,
     # ── Headless batch jobs (detached worker, pollable status) ────────────
     T.start_batch_job,
     T.get_batch_status,

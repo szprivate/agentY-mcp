@@ -252,8 +252,13 @@ def analyze_image(
     image_url: str = "",
     question: str = "",
     mode: Literal["describe", "full"] = "describe",
+    file_paths: Optional[list] = None,
 ) -> object:
     """Return an image so you can view and analyse it directly.
+
+    **Several images in ONE call:** pass ``file_paths=[...]`` (up to 16) and they
+    come back as ONE numbered contact sheet you look at once — instead of one call
+    per image. Answer per image number.
 
     Provide either a local ``file_path`` or a public ``image_url`` (not both).
     The image is auto-downsized to satisfy the 5 MB / 1568 px vision limits and
@@ -270,7 +275,34 @@ def analyze_image(
                    caption (you answer from the returned pixels).
         mode:      Accepted for backward compatibility and ignored — you now view
                    the image directly instead of delegating to a vision sub-model.
+        file_paths: Several local image paths to look at together (contact sheet).
     """
+    _many = [str(p) for p in (file_paths or []) if str(p or "").strip()]
+    if file_path and _many:
+        _many.insert(0, file_path)
+    if len(_many) >= 2:
+        from agenty_core.utils import contact_sheet as _cs
+        try:
+            sheet = _cs.build_contact_sheet(_many)
+        except ValueError as exc:
+            return {"status": "error", "content": [{"text": f"Could not build a contact sheet: {exc}"}]}
+        try:
+            out = analyze_image(file_path=sheet["path"],
+                                question=_cs.sheet_question(question, sheet["tiles"]))
+        finally:
+            try:
+                os.remove(sheet["path"])
+            except OSError:
+                pass
+        legend = "; ".join(f"{t['n']} = {t['file']}" for t in sheet["tiles"])
+        note = f"Contact sheet of {len(sheet['tiles'])} images ({legend})."
+        if isinstance(out, dict) and out.get("content"):
+            out["content"].insert(0, {"text": note})
+        elif isinstance(out, list):
+            out.insert(0, note)
+        return out
+    if len(_many) == 1 and not file_path:
+        file_path = _many[0]
     data: Optional[bytes] = None
     source_name = ""
     detected_mime = ""

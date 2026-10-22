@@ -160,3 +160,92 @@ async def execute_workflows_batch(workflow_paths: list, brainbriefing_json: str 
         if isinstance(line, str):
             log.append(line)
     return _build_result(log, collected)
+
+
+@tool
+async def partner_run(node_type: str, inputs: dict | None = None, settings: dict | None = None,
+                      save: str = "auto", name: str = "", run: bool = True) -> list:
+    """Build and run ONE partner (API) node directly - no template search.
+
+    The preferred route when the request names a partner model or node: Seedance,
+    Kling, GPT Image, Nano Banana / Gemini image, Ideogram, Meshy, Veo, Runway ...
+    The node's own schema decides the inputs; files get loaders wired to the right
+    slots, the result gets a save node, the graph is validated and (``run=True``)
+    executed - the same path as ``execute_workflow``, so the outputs come back as
+    images / sampled frames to look at.
+
+    ``node_type`` is the class name or the name you know it by ("Seedance 2.5 first
+    last frame"); an ambiguous name returns candidates and builds nothing.
+    ``inputs`` maps FILE slots to a path (or a list of paths for a slot group, e.g.
+    ``{"model.reference_images": ["a.png", "b.png"]}`` fills image_1, image_2 ...).
+    ``settings`` maps everything else: ``prompt``, ``model`` (a dynamic combo whose
+    option decides the other settings), ``resolution``, ``duration``,
+    ``generate_audio`` ... A bare name works when unambiguous. A value the node does
+    not offer is an error listing the options; nothing is changed silently.
+    ``save``: "image", "video" or "auto". ``run=False`` only builds and validates.
+
+    Runs on the user's partner credits: once per request, never to test.
+
+    Args:
+        node_type: Node class name or display name.
+        inputs: ``{slot: file path | [paths]}`` for image / video / audio inputs.
+        settings: ``{name: value}`` for prompt and every widget.
+        save: "image", "video" or "auto".
+        name: Short name for the output files.
+        run: False to build and validate only.
+    """
+    import asyncio
+    import json
+    from agenty_core.tools.partner_run import prepare_partner_workflow
+
+    prepared = await asyncio.to_thread(prepare_partner_workflow, node_type, inputs, settings, save, name)
+    if prepared.get("status") != "ready" or not run:
+        return [json.dumps(prepared if prepared.get("status") != "ready" else {**prepared, "ran": False})]
+    collected: list[str] = []
+    log: list[str] = [f"Built {prepared.get('node')} -> {prepared['workflow_path']}"
+                      + "".join(f"\nwarning: {w}" for w in prepared.get("warnings") or [])]
+    async for line in _stream_one(prepared["workflow_path"], "", verbose=False, collected_paths=collected):
+        if isinstance(line, str):
+            log.append(line)
+    return _build_result(log, collected)
+
+
+@tool
+async def run_variants(workflow_path: str, variants: list, run: bool = True) -> list:
+    """Make and run N independent variants of ONE workflow in a single call.
+
+    For "give me 4 versions", "try three lightings", "the same shot for each of these
+    prompts / seeds / images": ONE call duplicates the workflow N times (fresh seeds),
+    patches each copy with its own overrides, validates them and - with ``run=True`` -
+    submits them ALL up front (like ``execute_workflows_batch``) and returns the
+    outputs, instead of duplicate_workflow -> update_workflow -> execute_workflow once
+    per variant.
+
+    ``variants`` is a list of objects, e.g.
+    ``[{"label": "warm", "set": {"6.text": "a warm lamp"}},
+      {"label": "cold", "set": {"6.text": "a cold lamp", "12.image": "b.png"}}]``.
+    ``set`` keys are ``<node id>.<input name>``; the full ``update_workflow`` shape
+    (``patches`` / ``add_nodes`` / ``remove_nodes``) works too; ``{}`` is a
+    fresh-seeded copy. Up to 24. A variant that fails validation is reported and
+    skipped; the rest run. ``run=False`` only builds and validates.
+
+    Args:
+        workflow_path: Path of the validated base workflow.
+        variants: List of variant objects.
+        run: False to build and validate only.
+    """
+    import asyncio
+    import json
+    from agenty_core.tools.variants import prepare_variants
+
+    prepared = await asyncio.to_thread(prepare_variants, workflow_path, variants)
+    ready = list(prepared.get("ready") or [])
+    if prepared.get("status") == "error" or not run or not ready:
+        return [json.dumps({**prepared, "ran": False})]
+    collected: list[str] = []
+    log: list[str] = [json.dumps({"variants": [{k: v for k, v in x.items() if k != "problems" or v}
+                                                for x in prepared["variants"]]})]
+    async for line in _stream_batch(ready, "", verbose=False, collected_paths=collected):
+        if isinstance(line, str):
+            log.append(line)
+    return _build_result(log, collected)

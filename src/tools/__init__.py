@@ -112,7 +112,7 @@ from src.tools.file_tools import read_text_file, write_text_file  # noqa: F401
 from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
 from src.tools.web_search import web_search, web_search_images  # noqa: F401
-from src.tools.execution import execute_workflow, execute_workflows_batch  # noqa: F401
+from src.tools.execution import execute_workflow, execute_workflows_batch, partner_run, run_variants  # noqa: F401
 from src.tools.batch import (  # noqa: F401
     start_batch_job,
     get_batch_status,

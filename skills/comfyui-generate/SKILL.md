@@ -16,11 +16,19 @@ tool call.
 - **Question only** ("what templates exist?", "which model does X use?") → answer
   using `get_workflow_catalog`, `get_workflow_template`, `check_model`,
   `search_nodes`. No generation.
+- **A partner (API) model or node is named** ("Seedance 2.5 first-frame", "GPT Image 2",
+  "Nano Banana", "Kling", "Ideogram", "Meshy") and the job is that node alone → activate
+  the `partner-run` skill: one `partner_run(...)` call builds the node from its schema and
+  runs it. No template search.
 - **Single generation/edit** → follow steps 1–6 below once.
 - **Multi-step pipeline** (structurally different stages in sequence, e.g.
   text-to-image → upscale → image-to-video) → plan the stages yourself, then run
   steps 1–6 for each stage, feeding each step's output file(s) into the next as
   inputs (`upload_image`).
+- **N independent variants of one workflow** (different prompts / inputs / settings, results
+  wanted now) → ONE `run_variants(workflow_path, variants=[{"label": ..., "set": {"<node>.<input>": value}}])`
+  instead of duplicate -> update -> execute per variant.
+- **Several images, one question** → `analyze_image(file_paths=[...])` (one contact sheet, one look).
 - **Batch / variations** (same workflow run N times) → set `count_iter > 1`;
   for distinct prompts per run set `variations: true` and use the `batch-handoff`
   skill (Mode A), then `execute_workflows_batch`.
