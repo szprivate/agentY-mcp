@@ -60,6 +60,12 @@ mcp = FastMCP("agentY", instructions=INSTRUCTIONS)
 # verbatim, matching their original behaviour.
 
 _TOOLS = [
+    # ── Talk to a RUNNING agentY host (its own orchestrator/skills/hooks) ──
+    T.agenty_turn,
+    T.agenty_turn_status,
+    T.agenty_conversations,
+    T.agenty_reply,
+    T.agenty_stop,
     # ── Workflow templates & catalog ──────────────────────────────────────
     T.get_workflow_catalog,
     T.get_workflow_template,
