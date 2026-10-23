@@ -25,6 +25,24 @@ from src.executor import (
     execute_workflows_batch as _stream_batch,
 )
 
+def _cost_gate(paths: list[str], confirm: bool) -> list | None:
+    """Pre-flight for paid (partner) nodes: None to go ahead, else the refusal as the
+    tool answer (``error_kind`` confirm_cost / insufficient_credits). With *confirm*
+    the go-ahead is remembered for the files so the submission does not ask again."""
+    import json
+    from agenty_core import partner_credits as pc
+    try:
+        est = pc.preflight_many([str(p) for p in paths], confirm=confirm)
+    except pc.CostGateError as gate:
+        return [json.dumps(gate.payload())]
+    except Exception:  # noqa: BLE001 - a failed check never stops a render
+        return None
+    if confirm and est.get("paid"):
+        for p in paths:
+            pc.confirm_path(str(p), float("inf"))
+    return None
+
+
 # Output file extensions treated as still images.
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 # Cap on how many images are returned to the model so a large batch can't blow
@@ -104,7 +122,7 @@ def _build_result(log: list[str], outputs: list[str]) -> list:
 
 
 @tool
-async def execute_workflow(workflow_path: str, brainbriefing_json: str = "") -> list:
+async def execute_workflow(workflow_path: str, brainbriefing_json: str = "", confirm_cost: bool = False) -> list:
     """Run a fully-assembled, validated workflow on ComfyUI and return its outputs.
 
     Call this as the final step once ``validate_workflow`` (or ``update_workflow``)
@@ -117,6 +135,12 @@ async def execute_workflow(workflow_path: str, brainbriefing_json: str = "") -> 
         workflow_path:      Path to the validated workflow JSON (as returned by
                             ``get_workflow_template`` / ``save_workflow`` and
                             patched via ``update_workflow``).
+        confirm_cost:       True only once the user has agreed to the estimated cost.
+                            Paid (partner) nodes show their price first; at or above
+                            the confirmation level (default $1) the call answers
+                            ``error_kind: confirm_cost`` with the estimate - tell the
+                            user, ask, and repeat with ``confirm_cost=True`` after a
+                            yes. ``insufficient_credits``: the balance can't cover it.
         brainbriefing_json: Optional brainbriefing JSON string. When provided, its
                             ``output_nodes[].output_path`` entries are used to
                             resolve where each output was saved.
@@ -125,6 +149,10 @@ async def execute_workflow(workflow_path: str, brainbriefing_json: str = "") -> 
         A text summary (status lines + output file paths) followed by the output
         image content for direct visual QA.
     """
+    import asyncio
+    refusal = await asyncio.to_thread(_cost_gate, [workflow_path], confirm_cost)
+    if refusal:
+        return refusal
     collected: list[str] = []
     log: list[str] = []
     async for line in _stream_one(
@@ -136,7 +164,8 @@ async def execute_workflow(workflow_path: str, brainbriefing_json: str = "") -> 
 
 
 @tool
-async def execute_workflows_batch(workflow_paths: list, brainbriefing_json: str = "") -> list:
+async def execute_workflows_batch(workflow_paths: list, brainbriefing_json: str = "",
+                                  confirm_cost: bool = False) -> list:
     """Run several validated workflows (a batch) on ComfyUI and return their outputs.
 
     Use this for batch / variation runs — e.g. the per-variation workflow copies
@@ -146,12 +175,19 @@ async def execute_workflows_batch(workflow_paths: list, brainbriefing_json: str 
     Args:
         workflow_paths:     Ordered list of validated workflow JSON file paths.
         brainbriefing_json: Optional brainbriefing JSON string (for output paths).
+        confirm_cost:       True only once the user has agreed to the estimated cost
+                            (the batch is judged on the SUM of its paid nodes; see
+                            ``execute_workflow``).
 
     Returns:
         A text summary (per-iteration status + output file paths) followed by the
         output image content for direct visual QA.
     """
+    import asyncio
     paths = [str(p) for p in (workflow_paths or [])]
+    refusal = await asyncio.to_thread(_cost_gate, paths, confirm_cost)   # judged on the sum
+    if refusal:
+        return refusal
     collected: list[str] = []
     log: list[str] = []
     async for line in _stream_batch(
@@ -164,7 +200,8 @@ async def execute_workflows_batch(workflow_paths: list, brainbriefing_json: str 
 
 @tool
 async def partner_run(node_type: str, inputs: dict | None = None, settings: dict | None = None,
-                      save: str = "auto", name: str = "", run: bool = True) -> list:
+                      save: str = "auto", name: str = "", run: bool = True,
+                      confirm_cost: bool = False) -> list:
     """Build and run ONE partner (API) node directly - no template search.
 
     The preferred route when the request names a partner model or node: Seedance,
@@ -184,7 +221,12 @@ async def partner_run(node_type: str, inputs: dict | None = None, settings: dict
     not offer is an error listing the options; nothing is changed silently.
     ``save``: "image", "video" or "auto". ``run=False`` only builds and validates.
 
-    Runs on the user's partner credits: once per request, never to test.
+    Runs on the user's partner credits: once per request, never to test. The price
+    shows before it runs (``estimate_usd``; ``run=False`` returns it without
+    running). At or above the confirmation level (default $1) the run is refused with
+    ``error_kind: confirm_cost`` - tell the user the estimate, ask, and call again
+    with ``confirm_cost=True`` only after a yes. ``insufficient_credits``: even the
+    lowest estimate is above the balance. A finished run reports ``partner_cost_usd``.
 
     Args:
         node_type: Node class name or display name.
@@ -193,14 +235,29 @@ async def partner_run(node_type: str, inputs: dict | None = None, settings: dict
         save: "image", "video" or "auto".
         name: Short name for the output files.
         run: False to build and validate only.
+        confirm_cost: True only once the user has agreed to the estimated cost.
     """
     import asyncio
     import json
     from agenty_core.tools.partner_run import prepare_partner_workflow
+    from src.tools.execution import _cost_gate  # noqa: F401  (same module; kept explicit)
 
     prepared = await asyncio.to_thread(prepare_partner_workflow, node_type, inputs, settings, save, name)
+    if prepared.get("status") == "ready":
+        try:
+            from agenty_core import partner_credits as _pc
+            _est = await asyncio.to_thread(
+                _pc.estimate_workflow, json.loads(Path(prepared["workflow_path"]).read_text(encoding="utf-8")))
+            if _est["paid"]:
+                prepared["estimate_usd"] = {"min": _est["min_usd"], "max": _est["max_usd"],
+                                            "unknown_nodes": _est["unknown"]}
+        except Exception:  # noqa: BLE001 - an estimate never stops a build
+            pass
     if prepared.get("status") != "ready" or not run:
         return [json.dumps(prepared if prepared.get("status") != "ready" else {**prepared, "ran": False})]
+    refusal = await asyncio.to_thread(_cost_gate, [prepared["workflow_path"]], confirm_cost)
+    if refusal:
+        return [json.dumps({**prepared, **json.loads(refusal[0]), "ran": False})]
     collected: list[str] = []
     log: list[str] = [f"Built {prepared.get('node')} -> {prepared['workflow_path']}"
                       + "".join(f"\nwarning: {w}" for w in prepared.get("warnings") or [])]
@@ -211,7 +268,8 @@ async def partner_run(node_type: str, inputs: dict | None = None, settings: dict
 
 
 @tool
-async def run_variants(workflow_path: str, variants: list, run: bool = True) -> list:
+async def run_variants(workflow_path: str, variants: list, run: bool = True,
+                       confirm_cost: bool = False) -> list:
     """Make and run N independent variants of ONE workflow in a single call.
 
     For "give me 4 versions", "try three lightings", "the same shot for each of these
@@ -233,6 +291,9 @@ async def run_variants(workflow_path: str, variants: list, run: bool = True) -> 
         workflow_path: Path of the validated base workflow.
         variants: List of variant objects.
         run: False to build and validate only.
+        confirm_cost: True only once the user has agreed to the estimated cost. The
+            variants' paid prices are added up; at or above the confirmation level
+            (default $1) the call answers ``error_kind: confirm_cost`` until a yes.
     """
     import asyncio
     import json
@@ -242,6 +303,9 @@ async def run_variants(workflow_path: str, variants: list, run: bool = True) -> 
     ready = list(prepared.get("ready") or [])
     if prepared.get("status") == "error" or not run or not ready:
         return [json.dumps({**prepared, "ran": False})]
+    refusal = await asyncio.to_thread(_cost_gate, ready, confirm_cost)
+    if refusal:
+        return [json.dumps({**prepared, **json.loads(refusal[0]), "ran": False})]
     collected: list[str] = []
     log: list[str] = [json.dumps({"variants": [{k: v for k, v in x.items() if k != "problems" or v}
                                                 for x in prepared["variants"]]})]

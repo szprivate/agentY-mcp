@@ -138,6 +138,7 @@ _TOOLS = [
     T.stop_batch_job,
     T.list_batch_jobs,
     T.submit_prompt,
+    T.estimate_workflow_cost,
     T.queue,
     T.get_history,
     T.get_prompt_status_by_id,

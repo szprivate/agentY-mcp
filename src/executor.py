@@ -198,6 +198,11 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
         raise RuntimeError(f"Workflow file not found: {workflow_path}")
 
     workflow = json.loads(p.read_text(encoding="utf-8"))
+    # Paid partner nodes: priced first; a run the balance cannot cover, or one at or
+    # above the confirmation level, is refused (agenty_core.partner_credits.CostGateError)
+    # before anything is queued. The tools check earlier and carry confirm_cost.
+    from agenty_core import partner_credits as _credits
+    _cost = _credits.gate_submission(workflow, str(p))
     client = get_client()
     payload: dict = {"prompt": workflow}
     if client_id:
@@ -207,8 +212,21 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
 
     result = client.post("/prompt", json_data=payload)
     if isinstance(result, dict) and "prompt_id" in result:
+        _credits.track(result["prompt_id"], _cost)
         return result["prompt_id"]
     raise RuntimeError(f"Unexpected response from ComfyUI /prompt: {result!r}")
+
+
+async def _settle_partner(prompt_id: str) -> str:
+    """What a finished paid job cost in Comfy credits (balance before vs after), as
+    a status line; "" for a job with no paid node or an unreadable balance."""
+    import asyncio
+    from agenty_core import partner_credits as _credits
+    try:
+        usd = await asyncio.to_thread(_credits.settle, prompt_id)
+    except Exception:  # noqa: BLE001 - a measurement must never fail a run
+        return ""
+    return f"💳 partner_cost_usd: {usd:.2f}" if usd is not None else ""
 
 
 def _extract_output_files(history: dict) -> list[dict]:
@@ -463,6 +481,10 @@ async def execute_workflow(
     finally:
         await _gen.aclose()
 
+    _spent = await _settle_partner(prompt_id)
+    if _spent:
+        yield _spent
+
     if error_result is not None:
         error_msg = f"❌ ComfyUI execution error: {error_result.get('error')}"
         logger.error("executor: %s", error_msg)
@@ -573,6 +595,10 @@ async def execute_workflows_batch(
                 yield f"{label}{event}"
         finally:
             await _gen.aclose()
+
+        _spent = await _settle_partner(prompt_id)
+        if _spent:
+            yield f"{label}{_spent}"
 
         if error_result is not None:
             error_msg = f"{label}❌ ComfyUI execution error: {error_result.get('error')}"

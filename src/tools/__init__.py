@@ -25,6 +25,8 @@ from src.tools.comfyui import (  # noqa: F401
     get_comfyui_dirs,
     # Prompt submission
     submit_prompt,
+    # Price a workflow's paid (partner) nodes in Comfy credits before it runs
+    estimate_workflow_cost,
     # Batch: create iteration copies of a validated workflow
     duplicate_workflow,
     # Node inspection
