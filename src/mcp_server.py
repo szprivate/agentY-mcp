@@ -148,6 +148,12 @@ _TOOLS = [
     T.dcc_build,
     T.dcc_silhouette_check,
     T.measure_reference,
+    # ── Ayon pipeline (session launched through Ayon; AYON_API_KEY / AYON_SERVER_URL optional) ──
+    T.ayon_context,
+    T.ayon_load,
+    T.ayon_mark_publish,
+    T.ayon_publish,
+    T.ayon_open_tool,
     # ── Deadline render farm (DEADLINE_* settings, all optional) ──
     T.submit_to_deadline,
     T.deadline_job_status,
