@@ -39,3 +39,4 @@ tqdm>=4.66.0
 # src/__init__.py registers its loader dirs (win32, win32/lib, pywin32_system32)
 # from lib/ at startup. Skipped on non-Windows.
 pywin32>=306; sys_platform == "win32"
+playwright>=1.40          # reverse_image_search (uses the system Chrome; no browser download)

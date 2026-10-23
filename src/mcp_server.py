@@ -217,7 +217,7 @@ for _mod, _names in [
     ("agenty_core.tools.huggingface", ["wait_for_download"]),
     ("agenty_core.tools.model_research", ["hf_search", "hf_repo", "hf_file", "find_local_models", "inspect_workflow_file"]),
     ("agenty_core.tools.workspace_tools", ["get_node_source", "list_files", "find_workflows", "media_info", "video_frames", "read_web_page"]),
-    ("agenty_core.tools.reverse_image_search", ["reverse_image_search"]),
+    ("agenty_core.tools.reverse_search", ["reverse_image_search"]),
 ]:
     try:
         _m = importlib.import_module(_mod)
