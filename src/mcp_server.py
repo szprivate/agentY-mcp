@@ -147,6 +147,7 @@ _TOOLS = [
     # ── Model from a reference photo in Blender / Maya / Houdini ──
     T.dcc_build,
     T.dcc_silhouette_check,
+    T.measure_reference,
     # ── Deadline render farm (DEADLINE_* settings, all optional) ──
     T.submit_to_deadline,
     T.deadline_job_status,
