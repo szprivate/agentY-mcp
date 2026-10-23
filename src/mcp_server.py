@@ -20,6 +20,36 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+
+def _load_env() -> list[str]:
+    """Load .env files into os.environ at startup (explicit env always wins).
+
+    Order: this repo's own ``.env``, then agentY's ``.env`` - from
+    ``AGENTY_ENV_FILE`` (a file) or ``AGENTY_HOME`` (agentY's folder), else the
+    sibling checkout ``../agentY/.env``. ``override=False`` throughout, so a
+    variable set by the MCP host (or an earlier file) is never replaced.
+    """
+    import os
+
+    from dotenv import load_dotenv
+
+    root = Path(__file__).resolve().parent.parent
+    candidates = [root / ".env"]
+    if os.environ.get("AGENTY_ENV_FILE"):
+        candidates.append(Path(os.environ["AGENTY_ENV_FILE"]).expanduser())
+    elif os.environ.get("AGENTY_HOME"):
+        candidates.append(Path(os.environ["AGENTY_HOME"]).expanduser() / ".env")
+    else:
+        candidates.append(root.parent / "agentY" / ".env")
+    loaded = []
+    for f in candidates:
+        if f.is_file() and load_dotenv(f, override=False):
+            loaded.append(str(f))
+    return loaded
+
+
+_ENV_FILES = _load_env()
+
 # Anchor the shared agenty_core tool layer on this repo's root (it now lives in
 # a sibling package, so it can't resolve config/ and output_workflows/ from its
 # own __file__). Must run before the tool modules are imported below.
@@ -177,6 +207,23 @@ _TOOLS = [
     T.project_memory_write,
     T.project_memory_forget,
 ]
+
+# Further core tools, imported one by one so a missing/broken one never stops the
+# server from starting. (reverse_image_search arrives with its agenty_core module.)
+import importlib
+
+for _mod, _names in [
+    ("agenty_core.tools.comfyui", ["find_custom_node_for", "install_custom_node", "get_agent_output_dirs"]),
+    ("agenty_core.tools.huggingface", ["wait_for_download"]),
+    ("agenty_core.tools.model_research", ["hf_search", "hf_repo", "hf_file", "find_local_models", "inspect_workflow_file"]),
+    ("agenty_core.tools.workspace_tools", ["get_node_source", "list_files", "find_workflows", "media_info", "video_frames", "read_web_page"]),
+    ("agenty_core.tools.reverse_image_search", ["reverse_image_search"]),
+]:
+    try:
+        _m = importlib.import_module(_mod)
+        _TOOLS.extend(getattr(_m, _n) for _n in _names)
+    except Exception as _e:  # noqa: BLE001
+        logger.warning("optional core tools %s not offered: %s", _names, _e)
 
 for _fn in _TOOLS:
     # structured_output=False → return text/image content blocks verbatim

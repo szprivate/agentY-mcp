@@ -143,6 +143,12 @@ COMFYUI_API_KEY=          # blank for an unauthenticated local ComfyUI
 # MEMORY_ENABLED=false    # optional: disable the long-term memory tools
 ```
 
+**agentY's keys are picked up too.** At startup the server loads, in this order and
+without overriding anything already set: this repo's `.env`, then agentY's `.env`
+(for keys such as `WLT_API_KEY`, `DASHSCOPE_API_KEY`). Where agentY's file is:
+`AGENTY_ENV_FILE` (the file itself), else `AGENTY_HOME` (agentY's folder), else the
+sibling checkout `../agentY/.env`. Variables set by the MCP host always win.
+
 ### 3. Configure defaults (optional)
 
 Edit `config/settings.json` to point at your ComfyUI instance and model directory:
