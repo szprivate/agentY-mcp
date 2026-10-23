@@ -144,6 +144,9 @@ _TOOLS = [
     T.atlas_capture_around,
     T.train_splat,
     T.splat_training_status,
+    # ── Model from a reference photo in Blender / Maya / Houdini ──
+    T.dcc_build,
+    T.dcc_silhouette_check,
     # ── Deadline render farm (DEADLINE_* settings, all optional) ──
     T.submit_to_deadline,
     T.deadline_job_status,

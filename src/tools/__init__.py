@@ -102,6 +102,8 @@ from agenty_core.tools.atlas_render import atlas_render_view, atlas_open_in_view
 # All-round Atlas capture; a Gaussian splat trained locally from posed views (Brush).
 from agenty_core.tools.atlas_capture import atlas_capture_around  # noqa: F401
 from agenty_core.tools.splat_train import train_splat, splat_training_status  # noqa: F401
+# Run one build script in Blender / Maya / Houdini; check a model's silhouette against a photo by numbers.
+from agenty_core.tools.dcc import dcc_build, dcc_silhouette_check  # noqa: F401
 # Send ComfyUI workflows to the on-prem Deadline render farm and follow them.
 from agenty_core.tools.deadline_farm import submit_to_deadline, deadline_job_status, deadline_farm_info  # noqa: F401
 # Hand a request to a RUNNING agentY host (its own orchestrator, skills, hooks).
