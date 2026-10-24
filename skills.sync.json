@@ -27,7 +27,7 @@
     },
     "camera-move-control": {
       "files": 1,
-      "sha256": "b11b648c3379e23ef645a23cba842ff2da4035c370ad319a07ac0a3bb92e05c6"
+      "sha256": "6dbca57eafc37820cfec11d66db7788623d54a5a98b8c2817d38b237d6dd6166"
     },
     "custom-node-from-github": {
       "files": 1,
@@ -63,7 +63,7 @@
     },
     "motion-graphics-scene": {
       "files": 4,
-      "sha256": "7a9e475b43a5c8aef43c4f208c1173b8e28934851bac8a2a5adc9725b337f281"
+      "sha256": "65e15bd6cfbe3796138b2a6f33be50df226326f8721860323e230bd0b8a4ff8e"
     },
     "output-paths": {
       "files": 1,
@@ -115,7 +115,7 @@
     },
     "worldlabs-atlas": {
       "files": 1,
-      "sha256": "b779e0dba753bdb64ef9bccead52e07a301e14a7547ef0c8587eafc6c9b6cbc1"
+      "sha256": "bb6c4578e6f7ff36b76d0cb586448c211468b18ec4260f97c808b66e5b70e491"
     }
   }
 }
