@@ -207,6 +207,7 @@ _TOOLS = [
     # ── Model from a reference photo in Blender / Maya / Houdini ──
     T.dcc_build,
     T.dcc_silhouette_check,
+    T.find_app_installs,
     T.measure_reference,
     # ── Ayon pipeline (session launched through Ayon; AYON_API_KEY / AYON_SERVER_URL optional) ──
     T.ayon_context,

@@ -186,6 +186,10 @@
       "description": "Run several validated workflows (a batch) on ComfyUI and return their outputs."
     },
     {
+      "name": "find_app_installs",
+      "description": "Find which creative apps are installed here and which version is the newest."
+    },
+    {
       "name": "find_custom_node_for",
       "description": "Find which custom-node pack provides a given ComfyUI node class."
     },

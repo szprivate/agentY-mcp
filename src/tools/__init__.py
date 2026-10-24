@@ -113,6 +113,8 @@ from agenty_core.tools.lora_training import (  # noqa: F401
 )
 # Run one build script in Blender / Maya / Houdini; check a model's silhouette against a photo by numbers.
 from agenty_core.tools.dcc import dcc_build, dcc_silhouette_check  # noqa: F401
+# Which creative apps (Blender, Houdini, Maya, Nuke, ...) are installed here, and the newest version of each.
+from agenty_core.tools.app_installs import find_app_installs  # noqa: F401
 from agenty_core.tools.reference_measure import measure_reference  # noqa: F401
 # The studio's Ayon pipeline for a ComfyUI session launched through Ayon (no agentY host here: the canvas is
 # read from the user's selection, and node data is handed back to paste - see agentY docs/ayon.md).
