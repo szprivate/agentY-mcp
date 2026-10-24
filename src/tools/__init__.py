@@ -105,6 +105,7 @@ from agenty_core.tools.worldlabs_atlas import (  # noqa: F401
 from agenty_core.tools.atlas_render import atlas_render_view, atlas_open_in_viewer  # noqa: F401
 # All-round Atlas capture; a Gaussian splat trained locally from posed views (Brush).
 from agenty_core.tools.atlas_capture import atlas_capture_around  # noqa: F401
+from agenty_core.tools.worldlabs_marble import marble_create_world, marble_export  # noqa: F401
 from agenty_core.tools.splat_train import train_splat, splat_training_status  # noqa: F401
 from agenty_core.tools.lora_training import (  # noqa: F401
     lora_dataset_prepare, lora_dataset_set_captions, lora_dataset_review, train_lora, lora_training_status,

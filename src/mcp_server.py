@@ -194,6 +194,9 @@ _TOOLS = [
     T.atlas_capture_around,
     T.train_splat,
     T.splat_training_status,
+    # ── World Labs Marble: a ready splat world from pictures, SPZ / PLY export (WLT_MARBLE_API_KEY) ──
+    T.marble_create_world,
+    T.marble_export,
     # ── LoRA training: dataset, the user's review gate, local / hosted trainers ──
     T.lora_dataset_prepare,
     T.lora_dataset_set_captions,
