@@ -78,6 +78,18 @@ class SkillsMirror(unittest.TestCase):
         self.assertTrue(mod.is_clean(p), "the plugin skills are stale: " + mod.describe(p)
                         + " - run agentY/scripts/sync_plugin_skills.py and commit")
 
+    def test_git_tracks_the_same_folder_names_as_the_disk(self):
+        """On Windows/macOS git keeps the old case of a renamed folder; Linux would then miss the skill."""
+        import shutil
+        import subprocess
+        if not shutil.which("git"):
+            self.skipTest("no git")
+        out = subprocess.run(["git", "-C", str(ROOT), "ls-files", "skills"], capture_output=True, text=True)
+        if out.returncode != 0:
+            self.skipTest("not a git checkout")
+        tracked = {line.split("/")[1] for line in out.stdout.splitlines() if line.count("/") >= 2}
+        self.assertEqual(tracked, {d.name for d in (ROOT / "skills").iterdir() if d.is_dir()})
+
     def test_every_skill_has_matching_folder_and_name(self):
         for d in (ROOT / "skills").iterdir():
             if d.is_dir():
