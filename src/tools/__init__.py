@@ -106,6 +106,10 @@ from agenty_core.tools.atlas_render import atlas_render_view, atlas_open_in_view
 # All-round Atlas capture; a Gaussian splat trained locally from posed views (Brush).
 from agenty_core.tools.atlas_capture import atlas_capture_around  # noqa: F401
 from agenty_core.tools.splat_train import train_splat, splat_training_status  # noqa: F401
+from agenty_core.tools.lora_training import (  # noqa: F401
+    lora_dataset_prepare, lora_dataset_set_captions, lora_dataset_review, train_lora, lora_training_status,
+    lora_training_stop,
+)
 # Run one build script in Blender / Maya / Houdini; check a model's silhouette against a photo by numbers.
 from agenty_core.tools.dcc import dcc_build, dcc_silhouette_check  # noqa: F401
 from agenty_core.tools.reference_measure import measure_reference  # noqa: F401

@@ -57,6 +57,10 @@
       "files": 1,
       "sha256": "3b342fda211adaa479633a35d525e75b0864c43a648dd9a75478be96502c6216"
     },
+    "lora-training": {
+      "files": 1,
+      "sha256": "07b98a0fe5dac8fed1329227fe231f794c3e29d4f8d2b716d4b024aae105b0bf"
+    },
     "model-from-reference": {
       "files": 1,
       "sha256": "0ad4cf6bf833b1b615ccf8464e889380aee48873c84e23c416d8feb21932f79a"

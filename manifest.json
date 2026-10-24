@@ -107,7 +107,7 @@
     },
     {
       "name": "atlas_splat_to_mesh",
-      "description": "Turn a Gaussian-splat scene (.spz, e.g. a World Labs Marble export) into a GLB mesh with Atlas's splats2Mesh, so it can ..."
+      "description": "Turn a Gaussian-splat scene into a GLB mesh with Atlas's splats2Mesh, so it can be flown through with ..."
     },
     {
       "name": "ayon_context",
@@ -310,6 +310,26 @@
       "description": "List the available workflow recipes as a task -> model index."
     },
     {
+      "name": "lora_dataset_prepare",
+      "description": "Build a LoRA training dataset: collect pictures / clips, drop what is unusable, crop and resize them to the model's ..."
+    },
+    {
+      "name": "lora_dataset_review",
+      "description": "The user's gate before any training: show them the dataset and wait for their approval."
+    },
+    {
+      "name": "lora_dataset_set_captions",
+      "description": "Write or replace captions of a LoRA dataset (item id -> caption), and optionally change its trigger word."
+    },
+    {
+      "name": "lora_training_status",
+      "description": "Progress of a LoRA training: step / total, ETA, it/s, loss, learning rate, VRAM, the latest samples, new events. When ..."
+    },
+    {
+      "name": "lora_training_stop",
+      "description": "Stop a running LoRA training. With ``keep_last_checkpoint`` (default) the newest saved checkpoint is copied into ..."
+    },
+    {
       "name": "measure_reference",
       "description": "Measure a reference photo with MoGe (monocular metric geometry): camera field of view, camera height above the ground, ..."
     },
@@ -444,6 +464,10 @@
     {
       "name": "submit_to_deadline",
       "description": "Send a ComfyUI workflow to the on-prem Deadline render farm instead of the local ComfyUI."
+    },
+    {
+      "name": "train_lora",
+      "description": "Start training a LoRA on an APPROVED dataset, in the background. Returns a job id at once."
     },
     {
       "name": "train_splat",

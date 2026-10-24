@@ -194,6 +194,13 @@ _TOOLS = [
     T.atlas_capture_around,
     T.train_splat,
     T.splat_training_status,
+    # ── LoRA training: dataset, the user's review gate, local / hosted trainers ──
+    T.lora_dataset_prepare,
+    T.lora_dataset_set_captions,
+    T.lora_dataset_review,
+    T.train_lora,
+    T.lora_training_status,
+    T.lora_training_stop,
     # ── Model from a reference photo in Blender / Maya / Houdini ──
     T.dcc_build,
     T.dcc_silhouette_check,
