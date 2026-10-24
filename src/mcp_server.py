@@ -26,7 +26,7 @@ def _load_env() -> list[str]:
 
     Order: this repo's own ``.env``, then agentY's ``.env`` - from
     ``AGENTY_ENV_FILE`` (a file) or ``AGENTY_HOME`` (agentY's folder), else the
-    sibling checkout ``../agentY/.env``. ``override=False`` throughout, so a
+    sibling checkout ``../agentY/.env``; then ``$CLAUDE_PLUGIN_DATA/.env`` and ``~/.agenty/.env``. ``override=False`` throughout, so a
     variable set by the MCP host (or an earlier file) is never replaced.
     """
     import os
@@ -41,6 +41,11 @@ def _load_env() -> list[str]:
         candidates.append(Path(os.environ["AGENTY_HOME"]).expanduser() / ".env")
     else:
         candidates.append(root.parent / "agentY" / ".env")
+    # Plugin installed from GitHub (no sibling agentY): the plugin's data folder (survives
+    # plugin updates) or ~/.agenty hold the keys.
+    if os.environ.get("CLAUDE_PLUGIN_DATA"):
+        candidates.append(Path(os.environ["CLAUDE_PLUGIN_DATA"]) / ".env")
+    candidates.append(Path.home() / ".agenty" / ".env")
     loaded = []
     for f in candidates:
         if f.is_file() and load_dotenv(f, override=False):

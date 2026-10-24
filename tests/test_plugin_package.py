@@ -26,6 +26,42 @@ def _digest(folder: Path) -> str:
     return h.hexdigest()
 
 
+class GitHubInstall(unittest.TestCase):
+    """A plugin copied into Claude Code's cache has no .venv and no sibling agentY-core."""
+
+    @staticmethod
+    def _names(path):
+        out = set()
+        for line in (ROOT / path).read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                out.add(re.split(r"[<>=;\[ ]", line, 1)[0].lower())
+        return out
+
+    def test_plugin_requirements_cover_requirements_txt(self):
+        have = self._names("requirements-plugin.txt")
+        want = {n for n in self._names("requirements.txt") if not n.startswith("-e")}
+        self.assertFalse(want - have, f"requirements-plugin.txt is missing {want - have}")
+
+    def test_plugin_requirements_cover_the_core_dependencies(self):
+        core = ROOT.parent / "agentY-core" / "pyproject.toml"
+        if not core.is_file():
+            self.skipTest("agentY-core is not next to this repo")
+        text = core.read_text(encoding="utf-8")
+        block = text.split("dependencies = [", 1)[1].split(chr(10) + "]", 1)[0]
+        block = chr(10).join(l.split("#", 1)[0] for l in block.splitlines())
+        wanted = {re.split(r"[<>=;\[ ]", m, 1)[0].lower() for m in re.findall(r'"([^"]+)"', block)}
+        self.assertFalse(wanted - self._names("requirements-plugin.txt"), "agentY-core needs packages the plugin does not install")
+
+    def test_core_pin_names_a_tag_of_the_release(self):
+        pin = (ROOT / "core.pin").read_text(encoding="utf-8").strip()
+        self.assertRegex(pin, r"^(v\d+\.\d+\.\d+|dev)$")
+
+    def test_the_pin_follows_the_plugin_version(self):
+        self.assertEqual((ROOT / "core.pin").read_text(encoding="utf-8").strip(),
+                         "v" + _json(".claude-plugin/plugin.json")["version"])
+
+
 class Manifests(unittest.TestCase):
     def test_plugin_json(self):
         p = _json(".claude-plugin/plugin.json")
@@ -47,7 +83,10 @@ class Manifests(unittest.TestCase):
     def test_mcp_json_starts_the_server_from_the_plugin_root(self):
         s = _json(".mcp.json")["mcpServers"]["agentY"]
         self.assertEqual(s["command"], "uv")
-        self.assertIn("${CLAUDE_PLUGIN_ROOT}/.venv", s["args"])
+        # the environment is built by uv from the plugin's own list - there is no .venv in a plugin cache
+        self.assertIn("--with-requirements", s["args"])
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}/requirements-plugin.txt", s["args"])
+        self.assertNotIn(".venv", json.dumps(s))
         self.assertEqual(s["args"][-2:], ["-m", "src"])
         # Claude Code does not honour a "cwd" for plugin servers: src must come from PYTHONPATH
         self.assertNotIn("cwd", s)
@@ -102,7 +141,7 @@ class SkillsMirror(unittest.TestCase):
 
 class AgentsAndCommands(unittest.TestCase):
     # snake_case words in the prose that are JSON fields, not tools
-    FIELDS = {"server_errors", "workflow_path", "output_path", "input_image_count", "output_dir", "used_as", "fix_plan"}
+    FIELDS = set()
 
     def test_tool_names_in_agents_and_commands_exist(self):
         from src import mcp_server
@@ -118,9 +157,20 @@ class AgentsAndCommands(unittest.TestCase):
         for f in [*(ROOT / "agents").glob("*.md"), *(ROOT / "commands").glob("*.md")]:
             text = f.read_text(encoding="utf-8")
             for token in re.findall(r"`([a-z0-9]+(?:-[a-z0-9]+)+)`(?: skill)?", text):
-                if token in {"query-templates", "assemble-workflow", "error-checker", "reference-scout", "agenty-generate"}:
+                if token in {"agenty", "agenty-scout"} or token.startswith("agenty-") and (ROOT / "commands" / (token + ".md")).is_file():
                     continue
                 self.assertIn(token, have, f"{f.name} names the skill `{token}`, which is not in skills/")
+
+    def test_commands_have_a_description_and_use_the_arguments(self):
+        for f in (ROOT / "commands").glob("*.md"):
+            text = f.read_text(encoding="utf-8")
+            self.assertRegex(text, r"(?m)^description:\s*\S", f.name)
+            self.assertIn("$ARGUMENTS", text, f.name)
+
+    def test_there_are_no_agents_of_the_removed_pipeline(self):
+        names = {f.stem for f in (ROOT / "agents").glob("*.md")}
+        self.assertFalse(names & {"planner", "query-templates", "assemble-workflow", "error-checker", "story",
+                                  "cinematography", "reference-scout", "info"}, names)
 
     def test_agent_frontmatter(self):
         for f in (ROOT / "agents").glob("*.md"):

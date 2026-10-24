@@ -35,41 +35,52 @@ agentY MCP server  (python -m src, FastMCP over stdio)  ──HTTP/WS──►  
 
 ---
 
-## Claude Code plugin: role subagents + the LLM switch
+## Claude Code plugin
 
-When installed as a **Claude Code plugin** (see below), agentY also ships **role subagents** and the **`/agenty`
-orchestrator commands** on top of the MCP tools + skills. This reproduces the
-original multi-agent pipeline **and its per-stage LLM switch** — but natively,
-using the models the Claude Code session already has instead of Ollama.
+agentY-mcp is also a Claude Code plugin: the MCP tools, the agentY skills, two agents and
+five commands. Audit and history: `docs/plugin_audit.md`.
 
-**How the switch is reproduced.** The original app set a `"provider,model"` per
-role in `settings.json` (cheap local Ollama for the token-heavy/simple roles, a
-strong Claude model for the workflow "brain"). Here, each role is a subagent
-under `agents/` whose `model:` frontmatter is the switch:
+**Install from GitHub** (anyone, no checkout needed; needs `uv` and `git` on PATH):
 
-| Subagent (`agents/…`) | Original role | Model tier |
-|---|---|---|
-| `query-templates` | Researcher — resolve request → brainbriefing JSON | **haiku** |
-| `planner` | Multi-step decomposer | **haiku** |
-| `story` | Creative writing (synopsis/scene/storyboard) | **haiku** |
-| `cinematography` | Director of Photography pass | **haiku** |
-| `reference-scout` | Web reference gathering | **haiku** |
-| `info` | Read-only Q&A + image analysis | **haiku** |
-| `assemble-workflow` | Brain — assemble/patch/validate/execute/QA | **sonnet** |
-| `error-checker` | Post-failure log diagnosis | **sonnet** |
+    claude plugin marketplace add szprivate/agentY-mcp
+    claude plugin install agenty@agentY
 
-Triage/routing is absorbed into the main session via the **`/agenty`** command
-(and **`/agenty-generate`** to skip triage and force the generation chain). The
-old `vision_agent` role is gone — Sonnet QAs outputs with its own vision.
+Until the first release moves `main`, add the `dev` branch instead:
+`claude plugin marketplace add https://github.com/szprivate/agentY-mcp.git#dev`.
 
-**Changing the switch.** Edit the `model:` line in any `agents/*.md`
-(`haiku` | `sonnet` | `opus` | `inherit`) — e.g. brain → `opus` for hard
-assembly, or set every subagent to `inherit` to flip the whole pipeline at the
-session level. Run `/agents` in Claude Code to inspect them.
+The first start is slow (a minute or more, once): uv builds the plugin's Python
+environment from `requirements-plugin.txt` into **uv's own cache** (so it survives plugin
+updates and is reused), and the server clones agentY-core at the tag in `core.pin` into the
+plugin's data folder (`~/.claude/plugins/data/agenty-agentY/`, ~40 MB, kept across updates).
+After that it starts in seconds. Update: `claude plugin marketplace update agentY`, then
+`claude plugin update agenty@agentY`, restart Claude Code.
 
-> These are Claude Code plugin constructs. In **Claude Desktop** (MCP host)
-> subagents/slash-commands don't apply — there the single Claude model
-> orchestrates via the skills, exactly as before.
+**Install from your checkout** (the agentY installer does this: "Set up agentY for Claude
+Code"): `claude plugin marketplace add <path to agentY-mcp>`, `claude plugin install agenty@agentY`.
+It is read in place, so a `git pull` of agentY-mcp is the update (restart or `/reload-plugins`).
+A sibling `../agentY-core` checkout is used instead of the pinned clone.
+
+**Keys** (HF_TOKEN, COMFYUI_API_KEY, DASHSCOPE_API_KEY, WORLDLABS_API_KEY ...) come from an
+agentY `.env`. The server reads, without overriding anything already set: this repo's `.env`;
+`AGENTY_ENV_FILE` (a file) or `AGENTY_HOME` (agentY's folder), else the sibling
+`../agentY/.env`; then `$CLAUDE_PLUGIN_DATA/.env` and `~/.agenty/.env`. On a machine without
+agentY, put the keys in `~/.agenty/.env`, or export them before starting Claude Code.
+
+What the plugin adds on top of the skills (all of it points at skills and tools, nothing
+re-implements them):
+
+| | |
+|---|---|
+| agent `agenty` (sonnet) | does a long image / video / 3D job with agentY's tools; checks `list_skills` first, price-checks paid runs |
+| agent `agenty-scout` (haiku) | cheap read-only look-ups: catalog, models, nodes, web references |
+| `/agenty-generate` | generate or edit an image / video (template or partner model) |
+| `/agenty-model-from-photo` | model a building / object in Blender, Maya or Houdini from a photo |
+| `/agenty-destroy` | Houdini destruction sim |
+| `/agenty-atlas` | Atlas 3D scene, camera moves, new views |
+| `/agenty-cost` | price a workflow before running it |
+
+Change the model tier of an agent with the `model:` line in `agents/*.md`.
+Tests check that every tool and skill the agents and commands name exists.
 
 ---
 
@@ -192,17 +203,7 @@ Claude Code: the plugin loads `skills/` by itself (see above). Claude Desktop an
 clients: the server offers the skills as the tools `list_skills` / `read_skill` and as MCP
 prompts, and tells the model to check them before a task - nothing to upload.
 
-### Install the Claude Code plugin
-
-The agentY installer can do this ("Set up agentY for Claude Code"), or by hand:
-
-    claude plugin marketplace add D:igentY-mcp        # this checkout (or szprivate/agentY-mcp)
-    claude plugin install agenty@agentY
-
-The plugin starts the server with `uv run --python <plugin>/.venv`, so it needs `uv` on PATH
-and this checkout's `.venv` (the installer creates it). The marketplace is read from the checkout in place, so
-updating agentY-mcp (the launcher's `git pull`) updates the plugin: restart Claude Code or `/reload-plugins`. Releases keep the plugin version,
-`manifest.json` and the skills in step; see `docs/plugin_audit.md`.
+The Claude Code plugin install is described in [Claude Code plugin](#claude-code-plugin).
 
 ---
 

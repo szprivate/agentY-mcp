@@ -3,7 +3,8 @@
 * ``manifest.json`` (the .mcpb bundle for Claude Desktop): ``version`` and ``tools``
   (every tool the server offers, with the start of its docstring);
 * ``.claude-plugin/plugin.json`` and the entry in ``.claude-plugin/marketplace.json``:
-  ``version``.
+  ``version``;
+* ``core.pin``: ``v<version>``, the agentY-core tag a plugin installed from GitHub clones.
 
 Run from this repo's root with its own interpreter. agentY's release script calls it
 (``scripts/make_release.py``); the versions are the release version.
@@ -30,6 +31,7 @@ FILES = {
     "plugin": ROOT / ".claude-plugin" / "plugin.json",
     "marketplace": ROOT / ".claude-plugin" / "marketplace.json",
 }
+PIN = ROOT / "core.pin"     # the agentY-core tag a GitHub-installed plugin fetches
 
 
 def _read(p: Path) -> dict:
@@ -70,6 +72,8 @@ def wanted(version: str | None, tools: list | None) -> dict:
         if entry.get("name") == plugin["name"] and version:
             entry["version"] = version
     out["marketplace"] = (FILES["marketplace"], _dump(mk, False))
+    pin = f"v{version}" + chr(10) if version else (PIN.read_text(encoding="utf-8") if PIN.is_file() else "dev" + chr(10))
+    out["pin"] = (PIN, pin)
     return out
 
 
