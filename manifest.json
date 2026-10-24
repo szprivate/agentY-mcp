@@ -330,6 +330,14 @@
       "description": "Stop a running LoRA training. With ``keep_last_checkpoint`` (default) the newest saved checkpoint is copied into ..."
     },
     {
+      "name": "marble_create_world",
+      "description": "Make a navigable Gaussian-splat world with World Labs Marble from one or more pictures (or a prompt)."
+    },
+    {
+      "name": "marble_export",
+      "description": "Get the files of a Marble world made by marble_create_world: SPZ or PLY splats, the collider mesh. Free (no credits). ..."
+    },
+    {
       "name": "measure_reference",
       "description": "Measure a reference photo with MoGe (monocular metric geometry): camera field of view, camera height above the ground, ..."
     },
