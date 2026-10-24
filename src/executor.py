@@ -203,6 +203,11 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
     # before anything is queued. The tools check earlier and carry confirm_cost.
     from agenty_core import partner_credits as _credits
     _cost = _credits.gate_submission(workflow, str(p))
+    # Routed to the Deadline farm (DEADLINE_ROUTE_RUNS=1, off by default): same preparation and
+    # cost gate, only the queueing differs. The reference stands in for a prompt_id.
+    from agenty_core.utils import farm_run
+    if farm_run.enabled():
+        return farm_run.submit(workflow, name=p.stem)
     client = get_client()
     payload: dict = {"prompt": workflow}
     if client_id:
@@ -217,10 +222,21 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
     raise RuntimeError(f"Unexpected response from ComfyUI /prompt: {result!r}")
 
 
+def _job_stream(prompt_id: str, client_id: str, **kw):
+    """Progress events for a submitted job: the farm's for a ``farm:`` reference, ComfyUI's otherwise."""
+    from agenty_core.utils import farm_run
+    if farm_run.is_farm_ref(prompt_id):
+        return farm_run.stream(prompt_id, max_wait_s=farm_run.max_wait_seconds())
+    from src.utils.comfyui_progress import stream_comfyui_job
+    return stream_comfyui_job(prompt_id, client_id, **kw)
+
+
 async def _settle_partner(prompt_id: str) -> str:
     """What a finished paid job cost in Comfy credits (balance before vs after), as
     a status line; "" for a job with no paid node or an unreadable balance."""
     import asyncio
+    if str(prompt_id).startswith("farm:"):
+        return ""            # the worker's own key paid; no local balance to compare
     from agenty_core import partner_credits as _credits
     try:
         usd = await asyncio.to_thread(_credits.settle, prompt_id)
@@ -468,7 +484,7 @@ async def execute_workflow(
     node_titles = _load_node_titles(workflow_path)
     history: dict | None = None
     error_result: dict | None = None
-    _gen = stream_comfyui_job(prompt_id, client_id, node_titles=node_titles)
+    _gen = _job_stream(prompt_id, client_id, node_titles=node_titles)
     try:
         async for event in _gen:
             if isinstance(event, dict):
@@ -583,7 +599,7 @@ async def execute_workflows_batch(
         history: dict | None = None
         error_result: dict | None = None
         _node_titles = _load_node_titles(_wf_path)
-        _gen = stream_comfyui_job(prompt_id, cid, node_titles=_node_titles)
+        _gen = _job_stream(prompt_id, cid, node_titles=_node_titles)
         try:
             async for event in _gen:
                 if isinstance(event, dict):
