@@ -1,0 +1,20 @@
+{
+  "name": "agenty",
+  "displayName": "agentY",
+  "version": "1.4.0",
+  "description": "agentY - turn natural language into ComfyUI image/video workflows. The agentY MCP server (ComfyUI, HuggingFace, partner nodes, Atlas, DCC, Deadline, Ayon), the agentY skills, role subagents with a per-role model tier, and the /agenty commands.",
+  "author": {
+    "name": "szprivate",
+    "url": "https://github.com/szprivate/agentY"
+  },
+  "homepage": "https://github.com/szprivate/agentY",
+  "repository": "https://github.com/szprivate/agentY-mcp",
+  "license": "MIT",
+  "keywords": [
+    "comfyui",
+    "image-generation",
+    "video-generation",
+    "flux",
+    "stable-diffusion"
+  ]
+}

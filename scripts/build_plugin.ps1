@@ -72,7 +72,7 @@ function Get-SkillName($skillMd) {
 $skillsDest = Join-Path $plugin "skills"
 New-Item -ItemType Directory -Force -Path $skillsDest | Out-Null
 $skillCount = 0
-foreach ($srcDir in @((Join-Path $root "skills"), (Join-Path $root "skills_story"))) {
+foreach ($srcDir in @((Join-Path $root "skills"))) {
     if (-not (Test-Path $srcDir)) { continue }
     foreach ($d in (Get-ChildItem -Directory -LiteralPath $srcDir)) {
         $md = Join-Path $d.FullName "SKILL.md"

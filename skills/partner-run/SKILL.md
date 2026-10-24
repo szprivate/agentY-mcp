@@ -1,24 +1,25 @@
 ---
 name: partner-run
 description: Run ONE partner (API) node directly - Seedance, Kling, GPT Image, Nano Banana / Gemini image, Ideogram, Meshy, Veo, Runway, Hailuo ... - with partner_run, no template search. Activate when the request names a partner model or node and the job is that node alone (text/image/first-frame/reference to image or video or 3D); for the settings spelling of dynamic combos and reference slots, and for N shots of one node.
-allowed-tools: partner_run, run_variants, execute_workflow, upload_image, analyze_image, get_node_schema, search_nodes
+allowed-tools: partner_run, run_variants, upload_image, analyze_image, get_node_schema, search_nodes
 ---
 
 # partner_run - one partner node, built from its own schema
 
 `partner_run(node_type, inputs, settings, save, name, run=True)` replaces: search the
-catalog -> template -> assemble -> validate -> `execute_workflow`. It reads the node's
+catalog -> `prepare_workflow` -> validate -> `signal_workflow_ready`. It reads the node's
 schema, loads each file into the slot you name, sets the widgets, adds the save node,
-validates and **runs** it (partner credits - once per request, never to test). The outputs
-come back like `execute_workflow`'s (paths plus the images / sampled frames to look at). Do not
-also execute the file.
+validates and **runs** it (partner credits - once per request, never to test; the price shows
+before it runs, and above the confirmation level you ask the user, then repeat with
+`confirm_cost=True`). The outputs
+come back like `run_workflow_now`'s and land on the canvas. Do not also signal the file.
 
 ## When
 
 - The request names the model or node: "Seedance 2.5 first-frame", "GPT Image 2 edit",
   "Nano Banana", "Kling start-end", "Ideogram", "Meshy image to 3D".
 - The job is that node alone. Several stages (generate, then upscale, then animate), a
-  local model, or a pipeline of nodes: the template route (`get_workflow_catalog`) as before.
+  local model, or a pipeline of nodes: `prepare_workflow` / hooks as before.
 - Unsure of the node's name? Give your best name ("Seedance 2.5 first last frame"); an
   ambiguous or unknown name builds nothing and returns candidates - pick one and call again.
 
@@ -61,7 +62,7 @@ slot left empty names the slot.
 
 ## Do not
 
-- Search templates first for a request that names a partner node.
+- Search templates first, or call `prepare_workflow`, for a request that names a partner node.
 - Call it again for the same request "to check" - it spends money. Read the result.
 - Put a file path in `settings` or a plain value in `inputs`: the error says which is which.
 - Use a template whose name merely sounds right (a storyboard template for a first-frame job).

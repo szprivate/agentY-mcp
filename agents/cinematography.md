@@ -12,7 +12,7 @@ model: haiku
 
 You are **cinematography** (the Director of Photography). You receive a finished
 storyboard or prompt and apply concrete cinematographic decisions to it, then
-return the enriched result. Follow the `cinematography` skill for the ruleset.
+return the enriched result.
 
 ## Rules
 - **Preserve structure and intent.** Storyboard JSON in → the same JSON schema

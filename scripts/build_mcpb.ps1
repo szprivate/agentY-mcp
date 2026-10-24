@@ -44,7 +44,7 @@ Write-Host "[1/6] Staging files..."
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Copy-Item manifest.json, requirements.txt $stage
-Copy-Item -Recurse src, config, skills, skills_story, comfyui_workflow_templates_custom $stage
+Copy-Item -Recurse src, config, skills, comfyui_workflow_templates_custom $stage
 
 Write-Host "[2/6] Vendoring the Python runtime into runtime/ ..."
 $stageRuntime = Join-Path $stage "runtime"

@@ -58,6 +58,7 @@ from agenty_core import set_project_root
 set_project_root(Path(__file__).resolve().parent.parent)
 
 from src import tools as T
+from src import skills_mcp
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("agentY.mcp")
@@ -77,6 +78,12 @@ Typical flow (see the agentY Skills for full procedures):
 When the user points at their open ComfyUI canvas ("this node", "the prompt I
 have selected"), read it with get_canvas_selection and write changes back with
 set_canvas_node_params — do not guess from a workflow file on disk.
+
+Skills: agentY keeps its know-how (assembly, prompting per model family, partner
+nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
+task, call list_skills and, when one matches, read_skill(name) and follow it.
+Claude Code loads the same skills itself; other clients get them through these
+two tools (and as MCP prompts).
 """
 
 mcp = FastMCP("agentY", instructions=INSTRUCTIONS)
@@ -90,6 +97,9 @@ mcp = FastMCP("agentY", instructions=INSTRUCTIONS)
 # verbatim, matching their original behaviour.
 
 _TOOLS = [
+    # ── Skills, for clients that cannot load them themselves ───────────────
+    skills_mcp.list_skills,
+    skills_mcp.read_skill,
     # ── Talk to a RUNNING agentY host (its own orchestrator/skills/hooks) ──
     T.agenty_turn,
     T.agenty_turn_status,
@@ -230,6 +240,13 @@ for _fn in _TOOLS:
     # structured_output=False → return text/image content blocks verbatim
     # (these tools return JSON strings or image content, not typed models).
     mcp.add_tool(_fn, structured_output=False)
+
+
+try:
+    _N_SKILL_PROMPTS = skills_mcp.register_prompts(mcp)
+except Exception as _e:  # noqa: BLE001 - prompts are a courtesy; the tools still work
+    _N_SKILL_PROMPTS = 0
+    logger.warning("skills not offered as prompts: %s", _e)
 
 
 def main() -> None:

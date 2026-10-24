@@ -14,7 +14,7 @@ role that must run on a strong model). You receive a **brainbriefing JSON** and
 are responsible for everything from there to a QA'd result on disk.
 
 ## Procedure
-Follow **steps 5–6 of the `comfyui-generate` skill**:
+Follow the `workflow-templates`, `assemble-from-template` and `assemble-new-workflow` skills (list them with `list_skills` if your client does not load skills itself):
 
 1. **Assemble**
    - **Template path** (`template.name` is a real template): `get_workflow_template(name)`
@@ -31,14 +31,15 @@ Follow **steps 5–6 of the `comfyui-generate` skill**:
 
 2. **Execute & QA**
    - Single run: `execute_workflow(workflow_path, brainbriefing_json)`.
-   - Batch / variations: `duplicate_workflow` per iteration (or `batch-handoff`
-     Mode A for per-variation prompts), then `execute_workflows_batch([...paths...])`.
+   - Batch / variations: `run_variants` (duplicate + patch + queue N variants in one call), or
+     `duplicate_workflow` per iteration then `execute_workflows_batch([...paths...])`.
    - `execute_workflow` returns the generated image(s) or sampled video frames.
      **Look at them** with your own vision and judge subject, style, composition,
      edit fidelity, and artifacts against the brainbriefing. If they fall short,
-     diagnose (the `troubleshooting` skill for execution failures; `get_logs` for
-     errors) and re-patch + re-run. For qualitative follow-ups ("make it darker",
-     "now 16:9") reuse the prior workflow via the `feedback-loop` skill.
+     diagnose (`get_logs` for execution failures; the `assemble-workflow-learnings`
+     skill and `memory_read` for known fixes) and re-patch + re-run. For
+     qualitative follow-ups ("make it darker", "now 16:9") reuse the prior
+     workflow file and patch it with `update_workflow`.
 
 ## Constraints
 - State what you are about to do before each tool call.

@@ -1,0 +1,117 @@
+{
+  "_comment": "Written by agentY/scripts/sync_plugin_skills.py - do not edit. skills/ is a mirror of agentY/skills/.",
+  "excluded": [
+    "batch-handoff",
+    "canvas-layout",
+    "hook-pipeline",
+    "image-batch",
+    "orchestrator-skills",
+    "spawn-subagent"
+  ],
+  "skills": {
+    "annotation": {
+      "files": 1,
+      "sha256": "7d563c7a38542f7967f9e6e5e5d8630ef8d679afd791759c2ea41b3bebac6699"
+    },
+    "assemble-from-template": {
+      "files": 1,
+      "sha256": "82fbec9b51227fba37cea6cb3b7de0a6cdaa81359ae22d20682492338cb108df"
+    },
+    "assemble-new-workflow": {
+      "files": 1,
+      "sha256": "ddf28dcd608b7c7f2d84a723b7c6aaa3f34d47f6f2d7dd7ed4a7e39c04227d08"
+    },
+    "assemble-workflow-learnings": {
+      "files": 1,
+      "sha256": "cd338d310cd29b66cccbacaadfeb1aca95514b8808e308c33d3f07e8f196aecc"
+    },
+    "camera-move-control": {
+      "files": 1,
+      "sha256": "b11b648c3379e23ef645a23cba842ff2da4035c370ad319a07ac0a3bb92e05c6"
+    },
+    "custom-node-from-github": {
+      "files": 1,
+      "sha256": "d46d936e11884331379cd5620d2e6e9f514150637468d8fa21d95fefebc8418a"
+    },
+    "dashscope-generate": {
+      "files": 1,
+      "sha256": "d63af88016b94eeae9386edaefc5bcf61fab3f492ef21abc91871e7b47e6b8a3"
+    },
+    "dcc-destruction-houdini": {
+      "files": 1,
+      "sha256": "7b99d02bee6e8f5cdc38b1248e644a8db446e8734290cea5fb98a070e4337788"
+    },
+    "deadline-farm": {
+      "files": 1,
+      "sha256": "958371bc71b7f3aaeeed1ffaf0a23c2b971128cc17e0cfb9ea71670e4c254405"
+    },
+    "flux-sampling": {
+      "files": 1,
+      "sha256": "4629e8b0a73d6ebbdb8d57e3bbdb7c5c42d52b74995f43293341049afba46f72"
+    },
+    "image-downsize": {
+      "files": 2,
+      "sha256": "0167ed82d71d85124f02f6e10fde2a8031819569b1e8cca43ddcdde82fc0c1ce"
+    },
+    "kling-multishot": {
+      "files": 1,
+      "sha256": "3b342fda211adaa479633a35d525e75b0864c43a648dd9a75478be96502c6216"
+    },
+    "model-from-reference": {
+      "files": 1,
+      "sha256": "0ad4cf6bf833b1b615ccf8464e889380aee48873c84e23c416d8feb21932f79a"
+    },
+    "output-paths": {
+      "files": 1,
+      "sha256": "37e03d7713d6a7c904be28ca294d2aea863b9f42c30423e1c69ee31b6bb7ac43"
+    },
+    "partner-run": {
+      "files": 1,
+      "sha256": "bbb0fd9adbb893ce21c45d16de487a8520a95176f258299a35dbac2143d65570"
+    },
+    "prompting": {
+      "files": 11,
+      "sha256": "673fd3e591cbaabe68e5d6b7d1cdcb341510707f1ccd4707afa5e315bb98dcbb"
+    },
+    "recipe": {
+      "files": 1,
+      "sha256": "cf538c0669c73ce68a00a3f057a116368da58eb3e8b385969bc2ce1cbffc99f5"
+    },
+    "seedance-reference": {
+      "files": 1,
+      "sha256": "360b043739b635ac37369be905620950ddf7b21433b167f3a690929b6e0f7e57"
+    },
+    "show-in-viewer": {
+      "files": 1,
+      "sha256": "a00ea44c59407f258e471890ef784651ec82a4a61dc765c5199ea16b2ae4d76e"
+    },
+    "story-scene": {
+      "files": 1,
+      "sha256": "1959a3e7be7978757b0f6d43fc0143fd6c1a2020c1159a3f5297b3580e488e40"
+    },
+    "story-storyboard": {
+      "files": 1,
+      "sha256": "29f0ff14d4953f4c4953a196fdadaba758dbbe03a9ccbd0d014f3f4e5b3be71a"
+    },
+    "story-synopsis": {
+      "files": 1,
+      "sha256": "aefbe372a86196f86381c2d762455f4bbbbbae8b8602cd23eff75353a07caf81"
+    },
+    "upscale-ultimatesd": {
+      "files": 1,
+      "sha256": "6b4882d9a00a29a691b9ddac6f232d422f2c98fd7522b927e8699f51244924f2"
+    },
+    "video-gemini-motionpromptgeneration": {
+      "files": 1,
+      "sha256": "37ac0e215872b10ef70a6438022d0fd2255fd079c90a5ef29e32786c11fc8191"
+    },
+    "workflow-templates": {
+      "files": 1,
+      "sha256": "f1f1cbaca435bd82d268374697a763e4f454aee70e616ac4fe513fcc21e213dc"
+    },
+    "worldlabs-atlas": {
+      "files": 1,
+      "sha256": "b779e0dba753bdb64ef9bccead52e07a301e14a7547ef0c8587eafc6c9b6cbc1"
+    }
+  }
+}

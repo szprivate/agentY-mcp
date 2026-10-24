@@ -19,7 +19,7 @@ HuggingFace model management, image handling, web search, memory).
 
 ```
 Claude Desktop  (the orchestrator / "brain")
-   │  loads Skills  ── skills/ , skills_story/   (procedural knowledge)
+   │  loads Skills  ── skills/   (procedural knowledge)
    │  calls MCP tools
    ▼
 agentY MCP server  (python -m src, FastMCP over stdio)  ──HTTP/WS──►  ComfyUI
@@ -27,8 +27,9 @@ agentY MCP server  (python -m src, FastMCP over stdio)  ──HTTP/WS──►  
 
 - **MCP server** — `src/mcp_server.py` exposes ~43 tools (see `src/tools/`). The
   ComfyUI client, workflow parser, and executor are reused unchanged minus Ollama.
-- **Skills** — `skills/` (ComfyUI) and `skills_story/` (creative writing). The entry
-  point is **`comfyui-generate`**, which orchestrates the full flow.
+- **Skills** — `skills/`, a mirror of agentY's skills (kept by agentY's
+  `scripts/sync_plugin_skills.py`; never edit by hand). Clients that cannot load skills get
+  them through the `list_skills` / `read_skill` tools and as MCP prompts.
 - **Vision QA** — `execute_workflow` returns the generated image(s) (or sampled video
   frames) as image content, so Claude inspects results with its own vision.
 
@@ -36,8 +37,7 @@ agentY MCP server  (python -m src, FastMCP over stdio)  ──HTTP/WS──►  
 
 ## Claude Code plugin: role subagents + the LLM switch
 
-When installed as a **Claude Code plugin** (`scripts/build_plugin.ps1` →
-`dist/agentY-plugin`), agentY also ships **role subagents** and the **`/agenty`
+When installed as a **Claude Code plugin** (see below), agentY also ships **role subagents** and the **`/agenty`
 orchestrator commands** on top of the MCP tools + skills. This reproduces the
 original multi-agent pipeline **and its per-stage LLM switch** — but natively,
 using the models the Claude Code session already has instead of Ollama.
@@ -188,12 +188,21 @@ Restart Claude Desktop — the **agentY** tools should appear.
 
 ### 5. Install the Skills
 
-In Claude Desktop, **Settings → Capabilities → Skills → Upload skill**, then upload
-each skill folder (zip the folder so `SKILL.md` is at the zip root). The key one is
-**`comfyui-generate`**; the others (`comfyui-core`, `prompting`,
-`assemble-from-template`, `assemble-new-workflow`, `cinematography`, `reference-scout`,
-`batch-process` (bulk runs over a folder / many files), the `story-*` skills, etc.) are
-activated by `comfyui-generate` as needed.
+Claude Code: the plugin loads `skills/` by itself (see above). Claude Desktop and other MCP
+clients: the server offers the skills as the tools `list_skills` / `read_skill` and as MCP
+prompts, and tells the model to check them before a task - nothing to upload.
+
+### Install the Claude Code plugin
+
+The agentY installer can do this ("Set up agentY for Claude Code"), or by hand:
+
+    claude plugin marketplace add D:igentY-mcp        # this checkout (or szprivate/agentY-mcp)
+    claude plugin install agenty@agentY
+
+The plugin starts the server with `uv run --python <plugin>/.venv`, so it needs `uv` on PATH
+and this checkout's `.venv` (the installer creates it). Update: `claude plugin marketplace update agentY`
+then `claude plugin update agenty@agentY` (restart Claude Code). Releases keep the plugin version,
+`manifest.json` and the skills in step; see `docs/plugin_audit.md`.
 
 ---
 

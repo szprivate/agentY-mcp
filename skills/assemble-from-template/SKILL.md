@@ -1,10 +1,10 @@
 ---
 name: assemble-from-template
-description: Assembles a workfow on the basis of a brainbriefing JSON and a pre-selected template.
-allowed-tools: update_workflow, get_workflow_template
+description: Assembles a workflow on the basis of a brainbriefing JSON and a pre-selected template.
+allowed-tools: apply_brainbriefing, update_workflow, replace_node, get_node_schema, get_workflow_template
 ---
 
-This skill is used whenever you need to assemble and patch a workflow from a workflow template you have already selected. Uses the brainbriefing JSON to retrieve input- and output nodes.
+This skill is used whenever the assemble workflow agent needs to assemble and patch a workflow from a workflow template pre-selected by the query templates agent. Uses the brainbriefing JSON to retrieve input- and output nodes.
 
 **General constraints:**
 - Before every tool call, state what you are doing and why.
@@ -16,68 +16,23 @@ Load the workflow template specified in the brainbriefing.
 **Constraints:**
 - You MUST call `get_workflow_template(brainbriefing.template_name)` and record the returned file path.
 - You MUST NOT proceed if the template fails to load — report the error with `task_id` and stop.
-- If the template is a **Nano Banana / Nano Banana 2 / Nano Banana Pro** variant: you MUST activate the `nano-banana` skill.
-- If the template is a **z-Image** variant: you MUST activate the `zimage-turbo` skill.
-- If the template is **`Kling3_multiShot`**: you MUST activate the `kling-multishot` skill and follow its Brain assembly steps instead of the standard step 2 patch procedure below.
+- If the template is **`Kling3_multiShot`**: you MUST activate the `kling-multishot` skill and follow its Brain assembly steps instead of the standard step 2 procedure below.
+- For a **Nano Banana / Nano Banana Pro** or **z-Image** variant: if a dedicated `nano-banana` / `zimage-turbo` skill is available, activate it for its special handling; otherwise proceed with step 2 — `apply_brainbriefing` assembles these correctly.
 
-### 2. Prepare updates and update the workflow template
-- Start preparing workflow patches that can be used by the `update_workflow` tool in a single tool call: 
-- provide a patch for every input node listed in the brainbriefing
-- provide a patch for every output node listed in the brainbriefing
-- provide a patch for positive prompt nodes, as described in the brainbriefing
-- provide patches for any other nodes that need to be changed from the template (eg to apply parameters changes)
-- the patches MUST follow the the format described by `update_workflow` doc string
-- excesss input node removal: if `input_image_count` < number of existing image load nodes → provide a list of the the excess node IDs.
-- add missing input nodes: if `input_image_count` > number of existing image load nodes → prepare a list of nodes to be added, match the format described by `update_workflow` tool's doc string.
-
-- Update the workflow using the `update_workflow` tool.
+### 2. Apply the brainbriefing, then fix any errors
+Assemble the workflow by applying the whole brainbriefing in ONE call, then correct only what it could not do mechanically.
 
 **Constraints:**
-- You MUST call `update_workflow(workflow_path, patches, add_nodes, remove_nodes)`. Use this tool to update the template in a single 
-- You MUST NOT call `save_workflow()` — that tool is only for building entirely new workflows from scratch.
-- `patches` MUST cover: positive prompt, negative prompt, resolution (width/height), input image nodes, output nodes, sampler settings, seed, steps, cfg. Each patch: `{"node_id": "6", "input_name": "text", "value": "..."}`.
-  - `width` and `height` MUST come from `brainbriefing.resolution` — never guess.
-- If the workflow contains a **ModelSamplingFlux** node: you MUST include all four required inputs in `patches` — see **ModelSamplingFlux patch requirements** at the end of this skill.
-- If `update_workflow` returns `status: "error"`: you MUST read the reported problems, fix the patches, and call `update_workflow` again.
-- If `count_iter > 1` AND `variations == true`: you MUST activate the `batch-handoff` skill (Mode A) to generate distinct prompts before patching. This corresponds to a **`batch_request`**: the **same workflow template** is executed N times with substituted parameters only — the workflow structure does not change between iterations.
-- If you find a `BatchImagesNode` in the workflow template -- call `replace_node(workflow_path, <node_id>, "ImageBatch")` immediately. This tool preserves all connections automatically.
-
----
-
-## ModelSamplingFlux patch requirements
-
-When the workflow contains a `ModelSamplingFlux` node, all **four inputs** are required. Omitting any one will cause a ComfyUI validation failure.
-
-### Required inputs
-
-| input_name   | required value                                         |
-|--------------|--------------------------------------------------------|
-| `max_shift`  | `1.15`                                                 |
-| `base_shift` | `0.5`                                                  |
-| `width`      | from `brainbriefing.resolution_width`                  |
-| `height`     | from `brainbriefing.resolution_height`                 |
-
-### Patch template
-
-Include these four patches in the `patches` array passed to `update_workflow`:
-
-```json
-[
-  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "max_shift",  "value": 1.15 },
-  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "base_shift", "value": 0.5  },
-  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "width",      "value": <resolution_width>  },
-  { "node_id": "<ModelSamplingFlux_node_id>", "input_name": "height",     "value": <resolution_height> }
-]
-```
-
-Replace `<ModelSamplingFlux_node_id>` with the actual node ID from the workflow template. Replace `<resolution_width>` and `<resolution_height>` with the integer values from the brainbriefing.
-
-### How to find the node ID
-
-The `ModelSamplingFlux` node is typically listed in the `io.nodes` array returned by `get_workflow_template`. Look for `class_type: "ModelSamplingFlux"` and note its `nodeId`. If it is not in `io.nodes`, inspect the full workflow JSON for a node with `class_type: "ModelSamplingFlux"`.
-
-### Rules
-
-- You MUST include all four inputs in every `update_workflow` call that patches a ModelSamplingFlux node.
-- Values are **not optional** — ComfyUI will reject the workflow if any of the four are absent.
-- `width` and `height` MUST come from `brainbriefing.resolution_width` / `brainbriefing.resolution_height` — never hard-code or guess them.
+- You MUST call `apply_brainbriefing(workflow_path, brainbriefing_json)` with the **full** brainbriefing JSON. This single call patches every input node, the positive/negative prompt (into the exact `prompt_nodes` the briefing names, using each node's **real** input slot — e.g. `prompt` for `GeminiNanoBanana2`, `text` for `CLIPTextEncode`), the output node paths, and the resolution. Do **NOT** hand-build these patches yourself, and do NOT assume the prompt input is always `text`.
+- You MUST NOT call `save_workflow()` — that is only for building workflows from scratch.
+- If `apply_brainbriefing` returns `status: "ready"` (or `"ok"`): the workflow is assembled — inspect its `applied` list, then hand off. Do not re-patch anything it already applied.
+- If it returns `status: "error"`: read `problems` and `server_errors` and fix each with the **smallest** correction, then let it re-validate:
+  - a wrong/missing node input or value → `update_workflow(workflow_path, patches)`, each patch `{"node_id": "...", "input_name": "...", "value": ...}`. If you are unsure of the exact input name, inspect the node first with `get_node_schema`.
+  - a node that must be swapped → `replace_node(...)`.
+  Repeat at most twice, then hand off.
+- **Excess input nodes**: if `input_image_count` < the number of image-load nodes → remove the extras via `update_workflow(workflow_path, remove_nodes=[...])`.
+- **Missing input nodes**: if `input_image_count` > the number of image-load nodes → add them via `update_workflow(workflow_path, add_nodes=[...])`.
+- If the workflow has a **ModelSamplingFlux** node and `apply_brainbriefing` left its inputs incomplete: activate the `flux-sampling` skill and set all four required inputs via `update_workflow`.
+- If `count_iter > 1` AND `variations == true`: activate the `image-batch` skill first (a `batch_request`: the same template run N times with substituted parameters — the structure does not change).
+- If you find a `BatchImagesNode`: call `replace_node(workflow_path, <node_id>, "ImageBatch", remap_inputs=true)` immediately (the slots have other names, so the wires are carried over by type).
+- **`dead_nodes` in any result is a defect, even when `status` is `"ok"`.** Those nodes will never execute — ComfyUI runs a graph backwards from its output nodes, so a node whose output nothing reads is skipped silently, and validation passes. It usually means a wire you added is missing its other half: a decoded audio branch whose `CreateVideo.audio` was left unwired produced a silent video from an audio model. Wire each listed node into the branch that reaches the output node, or remove it with `update_workflow(remove_nodes=[...])`.

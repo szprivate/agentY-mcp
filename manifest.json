@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "agenty",
   "display_name": "agentY",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Turn natural language into ComfyUI image and video workflows.",
   "long_description": "agentY exposes a ComfyUI workflow toolkit as MCP tools \u2014 template selection, workflow assembly/validation/execution, HuggingFace model management, image handling, web search, and long-term memory. Pair it with the agentY Skills (comfyui-generate and friends) so the host orchestrates end-to-end image/video generation against a local ComfyUI instance.",
   "author": {
@@ -42,6 +42,26 @@
       "description": "Add a new node to an existing workflow file."
     },
     {
+      "name": "agenty_conversations",
+      "description": "List agentY's conversations (id, title, running) so one can be continued by passing its id as `conversation` to ..."
+    },
+    {
+      "name": "agenty_reply",
+      "description": "Answer a question a running turn is waiting on (a result with status=waiting and waiting.request_id): \"yes\", \"no\", or a ..."
+    },
+    {
+      "name": "agenty_stop",
+      "description": "Stop a running agentY turn (by turn_id, or every turn of a conversation) and interrupt what it queued in ComfyUI."
+    },
+    {
+      "name": "agenty_turn",
+      "description": "Send a message to the RUNNING agentY host and return what agentY did."
+    },
+    {
+      "name": "agenty_turn_status",
+      "description": "The current state of a turn started with agenty_turn (same result shape)."
+    },
+    {
       "name": "analyze_image",
       "description": "Return an image so you can view and analyse it directly."
     },
@@ -50,12 +70,96 @@
       "description": "Apply a brainbriefing to a loaded workflow template in one atomic step."
     },
     {
+      "name": "assemble_workflow_deterministic",
+      "description": "Assemble a ComfyUI workflow from a brainbriefing with NO LLM reasoning."
+    },
+    {
+      "name": "atlas_capture_around",
+      "description": "Have Atlas paint an Atlas world ALL ROUND: views in every direction (plus ceiling and floor) from the middle of the ..."
+    },
+    {
+      "name": "atlas_create_world",
+      "description": "Start a 3D scene with World Labs Atlas, from a picture (or several) or from a text prompt."
+    },
+    {
+      "name": "atlas_expand_world",
+      "description": "Grow an Atlas scene: have Atlas invent new views at new cameras (atlasGenerate) and add them to the mesh, so a camera ..."
+    },
+    {
+      "name": "atlas_fetch",
+      "description": "Collect an Atlas job that atlas_create_world / atlas_expand_world / atlas_splat_to_mesh timed out on (operations are ..."
+    },
+    {
+      "name": "atlas_list",
+      "description": "List Atlas scenes on this machine, or the operations of the World Labs project."
+    },
+    {
+      "name": "atlas_open_in_viewer",
+      "description": "Open an Atlas world in the bEpic viewer's 3D view, looking through a 16:9 camera at the first picture's viewpoint, so ..."
+    },
+    {
+      "name": "atlas_rebuild_world_mesh",
+      "description": "Rebuild an Atlas scene's mesh from its saved depth maps (no API call, no cost): finer or lighter, or with the sky / far ..."
+    },
+    {
+      "name": "atlas_render_view",
+      "description": "Render ONE new picture of an Atlas world from a camera you choose (World Labs atlasGenerate, 1280x720), optionally ..."
+    },
+    {
+      "name": "atlas_splat_to_mesh",
+      "description": "Turn a Gaussian-splat scene (.spz, e.g. a World Labs Marble export) into a GLB mesh with Atlas's splats2Mesh, so it can ..."
+    },
+    {
+      "name": "ayon_context",
+      "description": "The Ayon context of the running ComfyUI session: project, folder, task, workdir, and the folder's frame range, fps and ..."
+    },
+    {
+      "name": "ayon_load",
+      "description": "Load a published Ayon file into the Ayon-launched ComfyUI canvas, the way the Ayon Loader does."
+    },
+    {
+      "name": "ayon_mark_publish",
+      "description": "Make an output of the canvas a publish instance, the way the Ayon Creator does."
+    },
+    {
+      "name": "ayon_open_tool",
+      "description": "Open one of the Ayon host's own tools (a window on the artist's machine) from the running session."
+    },
+    {
+      "name": "ayon_publish",
+      "description": "Start the Ayon publish for this session: opens the Ayon Publisher on the registered instances."
+    },
+    {
       "name": "check_model",
       "description": "Check whether model files exist in the current ComfyUI installation."
     },
     {
       "name": "clear_history",
       "description": "Clear ComfyUI execution history. If prompt_id given, deletes that entry only."
+    },
+    {
+      "name": "dashscope_fetch",
+      "description": "Collect a DashScope generation that ``dashscope_generate`` timed out on."
+    },
+    {
+      "name": "dashscope_generate",
+      "description": "Generate an image or a video with an Alibaba DashScope (Model Studio) model, billed to the user's own DashScope key \u2014 ..."
+    },
+    {
+      "name": "dcc_build",
+      "description": "Run a whole build script file in a 3D app (Blender, Maya or Houdini), then optionally save and render a still."
+    },
+    {
+      "name": "dcc_silhouette_check",
+      "description": "Check a model's proportions against the reference photo BY NUMBERS: project key points through the scene camera and ..."
+    },
+    {
+      "name": "deadline_farm_info",
+      "description": "A cheap look at the Deadline farm: pools, groups, worker counts by state, and the dedicated ComfyUI pool (does it ..."
+    },
+    {
+      "name": "deadline_job_status",
+      "description": "State of a Deadline job started with ``submit_to_deadline``: Queued, Rendering, Completed, Failed or Suspended, task ..."
     },
     {
       "name": "download_hf_model",
@@ -67,7 +171,11 @@
     },
     {
       "name": "duplicate_workflow",
-      "description": "Create a copy of an existing workflow JSON with a fresh random seed."
+      "description": "Create fresh-seeded copies of an existing workflow JSON."
+    },
+    {
+      "name": "estimate_workflow_cost",
+      "description": "Price a workflow in Comfy credits BEFORE running it (paid partner nodes only)."
     },
     {
       "name": "execute_workflow",
@@ -78,16 +186,36 @@
       "description": "Run several validated workflows (a batch) on ComfyUI and return their outputs."
     },
     {
+      "name": "find_custom_node_for",
+      "description": "Find which custom-node pack provides a given ComfyUI node class."
+    },
+    {
       "name": "find_hf_file",
       "description": "Locate which Hugging Face repo(s) host a specific file."
+    },
+    {
+      "name": "find_local_models",
+      "description": "Which model files this ComfyUI already has, by part of the name \u2014 every model folder it loads from, extra_model_paths ..."
+    },
+    {
+      "name": "find_workflows",
+      "description": "Find workflow JSON files by what is in them: node types, model files, titles, prompt text \u2014 every word must appear. ..."
     },
     {
       "name": "free_memory",
       "description": "Free GPU/system memory in ComfyUI by unloading models and clearing caches."
     },
     {
+      "name": "get_agent_output_dirs",
+      "description": "Return the canonical, absolute folders the agent must write into."
+    },
+    {
       "name": "get_batch_status",
-      "description": "Return the live progress of a batch job started with start_batch_job."
+      "description": "Return the live progress of a batch job started with ``start_batch_job``."
+    },
+    {
+      "name": "get_canvas_selection",
+      "description": "Read the nodes the user has selected on the live ComfyUI canvas."
     },
     {
       "name": "get_comfyui_dirs",
@@ -111,7 +239,11 @@
     },
     {
       "name": "get_node_schema",
-      "description": "Get a structured schema for a ComfyUI node: required/optional inputs with types and defaults, output types, and descript"
+      "description": "Get the schema for one or more ComfyUI nodes: required/optional inputs with types and defaults, output types, and ..."
+    },
+    {
+      "name": "get_node_source",
+      "description": "How a ComfyUI node \u2014 or any part of ComfyUI \u2014 actually works: its Python."
     },
     {
       "name": "get_prompt_status_by_id",
@@ -127,11 +259,35 @@
     },
     {
       "name": "get_workflow_node_info",
-      "description": "Return full metadata for a single node inside a saved workflow."
+      "description": "Return full metadata for one or more nodes inside a saved workflow."
+    },
+    {
+      "name": "get_workflow_recipe",
+      "description": "Return the build recipe for a task (and optionally a model family)."
     },
     {
       "name": "get_workflow_template",
-      "description": "Load a workflow template by name. Saves the full workflow to a file and returns a compact summary with the file path."
+      "description": "Load one or more workflow templates by name. Saves each full workflow to its own file and returns a compact summary ..."
+    },
+    {
+      "name": "hf_file",
+      "description": "Check one file on Hugging Face without downloading it: is it there, how big, can you download it, where would it go in ..."
+    },
+    {
+      "name": "hf_repo",
+      "description": "What is in one Hugging Face repo: its files with sizes, whether you can download them, and (readme=True) the model card."
+    },
+    {
+      "name": "hf_search",
+      "description": "Find Hugging Face repos \u2014 and, with file_pattern, the files in them you want."
+    },
+    {
+      "name": "inspect_workflow_file",
+      "description": "Read any ComfyUI workflow JSON (an example workflow, a template, a saved one; UI or API format) and say what it does: ..."
+    },
+    {
+      "name": "install_custom_node",
+      "description": "Install a ComfyUI custom-node pack from a git URL."
     },
     {
       "name": "interrupt_execution",
@@ -142,6 +298,26 @@
       "description": "List recent batch jobs (most recent first) with their state and progress."
     },
     {
+      "name": "list_files",
+      "description": "What is in a folder: files with size and date, newest first, numbered frames collapsed into one line per sequence ..."
+    },
+    {
+      "name": "list_skills",
+      "description": "List the agentY skills (procedures and know-how). Check this BEFORE a task: when a skill matches (template assembly, ..."
+    },
+    {
+      "name": "list_workflow_recipes",
+      "description": "List the available workflow recipes as a task -> model index."
+    },
+    {
+      "name": "measure_reference",
+      "description": "Measure a reference photo with MoGe (monocular metric geometry): camera field of view, camera height above the ground, ..."
+    },
+    {
+      "name": "media_info",
+      "description": "Facts about a video, an image, an EXR or an image sequence \u2014 without opening it in a script."
+    },
+    {
       "name": "memory_read",
       "description": "Search long-term memory for facts relevant to the current task."
     },
@@ -150,32 +326,72 @@
       "description": "Persist a fact, preference, or workflow note to long-term memory."
     },
     {
+      "name": "open_workflow_in_canvas",
+      "description": "Load a workflow the agent built or ran into the ComfyUI canvas so the user can visually inspect it."
+    },
+    {
+      "name": "partner_run",
+      "description": "Build and run ONE partner (API) node directly - no template search."
+    },
+    {
       "name": "patch_workflow",
       "description": "Apply targeted edits to a saved workflow without re-outputting the full JSON."
+    },
+    {
+      "name": "project_memory_forget",
+      "description": "Remove a fact from the current project's memory."
+    },
+    {
+      "name": "project_memory_read",
+      "description": "Read a fact established for the CURRENT project, in full, by name."
+    },
+    {
+      "name": "project_memory_write",
+      "description": "Establish a fact for the CURRENT project, so later turns keep it."
     },
     {
       "name": "queue",
       "description": "Get or manage the ComfyUI execution queue."
     },
     {
+      "name": "read_skill",
+      "description": "Read one agentY skill: its full SKILL.md and the names of its extra files (references, scripts)."
+    },
+    {
       "name": "read_text_file",
-      "description": "Read a text file from disk and return its contents as a plain string."
+      "description": "Read one or more text files from disk and return their contents as plain strings."
+    },
+    {
+      "name": "read_web_page",
+      "description": "Read a web page as text \u2014 after web_search, to read what it found: a model guide, a node pack's documentation, a ..."
     },
     {
       "name": "register_workflow_template",
-      "description": "Register a custom ComfyUI workflow JSON as a reusable template (parse into index.json + add to the catalog)."
+      "description": "Register a custom ComfyUI workflow JSON as a reusable template."
     },
     {
       "name": "remove_workflow_node",
       "description": "Remove a node from an existing workflow and clean up any links pointing to it."
     },
     {
+      "name": "render_camera_move",
+      "description": "Fly a camera through a 3D scene in the bEpic viewer and render the move to a clip."
+    },
+    {
       "name": "replace_node",
-      "description": "Replace a node with a different class_type while preserving all connections."
+      "description": "Replace a node with a different class_type, keeping its wiring."
+    },
+    {
+      "name": "reverse_image_search",
+      "description": "Reverse image search: find other photos of the same object or place, or where a picture is from."
     },
     {
       "name": "run_script",
-      "description": "Run a shell command and return its stdout/stderr."
+      "description": "Run a single program and return its stdout/stderr."
+    },
+    {
+      "name": "run_variants",
+      "description": "Make and run N independent variants of ONE workflow in a single call."
     },
     {
       "name": "save_workflow",
@@ -190,24 +406,48 @@
       "description": "Search ComfyUI nodes by keyword across names, descriptions, and categories."
     },
     {
+      "name": "set_canvas_node_params",
+      "description": "Write widget values onto a node of the live ComfyUI canvas."
+    },
+    {
+      "name": "show_in_viewer",
+      "description": "Show files in the bEpic viewer, when the user asks to see them there."
+    },
+    {
+      "name": "splat_training_status",
+      "description": "Check on (and finish) a splat started by ``train_splat``: progress while Brush runs; when it is done, cleans and saves ..."
+    },
+    {
       "name": "start_batch_job",
       "description": "Launch a headless batch run over many inputs and return its job_id immediately."
     },
     {
       "name": "stop_batch_job",
-      "description": "Stop a running batch job (graceful stop.flag + process terminate fallback)."
+      "description": "Stop a running batch job."
     },
     {
       "name": "submit_prompt",
       "description": "Submit a workflow to the ComfyUI execution queue. Returns prompt_id and client_id on success."
     },
     {
+      "name": "submit_to_deadline",
+      "description": "Send a ComfyUI workflow to the on-prem Deadline render farm instead of the local ComfyUI."
+    },
+    {
+      "name": "train_splat",
+      "description": "Train a Gaussian splat (an explorable 3D scene) from posed pictures, locally on the GPU with Brush."
+    },
+    {
       "name": "unregister_workflow_template",
-      "description": "Unregister a custom workflow template by name (remove from index.json + catalog, delete its skills/<kebab> dir)."
+      "description": "Unregister a custom workflow template by name."
     },
     {
       "name": "update_workflow",
       "description": "Add/remove nodes, patch inputs, and validate a workflow in one atomic step."
+    },
+    {
+      "name": "upload_file_to_url",
+      "description": "HTTP PUT a local file's raw bytes to a presigned upload URL."
     },
     {
       "name": "upload_image",
@@ -218,8 +458,16 @@
       "description": "Validate a ComfyUI workflow (local + server-side) without executing it."
     },
     {
+      "name": "video_frames",
+      "description": "Pull still frames out of a video (or pick them from an image sequence) to look at \u2014 evenly spaced, or the frames / ..."
+    },
+    {
       "name": "view_image",
       "description": "Download a ComfyUI output image: save the full-resolution original to disk and return a viewable, downsized copy."
+    },
+    {
+      "name": "wait_for_download",
+      "description": "Keep waiting for a download download_hf_model started. Returns when it is done, or with its progress after ..."
     },
     {
       "name": "web_search",
@@ -231,7 +479,7 @@
     },
     {
       "name": "write_text_file",
-      "description": "Write *content* to a file on disk (UTF-8).  Parent directories are"
+      "description": "Write *content* to a file on disk (UTF-8). Parent directories are created automatically. Any existing file at *path* is ..."
     }
   ],
   "user_config": {
