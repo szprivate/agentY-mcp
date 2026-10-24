@@ -26,3 +26,6 @@ config/workflow_recipes_object_info_cache.json
 
 # downloaded helper programs (Brush, the splat trainer)
 /tools/
+
+# uv.lock: made by `uv run --project` on first start; the plugin cache / checkout keeps it
+uv.lock

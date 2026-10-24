@@ -1,0 +1,29 @@
+[project]
+name = "agenty-mcp"
+version = "1.4.0"
+description = "agentY MCP server: ComfyUI workflow tools, skills and a Claude Code plugin."
+requires-python = ">=3.10"
+# Not installed as a package: `uv run --project <plugin root> python -m src` (see .mcp.json)
+# only builds the environment from this list. Keep it equal to requirements.txt (a test
+# checks) plus what agentY-core needs; agenty_core itself comes from a sibling checkout or
+# from the pinned clone src/__init__.py makes (see core.pin).
+dependencies = [
+    "mcp>=1.26.0",
+    "requests>=2.31.0",
+    "websockets>=12.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+    "ddgs>=9.0.0",
+    "imageio[ffmpeg]>=2.34.0",
+    "tqdm>=4.66.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "playwright>=1.40",
+    # agentY-core's own dependencies (it is not pip-installed in a plugin cache)
+    "numpy>=1.26",
+    "scenedetect>=0.7.0",
+    "OpenEXR>=3.2",
+    "jsonata-python>=0.7.1",
+]
+
+[tool.uv]
+package = false

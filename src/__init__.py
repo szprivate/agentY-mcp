@@ -71,5 +71,54 @@ def _bootstrap_sibling_core() -> None:
             return
 
 
+def _bootstrap_pinned_core() -> None:
+    """Plugin installed from GitHub: there is no sibling checkout and agenty_core is not
+    installed, so keep a shallow clone of agentY-core at the tag named in core.pin.
+
+    The clone is the package AND its template corpus (agenty_core.paths.corpus_root is the
+    clone root). It lives in ``AGENTY_CORE_DIR``, else the plugin's data folder
+    (``CLAUDE_PLUGIN_DATA``, which survives plugin updates), else ``~/.agenty``. The first
+    start clones (~40 MB) - slow once; a changed pin updates it. All git chatter goes to
+    stderr: stdout belongs to the MCP protocol."""
+    try:
+        if _find_spec("agenty_core") is not None:
+            return
+    except (ImportError, ValueError):
+        pass
+    import subprocess as _sp
+
+    pin_file = _Path(__file__).resolve().parent.parent / "core.pin"
+    pin = pin_file.read_text(encoding="utf-8").strip() if pin_file.is_file() else "dev"
+    base = (_os.environ.get("AGENTY_CORE_DIR")
+            or (_os.path.join(_os.environ["CLAUDE_PLUGIN_DATA"], "agentY-core") if _os.environ.get("CLAUDE_PLUGIN_DATA") else "")
+            or _os.path.join(_os.path.expanduser("~"), ".agenty", "agentY-core"))
+    root = _Path(base)
+    url = _os.environ.get("AGENTY_CORE_URL", "https://github.com/szprivate/agentY-core.git")
+
+    def git(*args: str) -> int:
+        return _sp.run(["git", *args], stdout=_sys.stderr, stderr=_sys.stderr).returncode
+
+    try:
+        if not (root / ".git").is_dir():
+            root.parent.mkdir(parents=True, exist_ok=True)
+            print(f"[agentY] first start: fetching agentY-core {pin} into {root} ...", file=_sys.stderr, flush=True)
+            if git("clone", "--quiet", "--depth", "1", "--branch", pin, url, str(root)) != 0:
+                return
+        else:
+            have = _sp.run(["git", "-C", str(root), "describe", "--tags", "--exact-match"],
+                           capture_output=True, text=True).stdout.strip()
+            branch = _sp.run(["git", "-C", str(root), "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
+            if have != pin and branch != pin:
+                print(f"[agentY] updating agentY-core to {pin} ...", file=_sys.stderr, flush=True)
+                if git("-C", str(root), "fetch", "--quiet", "--depth", "1", "origin", pin) == 0:
+                    git("-C", str(root), "checkout", "--quiet", "--force", "FETCH_HEAD")
+    except OSError as exc:  # no git
+        print(f"[agentY] could not fetch agentY-core: {exc}", file=_sys.stderr)
+        return
+    if (root / "agenty_core" / "__init__.py").is_file():
+        _sys.path.append(str(root))
+
+
 _bootstrap_vendored_lib()
 _bootstrap_sibling_core()
+_bootstrap_pinned_core()
