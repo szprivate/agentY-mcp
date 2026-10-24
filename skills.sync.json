@@ -61,6 +61,10 @@
       "files": 1,
       "sha256": "0ad4cf6bf833b1b615ccf8464e889380aee48873c84e23c416d8feb21932f79a"
     },
+    "motion-graphics-scene": {
+      "files": 4,
+      "sha256": "7a9e475b43a5c8aef43c4f208c1173b8e28934851bac8a2a5adc9725b337f281"
+    },
     "output-paths": {
       "files": 1,
       "sha256": "37e03d7713d6a7c904be28ca294d2aea863b9f42c30423e1c69ee31b6bb7ac43"

@@ -178,6 +178,10 @@ _TOOLS = [
     # ── Show files in the bEpic viewer (focus, Edit panel) ────────────────
     T.show_in_viewer,
     T.render_camera_move,
+    # ── Editable motion graphics (a *.mgscene.json scene, rendered by Remotion) ──
+    T.mg_scene_validate,
+    T.mg_scene_preview_frame,
+    T.mg_render,
     # ── World Labs Atlas: picture / prompt -> 3D scene mesh (WORLDLABS_API_KEY) ──
     T.atlas_create_world,
     T.atlas_expand_world,

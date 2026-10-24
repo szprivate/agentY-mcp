@@ -96,6 +96,8 @@ from agenty_core.tools.dashscope_generate import (  # noqa: F401
 from agenty_core.tools.show_in_viewer import show_in_viewer  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.
 from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
+# Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.
+from agenty_core.tools.motion_graphics import mg_scene_validate, mg_scene_preview_frame, mg_render  # noqa: F401
 # A 3D scene from a picture or a prompt with World Labs Atlas.
 from agenty_core.tools.worldlabs_atlas import (  # noqa: F401
     atlas_create_world, atlas_expand_world, atlas_rebuild_world_mesh, atlas_splat_to_mesh, atlas_fetch, atlas_list,

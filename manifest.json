@@ -326,6 +326,18 @@
       "description": "Persist a fact, preference, or workflow note to long-term memory."
     },
     {
+      "name": "mg_render",
+      "description": "Render a motion-graphics scene (``*.mgscene.json``) to a video file."
+    },
+    {
+      "name": "mg_scene_preview_frame",
+      "description": "Render still frames of a scene so you can LOOK at them (then ``view_image`` the result)."
+    },
+    {
+      "name": "mg_scene_validate",
+      "description": "Check a motion-graphics scene file (``*.mgscene.json``) without rendering it."
+    },
+    {
       "name": "open_workflow_in_canvas",
       "description": "Load a workflow the agent built or ran into the ComfyUI canvas so the user can visually inspect it."
     },
