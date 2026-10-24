@@ -2,7 +2,7 @@
   "mcpServers": {
     "agentY": {
       "command": "uv",
-      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}", "python", "-m", "src"],
+      "args": ["run", "--no-project", "--with-requirements", "${CLAUDE_PLUGIN_ROOT}/requirements-plugin.txt", "python", "-m", "src"],
       "env": {
         "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}"
       }
