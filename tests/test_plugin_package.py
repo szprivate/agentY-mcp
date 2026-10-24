@@ -49,6 +49,9 @@ class Manifests(unittest.TestCase):
         self.assertEqual(s["command"], "uv")
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/.venv", s["args"])
         self.assertEqual(s["args"][-2:], ["-m", "src"])
+        # Claude Code does not honour a "cwd" for plugin servers: src must come from PYTHONPATH
+        self.assertNotIn("cwd", s)
+        self.assertEqual(s["env"]["PYTHONPATH"], "${CLAUDE_PLUGIN_ROOT}")
 
     def test_mcpb_manifest_tools_exist(self):
         from src import mcp_server

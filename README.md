@@ -200,8 +200,8 @@ The agentY installer can do this ("Set up agentY for Claude Code"), or by hand:
     claude plugin install agenty@agentY
 
 The plugin starts the server with `uv run --python <plugin>/.venv`, so it needs `uv` on PATH
-and this checkout's `.venv` (the installer creates it). Update: `claude plugin marketplace update agentY`
-then `claude plugin update agenty@agentY` (restart Claude Code). Releases keep the plugin version,
+and this checkout's `.venv` (the installer creates it). The marketplace is read from the checkout in place, so
+updating agentY-mcp (the launcher's `git pull`) updates the plugin: restart Claude Code or `/reload-plugins`. Releases keep the plugin version,
 `manifest.json` and the skills in step; see `docs/plugin_audit.md`.
 
 ---
