@@ -226,6 +226,10 @@
       "description": "Return the authoritative ComfyUI server directory paths."
     },
     {
+      "name": "get_execution_mode",
+      "description": "Where open-weight models run right now: the effective mode, the configured one, any per-turn override, whether a Comfy ..."
+    },
+    {
       "name": "get_history",
       "description": "Get recent ComfyUI execution history (status and output filenames only)."
     },
@@ -452,6 +456,10 @@
     {
       "name": "set_canvas_node_params",
       "description": "Write widget values onto a node of the live ComfyUI canvas."
+    },
+    {
+      "name": "set_execution_mode_for_turn",
+      "description": "Override where open-weight models run for THIS turn only."
     },
     {
       "name": "show_in_viewer",

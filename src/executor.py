@@ -205,6 +205,13 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
     _cost = _credits.gate_submission(workflow, str(p))
     # Routed to the Deadline farm (DEADLINE_ROUTE_RUNS=1, off by default): same preparation and
     # cost gate, only the queueing differs. The reference stands in for a prompt_id.
+    # Execution modes (AGENTY_EXECUTION_MODE or config/settings.json "execution": {"mode"}; default "local"):
+    # hybrid / cloud may send the open-weight part of the run to Comfy Cloud. Partner nodes never move.
+    _decision = _route_decision(workflow)
+    if _decision is not None and _decision.backend == "comfy_cloud":
+        from agenty_core.utils import cloud_run
+        return cloud_run.submit(workflow, name=p.stem, dest_dir=_output_dir() / "comfy_cloud",
+                                workflow_path=str(p), open_weight=_decision.open_weight)
     from agenty_core.utils import farm_run
     if farm_run.enabled():
         return farm_run.submit(workflow, name=p.stem)
@@ -222,11 +229,34 @@ def _submit_workflow(workflow_path: str, client_id: str = "") -> str:
     raise RuntimeError(f"Unexpected response from ComfyUI /prompt: {result!r}")
 
 
+def _execution_settings() -> dict:
+    got = _load_config().get("execution")
+    return got if isinstance(got, dict) else {}
+
+
+def _route_decision(workflow: dict):
+    """Where does this run execute (agenty_core.utils.exec_route)? ``None`` in local mode: today's path."""
+    from agenty_core.utils import exec_route, execution_mode
+    execution_mode.set_settings_provider(_execution_settings)
+    if execution_mode.effective_mode() == "local":
+        return None
+    try:
+        return exec_route.decide(workflow)
+    except exec_route.RouteRefused:
+        raise
+    except Exception as exc:  # noqa: BLE001 - a broken probe must never stop a run that can go local
+        logger.warning("executor: execution-mode routing failed (%s); running locally", exc)
+        return None
+
+
 def _job_stream(prompt_id: str, client_id: str, **kw):
     """Progress events for a submitted job: the farm's for a ``farm:`` reference, ComfyUI's otherwise."""
     from agenty_core.utils import farm_run
     if farm_run.is_farm_ref(prompt_id):
         return farm_run.stream(prompt_id, max_wait_s=farm_run.max_wait_seconds())
+    from agenty_core.utils import cloud_run
+    if cloud_run.is_cloud_ref(prompt_id):
+        return cloud_run.stream(prompt_id, max_wait_s=cloud_run.max_wait_seconds())
     from src.utils.comfyui_progress import stream_comfyui_job
     return stream_comfyui_job(prompt_id, client_id, **kw)
 
@@ -237,6 +267,9 @@ async def _settle_partner(prompt_id: str) -> str:
     import asyncio
     if str(prompt_id).startswith("farm:"):
         return ""            # the worker's own key paid; no local balance to compare
+    if str(prompt_id).startswith("cloud:"):
+        from agenty_core.utils import cloud_run
+        return await asyncio.to_thread(cloud_run.settle_line, prompt_id)     # ran_on + measured cost
     from agenty_core import partner_credits as _credits
     try:
         usd = await asyncio.to_thread(_credits.settle, prompt_id)

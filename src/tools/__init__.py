@@ -121,6 +121,8 @@ from agenty_core.tools.reference_measure import measure_reference  # noqa: F401
 from agenty_core.tools.ayon import ayon_context, ayon_load, ayon_mark_publish, ayon_publish, ayon_open_tool  # noqa: F401
 # Send ComfyUI workflows to the on-prem Deadline render farm and follow them.
 from agenty_core.tools.deadline_farm import submit_to_deadline, deadline_job_status, deadline_farm_info  # noqa: F401
+# Where open-weight models run (local / hybrid / cloud) and the override for one turn.
+from agenty_core.tools.execution_mode import set_execution_mode_for_turn, get_execution_mode  # noqa: F401
 # Hand a request to a RUNNING agentY host (its own orchestrator, skills, hooks).
 from src.tools.agenty_host import (  # noqa: F401
     agenty_turn, agenty_turn_status, agenty_conversations, agenty_reply, agenty_stop,

@@ -219,6 +219,9 @@ _TOOLS = [
     T.submit_to_deadline,
     T.deadline_job_status,
     T.deadline_farm_info,
+    # ── Execution modes: where open-weight models run (local / hybrid / Comfy Cloud) ──
+    T.set_execution_mode_for_turn,
+    T.get_execution_mode,
     # ── HuggingFace model management ──────────────────────────────────────
     T.search_huggingface_models,
     T.get_model_info,

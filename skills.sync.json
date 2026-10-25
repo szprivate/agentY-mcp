@@ -45,6 +45,10 @@
       "files": 1,
       "sha256": "958371bc71b7f3aaeeed1ffaf0a23c2b971128cc17e0cfb9ea71670e4c254405"
     },
+    "execution-modes": {
+      "files": 1,
+      "sha256": "960f102e1968b7dee8d87146c880c003d08a08f6aa7ffd64933d6601ccfdd2fd"
+    },
     "flux-sampling": {
       "files": 1,
       "sha256": "4629e8b0a73d6ebbdb8d57e3bbdb7c5c42d52b74995f43293341049afba46f72"
