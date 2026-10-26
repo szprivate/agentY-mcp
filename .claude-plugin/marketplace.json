@@ -10,7 +10,7 @@
       "name": "agenty",
       "source": "./",
       "description": "agentY MCP server + agentY skills + role subagents + /agenty commands. Needs uv and git on PATH; the first start builds its Python environment (slow once).",
-      "version": "1.8.0",
+      "version": "1.8.1",
       "category": "media"
     }
   ]
