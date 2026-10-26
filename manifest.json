@@ -106,6 +106,10 @@
       "description": "Render ONE new picture of an Atlas world from a camera you choose (World Labs atlasGenerate, 1280x720), optionally ..."
     },
     {
+      "name": "atlas_render_camera_move",
+      "description": "Render a camera MOVE through an Atlas world with Atlas-painted pictures (paid; dry_run prices it first): keyframes painted along the path, every frame rendered through the grown world in the bEpic viewer ..."
+    },
+    {
       "name": "atlas_splat_to_mesh",
       "description": "Turn a Gaussian-splat scene into a GLB mesh with Atlas's splats2Mesh, so it can be flown through with ..."
     },

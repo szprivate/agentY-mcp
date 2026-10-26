@@ -190,6 +190,7 @@ _TOOLS = [
     T.atlas_fetch,
     T.atlas_list,
     T.atlas_render_view,
+    T.atlas_render_camera_move,
     T.atlas_open_in_viewer,
     T.atlas_capture_around,
     T.train_splat,
