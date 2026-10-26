@@ -32,6 +32,7 @@ def main(argv=None) -> int:
     ap.add_argument("-c", "--conversation", help="continue this conversation id")
     ap.add_argument("-a", "--attach", action="append", default=[], help="a local file to attach (repeatable)")
     ap.add_argument("-t", "--title", help="name for a new conversation")
+    ap.add_argument("--canvas", help='"none", "conversation" (default) or a panel client id: which canvas the turn may edit')
     ap.add_argument("--no-wait", action="store_true", help="print the turn id and return at once")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds to wait (default 1800)")
     ap.add_argument("--status", metavar="TURN_ID", help="show a turn's current state")
@@ -46,7 +47,7 @@ def main(argv=None) -> int:
             res = host.turn_status(args.status)
         elif args.message:
             res = host.run_turn(args.message, args.conversation, not args.no_wait,
-                                args.timeout, args.attach, args.title)
+                                args.timeout, args.attach, args.title, args.canvas)
         else:
             ap.error("a message, --status or --conversations is required")
     except host.HostError as exc:

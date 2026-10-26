@@ -94,6 +94,12 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(res["reply"], "hello")
         self.assertEqual(FakeHost.sent[0][1]["conversation"], "c9")
 
+    def test_canvas_target_is_sent_and_omitted_by_default(self):
+        host.run_turn("hi", wait=False, canvas="none")
+        self.assertEqual(FakeHost.sent[-1][1]["canvas"], "none")
+        host.run_turn("hi", wait=False)
+        self.assertNotIn("canvas", FakeHost.sent[-1][1])
+
     def test_no_wait_returns_the_id(self):
         res = host.run_turn("hi", wait=False)
         self.assertEqual(res["turn_id"], "t1")

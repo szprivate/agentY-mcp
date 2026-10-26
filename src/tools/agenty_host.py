@@ -27,7 +27,7 @@ def _err(exc: Exception) -> str:
 
 async def agenty_turn(message: str, conversation: str | None = None, wait: bool = True,
                       timeout_s: int = 1800, attachments: list[str] | None = None,
-                      title: str | None = None) -> str:
+                      title: str | None = None, canvas: str | None = None) -> str:
     """Send a message to the RUNNING agentY host and return what agentY did.
 
     agentY runs the turn exactly as if the user typed it in its ComfyUI panel
@@ -47,6 +47,11 @@ async def agenty_turn(message: str, conversation: str | None = None, wait: bool 
             on the host; the result then has timed_out=true).
         attachments: Absolute paths of local images/videos to give the turn as inputs.
         title: Name for a new conversation.
+        canvas: Which ComfyUI canvas the turn may edit. Default ("conversation"): the
+            panel that is showing this conversation, if one is open - otherwise the
+            turn has NO canvas and its canvas tools say so (it then builds into
+            workflow files). "none": never. Or a panel's client id, to pick one of
+            several panels on the same conversation. Never "whichever tab is open".
 
     Returns JSON: status (done | error | waiting | running), reply (agentY's final
     text), tool_calls [{name, agent, status, input, result}], files [{path, kind,
@@ -57,7 +62,7 @@ async def agenty_turn(message: str, conversation: str | None = None, wait: bool 
     """
     try:
         res = await asyncio.to_thread(host.run_turn, message, conversation, wait,
-                                      timeout_s, attachments, title)
+                                      timeout_s, attachments, title, canvas)
         return _out(res)
     except host.HostError as exc:
         return _err(exc)

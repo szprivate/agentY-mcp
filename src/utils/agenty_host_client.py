@@ -104,8 +104,11 @@ def request(method: str, path: str, body: dict | None = None, timeout: float = 3
 
 
 def start_turn(message: str, conversation: str | None = None,
-               attachments: list[str] | None = None, title: str | None = None) -> dict:
+               attachments: list[str] | None = None, title: str | None = None,
+               canvas: str | None = None) -> dict:
     body: dict = {"message": message}
+    if canvas:
+        body["canvas"] = canvas
     if conversation:
         body["conversation"] = conversation
     if title:
@@ -123,11 +126,11 @@ def turn_status(turn_id: str, wait_s: float = 0) -> dict:
 
 def run_turn(message: str, conversation: str | None = None, wait: bool = True,
              timeout_s: float = 1800, attachments: list[str] | None = None,
-             title: str | None = None) -> dict:
+             title: str | None = None, canvas: str | None = None) -> dict:
     """Start a turn; with *wait*, follow it until it ends, stops to ask something
     (``status == "waiting"``), or *timeout_s* passes (``timed_out``; the turn keeps
     running and can be read with :func:`turn_status`)."""
-    started = start_turn(message, conversation, attachments, title)
+    started = start_turn(message, conversation, attachments, title, canvas)
     if not wait:
         return started
     turn_id = started["turn_id"]
