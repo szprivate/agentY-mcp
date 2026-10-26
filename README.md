@@ -278,4 +278,4 @@ instead of driving the ComfyUI browser panel. Turns show live in the panel when 
 is open. The host URL is `AGENTY_HOST_URL` (default `http://127.0.0.1:5000`); the
 session token is read from `../agentY/.agenty_token` (or `AGENTY_SESSION_TOKEN`,
 `AGENTY_TOKEN_FILE`, `AGENTY_HOME`). Shell use: `python scripts/agenty_turn.py "message"`.
-Details and the HTTP API: `docs/turn-api.md` in agentY.
+Details and the HTTP API: `docs/integrations/turn-api.md` in agentY.
