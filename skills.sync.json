@@ -19,7 +19,7 @@
     },
     "assemble-new-workflow": {
       "files": 1,
-      "sha256": "ddf28dcd608b7c7f2d84a723b7c6aaa3f34d47f6f2d7dd7ed4a7e39c04227d08"
+      "sha256": "cd8c328f24c8a5b218a36bc163e5fc058ac999eb826f8edc91d138b37067b8c5"
     },
     "assemble-workflow-learnings": {
       "files": 1,
@@ -35,7 +35,7 @@
     },
     "dashscope-generate": {
       "files": 1,
-      "sha256": "d63af88016b94eeae9386edaefc5bcf61fab3f492ef21abc91871e7b47e6b8a3"
+      "sha256": "6dbd347817873ca5b74b1d6a28693e5ea317e50f8bcaa84b1380777e22ef00ba"
     },
     "dcc-destruction-houdini": {
       "files": 1,
