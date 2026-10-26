@@ -63,7 +63,7 @@
     },
     "lora-training": {
       "files": 1,
-      "sha256": "07b98a0fe5dac8fed1329227fe231f794c3e29d4f8d2b716d4b024aae105b0bf"
+      "sha256": "10a4e1ea576e03828ca5c7c2e28286b87d876cd727cf6a8c3eef48e025307942"
     },
     "model-from-reference": {
       "files": 1,
@@ -123,7 +123,7 @@
     },
     "worldlabs-atlas": {
       "files": 1,
-      "sha256": "18a07510b54cdf90bc5384f829403feefb04a1af36bd7d930ca164303259727c"
+      "sha256": "0b2c9a8ddd42ae6214b213edbc39c82f6465206522608e02e1e5fa69fa227708"
     }
   }
 }

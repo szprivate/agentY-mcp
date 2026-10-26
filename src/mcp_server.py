@@ -190,7 +190,6 @@ _TOOLS = [
     T.atlas_fetch,
     T.atlas_list,
     T.atlas_render_view,
-    T.atlas_render_camera_move,
     T.atlas_open_in_viewer,
     T.atlas_capture_around,
     T.train_splat,
@@ -242,6 +241,14 @@ _TOOLS = [
     T.project_memory_write,
     T.project_memory_forget,
 ]
+
+# Experimental, off by default: the paid Atlas camera move (AGENTY_ATLAS_CAMERA_MOVE=1 switches it on).
+try:
+    from agenty_core.tools.atlas_camera_move import camera_move_enabled as _atlas_move_on
+    if _atlas_move_on():
+        _TOOLS.append(T.atlas_render_camera_move)
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("atlas camera move switch unavailable: %s", _e)
 
 # Further core tools, imported one by one so a missing/broken one never stops the
 # server from starting. (reverse_image_search arrives with its agenty_core module.)
