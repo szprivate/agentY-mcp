@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "agenty",
   "display_name": "agentY",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "description": "Turn natural language into ComfyUI image and video workflows.",
   "long_description": "agentY exposes a ComfyUI workflow toolkit as MCP tools \u2014 template selection, workflow assembly/validation/execution, HuggingFace model management, image handling, web search, and long-term memory. Pair it with the agentY Skills (comfyui-generate and friends) so the host orchestrates end-to-end image/video generation against a local ComfyUI instance.",
   "author": {
