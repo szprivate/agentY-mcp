@@ -69,7 +69,7 @@ class FarmRouting(unittest.TestCase):
         collected: list = []
         with mock.patch.object(executor, "_submit_workflow", return_value="farm:J1"), \
                 mock.patch.object(df, "job_status", side_effect=lambda j, w=0: next(states)), \
-                mock.patch.object(farm_run.asyncio, "sleep", new=lambda s: _REAL_SLEEP(0)):
+                mock.patch.object(farm_run.asyncio, "sleep", new=lambda s: _REAL_SLEEP(0)),                 mock.patch.object(executor, "_get_comfyui_output_dir", return_value=self.out.parent):
             lines = asyncio.run(_lines(executor.execute_workflow(
                 str(self.wf), "{}", collected_paths=collected, verbose=False)))
         text = "\n".join(l for l in lines if isinstance(l, str))
