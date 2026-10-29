@@ -1,7 +1,7 @@
 {
   "name": "agenty",
   "displayName": "agentY",
-  "version": "1.8.10",
+  "version": "1.9.0",
   "description": "agentY - turn natural language into ComfyUI image/video workflows. The agentY MCP server (ComfyUI, HuggingFace, partner nodes, Atlas, DCC, Deadline, Ayon), the agentY skills, role subagents with a per-role model tier, and the /agenty commands.",
   "author": {
     "name": "szprivate",
