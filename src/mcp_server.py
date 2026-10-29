@@ -272,10 +272,33 @@ for _mod, _names in [
     except Exception as _e:  # noqa: BLE001
         logger.warning("optional core tools %s not offered: %s", _names, _e)
 
+def _redacted(fn):
+    """*fn* with secrets masked in whatever text it returns (agenty_core.utils.redact).
+
+    The backstop behind the file tools' name checks: a key that reaches a tool
+    result by any route - run_script output, a log, an error message - leaves
+    masked instead of going to the model.
+    """
+    import functools
+    import inspect
+    from agenty_core.utils.redact import redact_obj
+
+    if inspect.iscoroutinefunction(fn):
+        @functools.wraps(fn)
+        async def _async(*a, **k):
+            return redact_obj(await fn(*a, **k))
+        return _async
+
+    @functools.wraps(fn)
+    def _sync(*a, **k):
+        return redact_obj(fn(*a, **k))
+    return _sync
+
+
 for _fn in _TOOLS:
     # structured_output=False → return text/image content blocks verbatim
     # (these tools return JSON strings or image content, not typed models).
-    mcp.add_tool(_fn, structured_output=False)
+    mcp.add_tool(_redacted(_fn), structured_output=False)
 
 
 try:
