@@ -234,6 +234,10 @@
       "description": "Get recent ComfyUI execution history (status and output filenames only)."
     },
     {
+      "name": "get_history_selection",
+      "description": "Read what the user has picked in a history panel right now: the bEpic viewer's history strip (Ctrl-selected snapshots, ..."
+    },
+    {
       "name": "get_image_resolution",
       "description": "Return the resolution (width and height in pixels) of a local image file."
     },

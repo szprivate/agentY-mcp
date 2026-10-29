@@ -82,7 +82,10 @@ Typical flow (see the agentY Skills for full procedures):
 
 When the user points at their open ComfyUI canvas ("this node", "the prompt I
 have selected"), read it with get_canvas_selection and write changes back with
-set_canvas_node_params — do not guess from a workflow file on disk.
+set_canvas_node_params — do not guess from a workflow file on disk. When they
+point at renders instead ("the selected images", "the one open in the viewer"),
+read get_history_selection: the files picked in the bEpic viewer's history strip
+or ComfyUI's assets sidebar, with paths you can use as inputs.
 
 Skills: agentY keeps its know-how (assembly, prompting per model family, partner
 nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
@@ -138,6 +141,8 @@ _TOOLS = [
     # ── Live canvas (what the user has selected in the open ComfyUI page) ──
     T.get_canvas_selection,
     T.set_canvas_node_params,
+    # ── What the user picked in a history panel (viewer strip, assets sidebar) ──
+    T.get_history_selection,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────
