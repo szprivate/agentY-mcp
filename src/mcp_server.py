@@ -199,6 +199,7 @@ _TOOLS = [
     T.atlas_capture_around,
     T.train_splat,
     T.splat_training_status,
+    T.atlas_views_to_splat,
     # ── World Labs Marble: a ready splat world from pictures, SPZ / PLY export (WLT_MARBLE_API_KEY) ──
     T.marble_create_world,
     T.marble_export,

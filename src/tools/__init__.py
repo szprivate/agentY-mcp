@@ -110,6 +110,8 @@ from agenty_core.tools.atlas_camera_move import atlas_render_camera_move  # noqa
 from agenty_core.tools.atlas_capture import atlas_capture_around  # noqa: F401
 from agenty_core.tools.worldlabs_marble import marble_create_world, marble_export  # noqa: F401
 from agenty_core.tools.splat_train import train_splat, splat_training_status  # noqa: F401
+# A splat built by World Labs from an Atlas world's posed views (posedImages2Splats).
+from agenty_core.tools.atlas_splat import atlas_views_to_splat  # noqa: F401
 from agenty_core.tools.lora_training import (  # noqa: F401
     lora_dataset_prepare, lora_dataset_set_captions, lora_dataset_review, train_lora, lora_training_status,
     lora_training_stop,

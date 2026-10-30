@@ -110,6 +110,10 @@
       "description": "Turn a Gaussian-splat scene into a GLB mesh with Atlas's splats2Mesh, so it can be flown through with ..."
     },
     {
+      "name": "atlas_views_to_splat",
+      "description": "Have World Labs build a high-quality Gaussian splat from an Atlas world's posed views (posedImages2Splats)."
+    },
+    {
       "name": "ayon_context",
       "description": "The Ayon context of the running ComfyUI session: project, folder, task, workdir, and the folder's frame range, fps and ..."
     },
