@@ -303,7 +303,7 @@
     },
     {
       "name": "install_custom_node",
-      "description": "Install a ComfyUI custom-node pack from a git URL."
+      "description": "Install a ComfyUI custom-node pack from its git repository."
     },
     {
       "name": "interrupt_execution",
