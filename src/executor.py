@@ -446,6 +446,15 @@ async def _process_completed_job(
         yield f"{pfx}❌ All output downloads failed."
         return
 
+    # The graph that made each output, kept beside it (agenty_core.utils.provenance): what
+    # "recreate this shot with one change" (regenerate_from_source) re-runs. On a
+    # background thread - the output folder may be a slow network share.
+    try:
+        from agenty_core.utils import provenance as _prov
+        _prov.capture(saved_paths, history, prompt_id, workflow_path, source="agentY-mcp")
+    except Exception as exc:  # noqa: BLE001 - never cost a run
+        logger.debug("executor: provenance not captured - %s", exc)
+
     # Copy the finished workflow to the ComfyUI user directory — run in a
     # background thread so a slow UNC/network share doesn't stall execution.
     if workflow_path:

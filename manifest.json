@@ -430,6 +430,14 @@
       "description": "Read a web page as text \u2014 after web_search, to read what it found: a model guide, a node pack's documentation, a ..."
     },
     {
+      "name": "recreatable_params",
+      "description": "List the parameters of a generated file that can be changed to recreate it, with their current values - compactly ..."
+    },
+    {
+      "name": "regenerate_from_source",
+      "description": "Recreate generated shots with specific changes; every other parameter stays EXACTLY as in the original run (the stored ..."
+    },
+    {
       "name": "register_workflow_template",
       "description": "Register a custom ComfyUI workflow JSON as a reusable template."
     },
@@ -500,6 +508,10 @@
     {
       "name": "submit_to_deadline",
       "description": "Send a ComfyUI workflow to the on-prem Deadline render farm instead of the local ComfyUI."
+    },
+    {
+      "name": "swap_in_takes",
+      "description": "Put new versions of shots into the bEpic viewer's cut as takes (the original stays one click away). Needs ComfyUI open ..."
     },
     {
       "name": "train_lora",

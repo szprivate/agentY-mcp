@@ -98,6 +98,10 @@ from agenty_core.tools.show_in_viewer import show_in_viewer  # noqa: F401
 from agenty_core.tools.history_selection import get_history_selection  # noqa: F401
 # What the bEpic viewer shows, and the marks the user drew on it (also as an inpaint mask).
 from agenty_core.tools.viewer_state import get_viewer_state, get_viewer_annotations  # noqa: F401
+# Recreate generated shots with a few changes, everything else as it was: the parameters a file
+# was made with, and the new versions swapped into the viewer's cut as takes. regenerate_from_source
+# itself is src.tools.execution's (it runs each shot through this server's executor).
+from agenty_core.tools.regenerate import recreatable_params, swap_in_takes  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.
 from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
 # Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.
@@ -139,6 +143,7 @@ from src.tools.shell import run_script  # noqa: F401
 from src.tools.memory_tools import memory_read, memory_write  # noqa: F401
 from src.tools.web_search import web_search, web_search_images  # noqa: F401
 from src.tools.execution import execute_workflow, execute_workflows_batch, partner_run, run_variants  # noqa: F401
+from src.tools.execution import regenerate_from_source  # noqa: F401
 from src.tools.batch import (  # noqa: F401
     start_batch_job,
     get_batch_status,

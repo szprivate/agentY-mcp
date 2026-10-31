@@ -148,6 +148,10 @@ _TOOLS = [
     # ── What the bEpic viewer shows (tab, item, frame, range) and the user's marks on it ──
     T.get_viewer_state,
     T.get_viewer_annotations,
+    # ── Recreate generated shots with a few changes (everything else as it was), as takes ──
+    T.recreatable_params,
+    T.regenerate_from_source,
+    T.swap_in_takes,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────

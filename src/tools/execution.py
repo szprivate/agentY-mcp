@@ -25,6 +25,68 @@ from src.executor import (
     execute_workflows_batch as _stream_batch,
 )
 
+async def _run_for_regeneration(workflow_path: str, confirm_cost: bool) -> dict:
+    """One shot of regenerate_from_source, the way execute_workflow runs a workflow (the
+    cost gate, then the executor), as core's runner result."""
+    import asyncio
+    import json
+    refusal = await asyncio.to_thread(_cost_gate, [workflow_path], confirm_cost)
+    if refusal:
+        try:
+            doc = json.loads(refusal[0])
+        except (TypeError, ValueError, IndexError):
+            doc = {"error": str(refusal)[:300]}
+        return {"status": "error", "outputs": [], "prompt_id": "", "error": str(doc.get("error") or "refused")[:400],
+                **({"error_kind": doc["error_kind"]} if doc.get("error_kind") else {})}
+    collected: list[str] = []
+    last = ""
+    async for line in _stream_one(workflow_path, "", verbose=False, collected_paths=collected):
+        if isinstance(line, str) and line.startswith(("❌", "⚠️")):
+            last = line.lstrip("❌⚠️ ").strip()
+    if not collected:
+        return {"status": "error", "outputs": [], "prompt_id": "", "error": last or "the run produced no output"}
+    return {"status": "done", "outputs": list(collected), "prompt_id": ""}
+
+
+@tool
+async def regenerate_from_source(paths: list, changes: list | None = None, new_seed: bool = False,
+                                 dry_run: bool = True, confirm_cost: bool = False) -> str:
+    import asyncio
+    from agenty_core.tools import regenerate as rg
+    if dry_run:
+        return await asyncio.to_thread(rg.regenerate_from_source, paths, changes, new_seed, True, confirm_cost)
+    loop = asyncio.get_running_loop()
+
+    def runner(workflow_path, *, confirm_cost=False):
+        fut = asyncio.run_coroutine_threadsafe(_run_for_regeneration(str(workflow_path), bool(confirm_cost)), loop)
+        try:
+            return fut.result(rg.RUN_TIMEOUT_S)
+        except Exception as exc:  # noqa: BLE001
+            fut.cancel()
+            return {"status": "error", "outputs": [], "prompt_id": "", "error": f"run failed: {str(exc)[:200]}"}
+
+    def go():
+        with _REGEN_LOCK:
+            rg.set_runner(runner)
+            try:
+                return rg.regenerate_from_source(paths, changes, new_seed, False, confirm_cost)
+            finally:
+                rg.set_runner(None)
+    return await asyncio.to_thread(go)
+
+
+def _regen_doc():
+    from agenty_core.tools import regenerate as rg
+    return rg.regenerate_from_source.__doc__
+
+
+import threading as _threading  # noqa: E402
+
+_REGEN_LOCK = _threading.Lock()     # core's runner is one module-level slot
+# agentY-core's tool, run through this server's executor (each shot like execute_workflow).
+regenerate_from_source.__doc__ = _regen_doc()
+
+
 def _cost_gate(paths: list[str], confirm: bool) -> list | None:
     """Pre-flight for paid (partner) nodes: None to go ahead, else the refusal as the
     tool answer (``error_kind`` confirm_cost / insufficient_credits). With *confirm*
