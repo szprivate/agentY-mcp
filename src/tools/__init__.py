@@ -96,6 +96,8 @@ from agenty_core.tools.dashscope_generate import (  # noqa: F401
 from agenty_core.tools.show_in_viewer import show_in_viewer  # noqa: F401
 # What the user picked in a history panel (the bEpic viewer's strip, ComfyUI's assets sidebar).
 from agenty_core.tools.history_selection import get_history_selection  # noqa: F401
+# What the bEpic viewer shows, and the marks the user drew on it (also as an inpaint mask).
+from agenty_core.tools.viewer_state import get_viewer_state, get_viewer_annotations  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.
 from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
 # Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.

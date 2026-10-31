@@ -270,6 +270,14 @@
       "description": "Return ComfyUI system info: GPU, VRAM, Python version, PyTorch version, OS."
     },
     {
+      "name": "get_viewer_annotations",
+      "description": "Read the marks the user drew with the bEpic viewer's Annotation tool - texts, arrows, boxes, freehand strokes - in ..."
+    },
+    {
+      "name": "get_viewer_state",
+      "description": "Read what the bEpic viewer is showing right now: whether it is open, docked, full screen or popped out; the active tab ..."
+    },
+    {
       "name": "get_workflow_catalog",
       "description": "Return the workflow template catalog as a flat {name: description} dictionary."
     },
