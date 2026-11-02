@@ -178,6 +178,10 @@
       "description": "Create fresh-seeded copies of an existing workflow JSON."
     },
     {
+      "name": "edit_cut",
+      "description": "Read the cut open in the bEpic viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music or a clip ..."
+    },
+    {
       "name": "estimate_workflow_cost",
       "description": "Price a workflow in Comfy credits BEFORE running it (paid partner nodes only)."
     },

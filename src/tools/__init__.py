@@ -102,6 +102,9 @@ from agenty_core.tools.viewer_state import get_viewer_state, get_viewer_annotati
 # was made with, and the new versions swapped into the viewer's cut as takes. regenerate_from_source
 # itself is src.tools.execution's (it runs each shot through this server's executor).
 from agenty_core.tools.regenerate import recreatable_params, swap_in_takes  # noqa: F401
+# Read and change the cut open in the viewer's Edit panel: a voice-over or a clip at a time on a
+# track, trims, moves, removals (saved by the viewer, taken in by the open panel).
+from agenty_core.tools.edit_cut import edit_cut  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.
 from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
 # Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.

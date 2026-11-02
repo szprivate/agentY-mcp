@@ -35,6 +35,11 @@ class Offered(unittest.TestCase):
         self.assertIs(T.regenerate_from_source, E.regenerate_from_source)
         self.assertIn("EXACTLY", E.regenerate_from_source.__doc__)
 
+    def test_edit_cut_is_offered_too(self):
+        """The cut in the viewer's Edit panel: read it, lay a voice-over or a clip at a time, trim, remove."""
+        from src import mcp_server
+        self.assertIn(T.edit_cut, mcp_server._TOOLS)
+
     def test_the_manifest_lists_them(self):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"recreatable_params", "regenerate_from_source", "swap_in_takes"} <= names)

@@ -152,6 +152,8 @@ _TOOLS = [
     T.recreatable_params,
     T.regenerate_from_source,
     T.swap_in_takes,
+    # ── The cut in the viewer's Edit panel: read it, lay a VO / clip at a time, trim, remove ──
+    T.edit_cut,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────
