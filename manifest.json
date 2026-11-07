@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "agenty",
   "display_name": "agentY",
-  "version": "1.18.1",
+  "version": "1.19.0",
   "description": "Turn natural language into ComfyUI image and video workflows.",
   "long_description": "agentY exposes a ComfyUI workflow toolkit as MCP tools \u2014 template selection, workflow assembly/validation/execution, HuggingFace model management, image handling, web search, and long-term memory. Pair it with the agentY Skills (comfyui-generate and friends) so the host orchestrates end-to-end image/video generation against a local ComfyUI instance.",
   "author": {
@@ -95,7 +95,7 @@
     },
     {
       "name": "atlas_open_in_viewer",
-      "description": "Open an Atlas world in the ComfyUI Image Viewer's 3D view, looking through a 16:9 camera at the first picture's viewpoint, so ..."
+      "description": "Open an Atlas world in the ComfyUI Image Viewer's 3D view, looking through a 16:9 camera at the first picture's ..."
     },
     {
       "name": "atlas_rebuild_world_mesh",
@@ -179,7 +179,7 @@
     },
     {
       "name": "edit_cut",
-      "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music or a clip ..."
+      "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music ..."
     },
     {
       "name": "estimate_workflow_cost",
@@ -243,7 +243,7 @@
     },
     {
       "name": "get_history_selection",
-      "description": "Read what the user has picked in a history panel right now: the ComfyUI Image Viewer's history strip (Ctrl-selected snapshots, ..."
+      "description": "Read what the user has picked in a history panel right now: the ComfyUI Image Viewer's history strip (Ctrl-selected ..."
     },
     {
       "name": "get_image_resolution",
@@ -275,11 +275,11 @@
     },
     {
       "name": "get_viewer_annotations",
-      "description": "Read the marks the user drew with the ComfyUI Image Viewer's Annotation tool - texts, arrows, boxes, freehand strokes - in ..."
+      "description": "Read the marks the user drew with the ComfyUI Image Viewer's Annotation tool - texts, arrows, boxes, freehand strokes - ..."
     },
     {
       "name": "get_viewer_state",
-      "description": "Read what the ComfyUI Image Viewer is showing right now: whether it is open, docked, full screen or popped out; the active tab ..."
+      "description": "Read what the ComfyUI Image Viewer is showing right now: whether it is open, docked, full screen or popped out; the ..."
     },
     {
       "name": "get_workflow_catalog",
@@ -515,7 +515,7 @@
     },
     {
       "name": "swap_in_takes",
-      "description": "Put new versions of shots into the ComfyUI Image Viewer's cut as takes (the original stays one click away). Needs ComfyUI open ..."
+      "description": "Put new versions of shots into the ComfyUI Image Viewer's cut as takes (the original stays one click away). Needs ..."
     },
     {
       "name": "train_lora",

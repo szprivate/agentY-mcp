@@ -27,7 +27,7 @@
     },
     "camera-move-control": {
       "files": 1,
-      "sha256": "6dbca57eafc37820cfec11d66db7788623d54a5a98b8c2817d38b237d6dd6166"
+      "sha256": "61c5ea80a79e0e4f7ff41008159a91804c561af9488c6834a86a6ee2bd7fcce4"
     },
     "custom-node-from-github": {
       "files": 1,
@@ -71,7 +71,7 @@
     },
     "motion-graphics-scene": {
       "files": 4,
-      "sha256": "93999b9c42bc79dd9c8555c057698bd282644fdd5791aeca7fccb2677bdcd549"
+      "sha256": "3e1c3f2522e61332d265616415ecddbbb90075c87383b92c89c6431f90a1b6ff"
     },
     "output-paths": {
       "files": 1,
@@ -95,7 +95,7 @@
     },
     "show-in-viewer": {
       "files": 1,
-      "sha256": "5f16f91585ce37f845ba7f335ae529c203c755689a611d1d852fcfc53136ae13"
+      "sha256": "8a983b7867a82611833ba898cf3680d33de5a66eb69c8937476fa57b3c6e9d69"
     },
     "story-scene": {
       "files": 1,
