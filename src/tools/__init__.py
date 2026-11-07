@@ -92,11 +92,11 @@ from agenty_core.tools.dashscope_generate import (  # noqa: F401
     dashscope_generate,
     dashscope_fetch,
 )
-# Show files in the bEpic viewer / open an edit in its Edit panel.
+# Show files in the ComfyUI Image Viewer / open an edit in its Edit panel.
 from agenty_core.tools.show_in_viewer import show_in_viewer  # noqa: F401
-# What the user picked in a history panel (the bEpic viewer's strip, ComfyUI's assets sidebar).
+# What the user picked in a history panel (the ComfyUI Image Viewer's strip, ComfyUI's assets sidebar).
 from agenty_core.tools.history_selection import get_history_selection  # noqa: F401
-# What the bEpic viewer shows, and the marks the user drew on it (also as an inpaint mask).
+# What the ComfyUI Image Viewer shows, and the marks the user drew on it (also as an inpaint mask).
 from agenty_core.tools.viewer_state import get_viewer_state, get_viewer_annotations  # noqa: F401
 # Recreate generated shots with a few changes, everything else as it was: the parameters a file
 # was made with, and the new versions swapped into the viewer's cut as takes. regenerate_from_source

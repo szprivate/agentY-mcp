@@ -95,7 +95,7 @@
     },
     {
       "name": "atlas_open_in_viewer",
-      "description": "Open an Atlas world in the bEpic viewer's 3D view, looking through a 16:9 camera at the first picture's viewpoint, so ..."
+      "description": "Open an Atlas world in the ComfyUI Image Viewer's 3D view, looking through a 16:9 camera at the first picture's viewpoint, so ..."
     },
     {
       "name": "atlas_rebuild_world_mesh",
@@ -179,7 +179,7 @@
     },
     {
       "name": "edit_cut",
-      "description": "Read the cut open in the bEpic viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music or a clip ..."
+      "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music or a clip ..."
     },
     {
       "name": "estimate_workflow_cost",
@@ -243,7 +243,7 @@
     },
     {
       "name": "get_history_selection",
-      "description": "Read what the user has picked in a history panel right now: the bEpic viewer's history strip (Ctrl-selected snapshots, ..."
+      "description": "Read what the user has picked in a history panel right now: the ComfyUI Image Viewer's history strip (Ctrl-selected snapshots, ..."
     },
     {
       "name": "get_image_resolution",
@@ -275,11 +275,11 @@
     },
     {
       "name": "get_viewer_annotations",
-      "description": "Read the marks the user drew with the bEpic viewer's Annotation tool - texts, arrows, boxes, freehand strokes - in ..."
+      "description": "Read the marks the user drew with the ComfyUI Image Viewer's Annotation tool - texts, arrows, boxes, freehand strokes - in ..."
     },
     {
       "name": "get_viewer_state",
-      "description": "Read what the bEpic viewer is showing right now: whether it is open, docked, full screen or popped out; the active tab ..."
+      "description": "Read what the ComfyUI Image Viewer is showing right now: whether it is open, docked, full screen or popped out; the active tab ..."
     },
     {
       "name": "get_workflow_catalog",
@@ -451,7 +451,7 @@
     },
     {
       "name": "render_camera_move",
-      "description": "Fly a camera through a 3D scene in the bEpic viewer and render the move to a clip."
+      "description": "Fly a camera through a 3D scene in the ComfyUI Image Viewer and render the move to a clip."
     },
     {
       "name": "replace_node",
@@ -491,7 +491,7 @@
     },
     {
       "name": "show_in_viewer",
-      "description": "Show files in the bEpic viewer, when the user asks to see them there."
+      "description": "Show files in the ComfyUI Image Viewer, when the user asks to see them there."
     },
     {
       "name": "splat_training_status",
@@ -515,7 +515,7 @@
     },
     {
       "name": "swap_in_takes",
-      "description": "Put new versions of shots into the bEpic viewer's cut as takes (the original stays one click away). Needs ComfyUI open ..."
+      "description": "Put new versions of shots into the ComfyUI Image Viewer's cut as takes (the original stays one click away). Needs ComfyUI open ..."
     },
     {
       "name": "train_lora",
