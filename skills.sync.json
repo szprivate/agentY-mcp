@@ -55,7 +55,7 @@
     },
     "image-downsize": {
       "files": 2,
-      "sha256": "f0d155a406d3916490236f9ce0198732cbf98a8891b3ff6192bf0f58e5464259"
+      "sha256": "0167ed82d71d85124f02f6e10fde2a8031819569b1e8cca43ddcdde82fc0c1ce"
     },
     "kling-multishot": {
       "files": 1,
@@ -71,7 +71,7 @@
     },
     "motion-graphics-scene": {
       "files": 4,
-      "sha256": "98b04ac707149c366996d9c1857744a5b9d9019ffc8fbb943c238a6583bbbdf0"
+      "sha256": "3e1c3f2522e61332d265616415ecddbbb90075c87383b92c89c6431f90a1b6ff"
     },
     "output-paths": {
       "files": 1,
@@ -83,7 +83,7 @@
     },
     "prompting": {
       "files": 11,
-      "sha256": "31e7e238d18e9deefe0f8397e2dd1af1edeaeee782a1e3ca4e738234caf9f8d2"
+      "sha256": "673fd3e591cbaabe68e5d6b7d1cdcb341510707f1ccd4707afa5e315bb98dcbb"
     },
     "recipe": {
       "files": 1,

@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "agenty",
   "display_name": "agentY",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "description": "Turn natural language into ComfyUI image and video workflows.",
   "long_description": "agentY exposes a ComfyUI workflow toolkit as MCP tools \u2014 template selection, workflow assembly/validation/execution, HuggingFace model management, image handling, web search, and long-term memory. Pair it with the agentY Skills (comfyui-generate and friends) so the host orchestrates end-to-end image/video generation against a local ComfyUI instance.",
   "author": {
@@ -183,7 +183,7 @@
     },
     {
       "name": "edit_image",
-      "description": "Read the picture open in the ComfyUI Image Viewer's Paint tab (or any .ora / .psd / picture) in layers and change it: add a layer, mask, adjust, add text ..."
+      "description": "Read the picture open in the ComfyUI Image Viewer's Paint tab (or any .ora / .psd / picture), and change it in LAYERS: ..."
     },
     {
       "name": "estimate_workflow_cost",
@@ -199,7 +199,7 @@
     },
     {
       "name": "file_dependencies",
-      "description": "What a file was made from, what has been made from it, and whether it is out of date (passes to reuse)."
+      "description": "What a file was made from, what has been made from it, and whether it is out of date."
     },
     {
       "name": "find_app_installs",
