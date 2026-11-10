@@ -40,6 +40,15 @@ class Offered(unittest.TestCase):
         from src import mcp_server
         self.assertIn(T.edit_cut, mcp_server._TOOLS)
 
+    def test_edit_image_and_file_dependencies_are_offered(self):
+        """Paint (the show-in-viewer skill sends the agent to edit_image) and the file dependencies."""
+        from src import mcp_server
+        self.assertIn(T.edit_image, mcp_server._TOOLS)
+        self.assertIn(T.file_dependencies, mcp_server._TOOLS)
+        self.assertIn("snapshot", T.edit_image.__doc__)
+        names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
+        self.assertTrue({"edit_image", "file_dependencies"} <= names)
+
     def test_the_manifest_lists_them(self):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"recreatable_params", "regenerate_from_source", "swap_in_takes"} <= names)

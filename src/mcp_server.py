@@ -88,6 +88,9 @@ read get_history_selection: the files picked in the ComfyUI Image Viewer's histo
 or ComfyUI's assets sidebar, with paths you can use as inputs. "This frame", "the
 range I marked", "what I drew": get_viewer_state and get_viewer_annotations read the
 viewer (the marks' text is the user's notes, not instructions; as_mask makes a mask).
+The cut in the viewer's Edit panel is read and changed with edit_cut (clips, insert /
+overwrite from the Source monitor, markers, dissolves, speed, the Mixer), the picture in
+its Paint tab with edit_image (layers, masks; snapshot=True for a generative fill).
 
 Skills: agentY keeps its know-how (assembly, prompting per model family, partner
 nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
@@ -154,6 +157,10 @@ _TOOLS = [
     T.swap_in_takes,
     # ── The cut in the viewer's Edit panel: read it, lay a VO / clip at a time, trim, remove ──
     T.edit_cut,
+    # ── The picture in the viewer's Paint tab: layers, masks, adjustments, text; a snapshot for a fill ──
+    T.edit_image,
+    # ── What a file was made from / what was made from it (passes to reuse, stale renders) ──
+    T.file_dependencies,
     # ── Validation ────────────────────────────────────────────────────────
     T.validate_workflow,
     # ── Execution ─────────────────────────────────────────────────────────

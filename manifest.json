@@ -182,6 +182,10 @@
       "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music ..."
     },
     {
+      "name": "edit_image",
+      "description": "Read the picture open in the ComfyUI Image Viewer's Paint tab (or any .ora / .psd / picture) in layers and change it: add a layer, mask, adjust, add text ..."
+    },
+    {
       "name": "estimate_workflow_cost",
       "description": "Price a workflow in Comfy credits BEFORE running it (paid partner nodes only)."
     },
@@ -192,6 +196,10 @@
     {
       "name": "execute_workflows_batch",
       "description": "Run several validated workflows (a batch) on ComfyUI and return their outputs."
+    },
+    {
+      "name": "file_dependencies",
+      "description": "What a file was made from, what has been made from it, and whether it is out of date (passes to reuse)."
     },
     {
       "name": "find_app_installs",
