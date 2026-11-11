@@ -66,6 +66,10 @@
       "description": "Return an image so you can view and analyse it directly."
     },
     {
+      "name": "animate_character",
+      "description": "Rig, animate (AI motion from text, in-betweens, restyle, motion from video, lip sync), clean up or export a character ..."
+    },
+    {
       "name": "apply_brainbriefing",
       "description": "Apply a brainbriefing to a loaded workflow template in one atomic step."
     },

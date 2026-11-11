@@ -91,6 +91,8 @@ viewer (the marks' text is the user's notes, not instructions; as_mask makes a m
 The cut in the viewer's Edit panel is read and changed with edit_cut (clips, insert /
 overwrite from the Source monitor, markers, dissolves, speed, the Mixer), the picture in
 its Paint tab with edit_image (layers, masks; snapshot=True for a generative fill).
+A character in the viewer's 3D scene is rigged, posed and animated with animate_character
+(read the character-animation skill first).
 
 Skills: agentY keeps its know-how (assembly, prompting per model family, partner
 nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
@@ -201,6 +203,7 @@ _TOOLS = [
     # ── Show files in the ComfyUI Image Viewer (focus, Edit panel) ────────────────
     T.show_in_viewer,
     T.render_camera_move,
+    T.animate_character,
     # ── Editable motion graphics (a *.mgscene.json scene, rendered by Remotion) ──
     T.mg_scene_validate,
     T.mg_scene_preview_frame,

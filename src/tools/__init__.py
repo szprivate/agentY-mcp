@@ -112,6 +112,9 @@ from agenty_core.tools.edit_image import edit_image  # noqa: F401
 from agenty_core.tools.file_dependencies import file_dependencies  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.
 from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
+# Rig and animate a character in the viewer's 3D scene: rig / auto-rig, AI motion and in-betweens, restyle,
+# motion from video, lip sync, one pose (presets, joints, a picture), layers, constraints, the pose library, export.
+from agenty_core.tools.animate_character import animate_character  # noqa: F401
 # Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.
 from agenty_core.tools.motion_graphics import mg_scene_validate, mg_scene_preview_frame, mg_render  # noqa: F401
 # A 3D scene from a picture or a prompt with World Labs Atlas.

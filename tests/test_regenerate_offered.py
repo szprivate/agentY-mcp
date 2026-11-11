@@ -35,6 +35,14 @@ class Offered(unittest.TestCase):
         self.assertIs(T.regenerate_from_source, E.regenerate_from_source)
         self.assertIn("EXACTLY", E.regenerate_from_source.__doc__)
 
+    def test_animate_character_is_offered(self):
+        """The character-animation skill names animate_character; it carries the pose / restyle / video options."""
+        from src import mcp_server
+        self.assertIn(T.animate_character, mcp_server._TOOLS)
+        doc = T.animate_character.__doc__ or ""
+        for word in ("pose_presets", "restyle", "lipsync"):
+            self.assertIn(word, doc)
+
     def test_edit_cut_is_offered_too(self):
         """The cut in the viewer's Edit panel: read it, lay a voice-over or a clip at a time, trim, remove."""
         from src import mcp_server
