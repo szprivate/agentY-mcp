@@ -11,7 +11,7 @@
 -e ../agentY-core
 
 # Model Context Protocol SDK (FastMCP server + stdio transport)
-mcp>=1.26.0
+mcp>=1.26.0,<2
 
 # ComfyUI HTTP/WebSocket client
 requests>=2.31.0

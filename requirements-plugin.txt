@@ -4,7 +4,7 @@
 # touches the .venv the installer made. Keep it equal to requirements.txt (a test checks)
 # plus what agentY-core needs - agenty_core itself is NOT listed: it comes from the sibling
 # checkout, or from the pinned clone src/__init__.py makes (core.pin).
-mcp>=1.26.0
+mcp>=1.26.0,<2
 requests>=2.31.0
 websockets>=12.0
 python-dotenv>=1.0.0
