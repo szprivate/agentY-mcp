@@ -31,7 +31,7 @@
     },
     "character-animation": {
       "files": 1,
-      "sha256": "cee268eea0427ee60ccfd3088a61c55fe6fe3edd43956bf804543adafece618b"
+      "sha256": "889c2d71e3ddbc9b8430b4d0a755ab2572c1e080cd26330dbe14567eaa871ecb"
     },
     "custom-node-from-github": {
       "files": 1,
@@ -127,7 +127,7 @@
     },
     "worldlabs-atlas": {
       "files": 1,
-      "sha256": "9e927cbe6b676b37b2373e59184e3bce3dae72ccf7130d06bdfe0c8e75722917"
+      "sha256": "791cd22888a472e824bdb070de6668b3da8832f42a39dafcc410f567fedecf06"
     }
   }
 }
