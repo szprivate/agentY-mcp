@@ -70,6 +70,10 @@
       "description": "Rig, animate (AI motion from text, in-betweens, restyle, motion from video, lip sync), clean up or export a character ..."
     },
     {
+      "name": "animate_scene",
+      "description": "Work on the 3D scene open in the ComfyUI Image Viewer: clips, cameras, turntables, renders, keys, layers."
+    },
+    {
       "name": "apply_brainbriefing",
       "description": "Apply a brainbriefing to a loaded workflow template in one atomic step."
     },
@@ -180,6 +184,14 @@
     {
       "name": "duplicate_workflow",
       "description": "Create fresh-seeded copies of an existing workflow JSON."
+    },
+    {
+      "name": "echo_create_world",
+      "description": "Make a navigable Gaussian-splat world with SpAItial Echo from ONE picture, a 360 panorama, or a prompt."
+    },
+    {
+      "name": "echo_export",
+      "description": "Get files of a SpAItial Echo world made by echo_create_world; also collects one whose creation timed out."
     },
     {
       "name": "edit_cut",
@@ -464,6 +476,10 @@
     {
       "name": "render_camera_move",
       "description": "Fly a camera through a 3D scene in the ComfyUI Image Viewer and render the move to a clip."
+    },
+    {
+      "name": "render_turntables",
+      "description": "Render a turntable of each animation clip in the viewer's 3D scene: the camera goes once round the subject over every ..."
     },
     {
       "name": "replace_node",

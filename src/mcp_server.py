@@ -91,8 +91,10 @@ viewer (the marks' text is the user's notes, not instructions; as_mask makes a m
 The cut in the viewer's Edit panel is read and changed with edit_cut (clips, insert /
 overwrite from the Source monitor, markers, dissolves, speed, the Mixer), the picture in
 its Paint tab with edit_image (layers, masks; snapshot=True for a generative fill).
-A character in the viewer's 3D scene is rigged, posed and animated with animate_character
-(read the character-animation skill first).
+A character in the viewer's 3D scene is rigged, posed and animated with animate_character;
+the rest of the 3D space (clips, cameras, keys, layers, renders, USD) with animate_scene,
+and a turntable render of each clip with render_turntables (read the character-animation
+skill first).
 
 Skills: agentY keeps its know-how (assembly, prompting per model family, partner
 nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
@@ -204,6 +206,8 @@ _TOOLS = [
     T.show_in_viewer,
     T.render_camera_move,
     T.animate_character,
+    T.animate_scene,
+    T.render_turntables,
     # ── Editable motion graphics (a *.mgscene.json scene, rendered by Remotion) ──
     T.mg_scene_validate,
     T.mg_scene_preview_frame,
@@ -287,6 +291,7 @@ for _mod, _names in [
     ("agenty_core.tools.model_research", ["hf_search", "hf_repo", "hf_file", "find_local_models", "inspect_workflow_file"]),
     ("agenty_core.tools.workspace_tools", ["get_node_source", "list_files", "find_workflows", "media_info", "video_frames", "read_web_page"]),
     ("agenty_core.tools.reverse_search", ["reverse_image_search"]),
+    ("agenty_core.tools.spaitial_echo", ["echo_create_world", "echo_export"]),
 ]:
     try:
         _m = importlib.import_module(_mod)
