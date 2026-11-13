@@ -198,6 +198,10 @@
       "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music ..."
     },
     {
+      "name": "edit_comp",
+      "description": "Read or change a comp of the ComfyUI Image Viewer's Comp space (*.comp.json): add nodes, wire them, set and key parameters, add Write nodes."
+    },
+    {
       "name": "edit_image",
       "description": "Read the picture open in the ComfyUI Image Viewer's Paint tab (or any .ora / .psd / picture), and change it in LAYERS: ..."
     },
@@ -476,6 +480,10 @@
     {
       "name": "render_camera_move",
       "description": "Fly a camera through a 3D scene in the ComfyUI Image Viewer and render the move to a clip."
+    },
+    {
+      "name": "render_comp",
+      "description": "Render a comp's Write nodes (EXR sequences with layers, PNG, films) in ComfyUI, or send them to the Deadline farm."
     },
     {
       "name": "render_turntables",

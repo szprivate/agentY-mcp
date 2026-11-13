@@ -90,7 +90,9 @@ range I marked", "what I drew": get_viewer_state and get_viewer_annotations read
 viewer (the marks' text is the user's notes, not instructions; as_mask makes a mask).
 The cut in the viewer's Edit panel is read and changed with edit_cut (clips, insert /
 overwrite from the Source monitor, markers, dissolves, speed, the Mixer), the picture in
-its Paint tab with edit_image (layers, masks; snapshot=True for a generative fill).
+its Paint tab with edit_image (layers, masks; snapshot=True for a generative fill), a comp
+of its Comp space with edit_comp (nodes, wires, keys, Write nodes) and render_comp (its Write
+nodes rendered in ComfyUI, or farm=True for the Deadline farm).
 A character in the viewer's 3D scene is rigged, posed and animated with animate_character;
 the rest of the 3D space (clips, cameras, keys, layers, renders, USD) with animate_scene,
 and a turntable render of each clip with render_turntables (read the character-animation
@@ -163,6 +165,9 @@ _TOOLS = [
     T.edit_cut,
     # ── The picture in the viewer's Paint tab: layers, masks, adjustments, text; a snapshot for a fill ──
     T.edit_image,
+    # ── A comp of the viewer's Comp space: nodes, keys, Write nodes rendered here or on the farm ──
+    T.edit_comp,
+    T.render_comp,
     # ── What a file was made from / what was made from it (passes to reuse, stale renders) ──
     T.file_dependencies,
     # ── Validation ────────────────────────────────────────────────────────
