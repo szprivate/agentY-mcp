@@ -108,6 +108,9 @@ from agenty_core.tools.edit_cut import edit_cut  # noqa: F401
 # Read and change a picture in layers in the viewer's Paint tab: a generated result back as a masked
 # layer, adjustments, text, masks (saved by the viewer, taken in by the open tab as one undo step).
 from agenty_core.tools.edit_image import edit_image  # noqa: F401
+# Build, read and render comps of the viewer's Comp space: nodes, wires, keys, Write nodes rendered in
+# ComfyUI or sent to the Deadline farm (saved by the viewer, taken in by the open Comp tab).
+from agenty_core.tools.comp import edit_comp, render_comp  # noqa: F401
 # What a file was made from, what was made from it, and what is out of date (passes to reuse).
 from agenty_core.tools.file_dependencies import file_dependencies  # noqa: F401
 # Fly a camera through a 3D scene in the viewer and render the move.

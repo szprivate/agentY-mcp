@@ -57,6 +57,14 @@ class Offered(unittest.TestCase):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"edit_image", "file_dependencies"} <= names)
 
+    def test_the_comp_tools_are_offered(self):
+        """The viewer's Comp space: build a comp, render its Write nodes here or on the farm."""
+        from src import mcp_server
+        self.assertIn(T.edit_comp, mcp_server._TOOLS)
+        self.assertIn(T.render_comp, mcp_server._TOOLS)
+        names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
+        self.assertTrue({"edit_comp", "render_comp"} <= names)
+
     def test_the_manifest_lists_them(self):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"recreatable_params", "regenerate_from_source", "swap_in_takes"} <= names)
