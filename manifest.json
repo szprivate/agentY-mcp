@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "agenty",
   "display_name": "agentY",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "description": "Turn natural language into ComfyUI image and video workflows.",
   "long_description": "agentY exposes a ComfyUI workflow toolkit as MCP tools \u2014 template selection, workflow assembly/validation/execution, HuggingFace model management, image handling, web search, and long-term memory. Pair it with the agentY Skills (comfyui-generate and friends) so the host orchestrates end-to-end image/video generation against a local ComfyUI instance.",
   "author": {
@@ -194,12 +194,12 @@
       "description": "Get files of a SpAItial Echo world made by echo_create_world; also collects one whose creation timed out."
     },
     {
-      "name": "edit_cut",
-      "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music ..."
+      "name": "edit_comp",
+      "description": "Read or change a comp of the ComfyUI Image Viewer's Comp space (a node graph of pixel operations in a ``*.comp.json``): ..."
     },
     {
-      "name": "edit_comp",
-      "description": "Read or change a comp of the ComfyUI Image Viewer's Comp space (*.comp.json): add nodes, wire them, set and key parameters, add Write nodes."
+      "name": "edit_cut",
+      "description": "Read the cut open in the ComfyUI Image Viewer's Edit panel (or any .otio cut), and change it: lay a voice-over, music ..."
     },
     {
       "name": "edit_image",
@@ -483,7 +483,7 @@
     },
     {
       "name": "render_comp",
-      "description": "Render a comp's Write nodes (EXR sequences with layers, PNG, films) in ComfyUI, or send them to the Deadline farm."
+      "description": "Render a comp's Write nodes - each writes its own files (EXR sequences with layers, PNG, films) - in ComfyUI, or send ..."
     },
     {
       "name": "render_turntables",
