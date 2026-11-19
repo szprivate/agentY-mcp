@@ -394,6 +394,10 @@
       "description": "Get the files of a Marble world made by marble_create_world: SPZ or PLY splats, the collider mesh. Free (no credits). ..."
     },
     {
+      "name": "matchmove",
+      "description": "Track a plate's camera (and moving objects) in the ComfyUI Image Viewer's matchmove, step by step."
+    },
+    {
       "name": "measure_reference",
       "description": "Measure a reference photo with MoGe (monocular metric geometry): camera field of view, camera height above the ground, ..."
     },

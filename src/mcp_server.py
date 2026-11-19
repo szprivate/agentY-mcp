@@ -96,7 +96,8 @@ nodes rendered in ComfyUI, or farm=True for the Deadline farm).
 A character in the viewer's 3D scene is rigged, posed and animated with animate_character;
 the rest of the 3D space (clips, cameras, keys, layers, renders, USD) with animate_scene,
 and a turntable render of each clip with render_turntables (read the character-animation
-skill first).
+skill first). A plate's camera is tracked and solved in the viewer's matchmove with matchmove
+(lens, masks, tracks, solve, into the 3D space; read the matchmove skill first).
 
 Skills: agentY keeps its know-how (assembly, prompting per model family, partner
 nodes, upscaling, Atlas/3D, DCC, Deadline, storyboards ...) in skills. BEFORE a
@@ -213,6 +214,7 @@ _TOOLS = [
     T.animate_character,
     T.animate_scene,
     T.render_turntables,
+    T.matchmove,
     # ── Editable motion graphics (a *.mgscene.json scene, rendered by Remotion) ──
     T.mg_scene_validate,
     T.mg_scene_preview_frame,

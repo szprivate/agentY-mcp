@@ -65,6 +65,13 @@ class Offered(unittest.TestCase):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"edit_comp", "render_comp"} <= names)
 
+    def test_matchmove_is_offered(self):
+        """The viewer's matchmove: a plate's camera tracked, solved and built into the 3D space."""
+        from src import mcp_server
+        self.assertIn(T.matchmove, mcp_server._TOOLS)
+        names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
+        self.assertIn("matchmove", names)
+
     def test_the_manifest_lists_them(self):
         names = {t["name"] for t in json.loads(Path("manifest.json").read_text(encoding="utf-8-sig"))["tools"]}
         self.assertTrue({"recreatable_params", "regenerate_from_source", "swap_in_takes"} <= names)

@@ -120,6 +120,8 @@ from agenty_core.tools.previz_shot import render_camera_move  # noqa: F401
 from agenty_core.tools.animate_character import animate_character  # noqa: F401
 # The rest of the 3D space: clips, cameras, turntables, renders, keys, layers, rig extras, USD export.
 from agenty_core.tools.animate_scene import animate_scene, render_turntables  # noqa: F401
+# Track a plate's camera in the viewer's matchmove: lens, masks, tracks, solve, objects, into the 3D space.
+from agenty_core.tools.matchmove import matchmove  # noqa: F401
 # Editable motion graphics: a scene file (data), checked, previewed and rendered with Remotion.
 from agenty_core.tools.motion_graphics import mg_scene_validate, mg_scene_preview_frame, mg_render  # noqa: F401
 # A 3D scene from a picture or a prompt with World Labs Atlas.
