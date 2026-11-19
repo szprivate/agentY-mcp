@@ -69,6 +69,10 @@
       "files": 1,
       "sha256": "10a4e1ea576e03828ca5c7c2e28286b87d876cd727cf6a8c3eef48e025307942"
     },
+    "matchmove": {
+      "files": 1,
+      "sha256": "7bed65d3a39cb245f15f4df50766104c2266ec110878a88b50ae9a946615bd83"
+    },
     "model-from-reference": {
       "files": 1,
       "sha256": "0ad4cf6bf833b1b615ccf8464e889380aee48873c84e23c416d8feb21932f79a"
