@@ -1,7 +1,7 @@
 ---
 name: matchmove
-description: Track a plate's camera in the ComfyUI Image Viewer's matchmove - the lens distortion from a grid, lines or a comp, masks over what moves, feature tracks, the camera solve and its error, cleaning up bad tracks, orienting and scaling the scene, a moving object's own track, and the solved camera with the undistorted plate built into the 3D space. Use for "track this shot", "matchmove the plate", "solve the camera of this clip", "camera track for CG", "get me the camera from this footage", "undistort the plate", "lens grid", "track the car in the shot", "put a CG object into this shot", "export the lens distortion to Comp", "why does the solve drift".
-allowed-tools: matchmove get_viewer_state show_in_viewer edit_comp animate_scene
+description: Track a plate's camera in the ComfyUI Image Viewer's matchmove - the lens distortion from a grid, lines or a comp, masks over what moves, feature tracks, the camera solve and its error, cleaning up bad tracks, orienting and scaling the scene, a moving object's own track, and the solved camera with the undistorted plate built into the 3D space. Use for "track this shot", "matchmove the plate", "solve the camera of this clip", "camera track for CG", "get me the camera from this footage", "undistort the plate", "lens grid", "track the car in the shot", "put a CG object into this shot", "export the lens distortion to Comp", "why does the solve drift", "track my iPhone clip", "the solve looks squashed", "use the iPhone's depth", "use AI depth for the track", "the camera barely moves", "set the ground", "mask the people with AI".
+allowed-tools: matchmove get_viewer_state show_in_viewer edit_comp animate_scene analyze_image view_image
 ---
 
 # Matchmove: a plate's camera, step by step
@@ -14,9 +14,29 @@ Plate coordinates are its own pixels, x right, y down from the top left; frames 
 The order matters. A wrong lens or an unmasked moving car spoils every step after it, and no amount of
 solving fixes it later.
 
+## 0. Is a plate loaded already?
+
+The user often loads the plate themselves (the guide's Plate step, the Plate panel, the plate in the main
+view). The turn's `[VIEWER]` lines then carry a `matchmove plate=...` line: its path, size, frame range,
+the frame shown ("this frame"), the step, the tracks and the solve. `get_viewer_state` has the same under
+`state.matchmove`. **Start with `matchmove("info")`** and go on with that plate; `open` only when the user
+wants another one. Never ask the user for the plate's path when one is loaded.
+
+## Looking at the plate
+
+`matchmove("frame", {"frames": [0, 40, 80]})` (or `{"frame": n}`; no frame = the one shown) saves those
+frames as pictures with the tracks drawn on them (green: solved under 1 px, yellow: not solved yet, red:
+over 1 px or switched off; their ids beside them when there are few) and lists each frame's tracks with
+x, y and error. Hand `result.frames[i].path` (or `result.contact_sheet`) to
+`analyze_image(file_paths=[...])`. Use it to see what is in the shot (what moves and needs a mask, where
+the floor is, straight lines for the lens), to check tracks sit on corners rather than on reflections or
+edges, and before telling the user anything about how the plate looks. `"undistort": true` shows the plate
+through the lens (no tracks drawn). At most 16 frames a call.
+
 ## 1. Plate
 
-`matchmove("open", {"plate": "<film, or one frame of a numbered sequence>"})`.
+`matchmove("open", {"plate": "<film, or one frame of a numbered sequence>"})` - only for a plate that is
+not loaded yet (step 0).
 
 - Track the **original** plate: not a graded, retimed, stabilised, cropped or rescaled copy. The lens and
   the frame size have to be the camera's.
@@ -25,9 +45,35 @@ solving fixes it later.
   whole chip. A wrong sensor gives a wrong field of view, and then a wrong depth for everything.
 - If the user knows the lens and format, give them:
   `matchmove("camera", {"focal_mm": 35, "sensor": [24.9, 14.0], "known": true})`.
-  A known focal length makes the solve faster and surer. When unsure, leave `known` false and let the
-  solve find it.
+  A known focal length is where the solve starts. With `refine: "auto"` (the default) the solve still
+  refines it, which is what you want: metadata that is a little off gives a squashed or stretched solve
+  when it is held fixed. Hold it (`refine: "off"`) only for a lens you are sure of, measured on set.
+  When unsure, leave `known` false and let the solve find it.
+- A camera the user names but the file does not: `matchmove("camera", {"preset": "iphone14-wide"})`. The
+  list has phones (`iphone12-wide` .. `iphone16-wide`, `iphone14pro-wide`, `iphone-ultra`,
+  `iphone-tele77`, `iphone-tele120` ...) as 35 mm equivalents on the plate's own shape; an unknown id
+  answers with the whole list.
+- An anamorphic plate: `{"pixel_aspect": 2}` (or 1.33, 1.5 ...) before the solve. Films say it themselves
+  when they carry it; check `matchmove.camera.pixel_aspect`.
 - A zoom shot (focal length changing over the shot) is not supported. Say so instead of solving it.
+
+### A plate from an iPhone
+
+An iPhone's own film (.mov) or photo (.heic, .heif) is read in full: open the original file straight off
+the phone (AirDrop or a cable, "Most Compatible" off), not a copy an app re-encoded, or the metadata is gone.
+
+- `result.facts` and `matchmove.camera` give the model and the lens (wide, ultra wide, tele) with its focal
+  length from the phone's 35 mm equivalent. `matchmove.phone` says which camera, how it was turned (a film
+  shot upright is turned upright for you), the iOS version, and whether it carries **depth**.
+- A phone stabilises and lens-corrects its films, which crops them a little: its focal length is a good
+  start, never the answer. A fresh iPhone film therefore starts with `refine: "on"`; keep it.
+- Only a **Cinematic** film carries depth (`matchmove.phone.depth` with `samples`); ordinary iPhone video
+  has none, no gyro data and no LiDAR. A HEIC portrait photo may carry a depth picture. Use the depth in
+  the solve (step 5, `depth: "phone"`), for the clean-up (`track_delete` `depth_edges`), in step 7
+  (`ground` how `phone`) and, when the user wants the maps, `matchmove("phone_export")` writes the
+  depth track as a 16-bit picture sequence (bright = near) and answers the pattern.
+- The phone's depth has no units: it sets the ground, not the scale. Measure for the scale (step 5).
+- The phone's lens distortion is already corrected in its film: use lens `none` unless lines still bend.
 
 ## 2. Lens
 
@@ -65,6 +111,17 @@ Tracks there pull the camera towards their motion.
 - A mask needs the same number of points in every key.
 - Make masks generous. Losing a few good features costs less than keeping one bad one.
 
+**With AI** (one ComfyUI job, a matte on every frame of the stretch, no keys to set):
+
+- `matchmove("ai_mask", {"engine": "objects", "prompt": "person"})` - SAM 3 finds what the words name
+  ("person", "car", "water", "sky", "tree"). One run per kind of thing.
+- `matchmove("ai_mask", {"engine": "background"})` - a background remover keeps the subject: for a shot
+  that follows one person or object. Films go through the video model (at most 60 s).
+- `step` (every Nth frame) and `scale` (0.25 / 0.5 runs the model on a smaller copy: faster, rougher
+  edges) for long or large plates; `from` / `to` for part of the shot; `object` makes it an object's mask.
+- A model that is not installed refuses with what is missing: tell the user what to download in the guide.
+- Track again after a mask is added (`matchmove("track")`): tracks already inside it are switched off.
+
 ## 4. Tracks
 
 `matchmove("track", {"features": 200})`, then read `matchmove.tracks`:
@@ -78,6 +135,11 @@ Tracks there pull the camera towards their motion.
   only on a distant wall, or only on the ground, solve badly. A shot with all tracks far away and no
   parallax is a nodal pan (see step 5).
 - Motion blur, rolling shutter, heavy grain and fast whip pans make tracks jump. Expect more cleanup there.
+- **Hard shots** (things coming into view, a fast turn, a start where little is trackable): after the first
+  pass, `matchmove("track", {"seeds": "thin"})` finds new points in the middle of every thin stretch and
+  follows them both ways; `{"seeds": [frame, ...], "direction": "both"}` does it on frames you pick;
+  `{"extend": true}` (or a list of track ids) carries tracks on past where they stopped. `direction`
+  (`forward`, `backward`, `both`) and `start` (the frame to start from) also work on a plain track.
 
 ## 5. Solve
 
@@ -87,6 +149,69 @@ Tracks there pull the camera towards their motion.
   is built on it.
 - `focal_px` / `focal_mm` should make sense for the camera. A long lens solved as a wide one (or the other
   way round) means bad tracks or a missed lens. Hold a known focal with `refine: "off"`.
+- `focal_check` (free solves) re-solves with the focal 10 % shorter and longer. `weak: true` means the
+  shot cannot tell the focal length apart (little parallax): the proportions in depth are not to be
+  trusted - give the real focal length, or measure (below). `better` names a direction that fitted better.
+- `units` is `"m"` once a distance is measured, else the solve's own units.
+
+### Depth: when the camera hardly moves, or the solve looks squashed
+
+A depth picture per frame tells the solve how far each track is. `matchmove("solve", {"depth": "phone"})`
+uses a Cinematic iPhone film's own depth track; `{"depth": "ai"}` runs a depth model (Depth Anything 3) on
+12 frames over the tracks first, as one ComfyUI job, and keeps it for the next solves (`depth_again: true`
+or another `depth_workflow` runs it again; `depth_scale` 0.5 is quicker). The depth has no units: each
+frame is scaled onto the solve, so it fixes the PROPORTIONS (and with them the focal length), never the
+scale - measure a distance for metres. Use it when:
+
+- the camera moves little (a small push, a handheld drift): `focal_check.weak` is true, or the solve looks
+  squashed or stretched;
+- the solve came out inside out (near and far swapped - things that should be close are far): the depth
+  sees that and solves again from it (`solve.depth.turned`, and a note says so).
+
+Read `solve.depth`: `order` near 1 means the depth and the solve agree on near and far; `agreement` is how
+far apart they are (0.02 = 2 %). An `error` says why it was left out (read the wrong way, another plate, too
+few tracks with depth). `depth_strength` (default 1) pulls harder for a shot that barely moves. A tripod
+shot has no depth to fix and leaves it out. Nothing is lost by trying: when the depth does not fit, the
+solve is the one without it.
+
+Before the solve, or after a bad one: `matchmove("track_delete", {"depth_edges": true})` deletes the tracks
+the depth says not to trust - on a depth edge (a corner in front of something far, where the feature slides
+between the two) or jumping in depth against the rest. Answered as `depth_edges` [[id, edge | jumps]].
+
+### Measurements: when the solve looks squashed or stretched
+
+A solve can fit the plate well (low rms) and still be wrong in depth: a room too shallow, a floor too
+steep, a cube that comes out as a slab. Real measurements fix that. Pick tracks with a 3D point and add:
+
+- `matchmove("measure", {"add": {"kind": "distance", "ids": ["t12", "t40"], "metres": 2.1}})` - two tracks
+  and how far apart they are in the world. One sets the scale (1 unit = 1 m); two or more **in different
+  directions** (across and into the picture) fix the proportions.
+- `{"kind": "plane", "ids": [3+ tracks on one floor, wall or table]}`, `{"kind": "line", "ids": [3+ along
+  one straight edge]}`, `{"kind": "right", "ids": [end, corner, end]}` (a corner of a room, a box, a door).
+
+Then `matchmove("solve")` again. `matchmove.measurements` says for each whether it now holds. Measured
+tracks are never deleted by the clean-up. `{"remove": id}` or `{"clear": true}` takes them off. Ask the
+user for a real measurement (a door is about 2.0 m, a table top 0.75 m high, a parking bay 2.5 m wide)
+when the shot needs one.
+
+### Geometry in the 3D space: survey points
+
+When the set is already in the 3D space - a box placed where the real one stands, an imported set model, a
+scan, or points the user surveyed - pin tracks to it and the solve lands IN that space, in its units:
+
+- `matchmove("pin", {"add": [{"track": "t12", "point": [1.2, 0, -3.4]}, ...]})` - a track and the spot it
+  sits on, in the 3D space's axes and units (Y up).
+- `{"add": {"track": "t40", "item": "Table", "vertex": 7}}` - an item's vertex (`vertex` left out: its
+  origin, e.g. a locator the user placed). Ask the user which corner a track is when it is not clear; the
+  user can also click it themselves (Solve step, Geometry, "Pin … to geometry…").
+- 3 or more pins, spread out and NOT on one line (4-6 across the picture and in depth is better).
+- `mode`: `"hold"` (default) also pulls the solve into the pins - the camera and focal length follow, which
+  mends a squashed solve; `"align"` only moves, turns and scales the solve onto them. `"off"` ignores them.
+
+Then `matchmove("solve")`. Check `solve.surveyed` is true and read `solve.geometry.pins`: how far each pin
+lands off; one `used: false` disagreed with the rest (a wrong vertex, or a track that slid) - fix or
+remove it. A solve on geometry needs no orient, ground or scale in step 7: Build puts the camera straight
+into the geometry's world, and orienting would move it off. A tripod solve cannot use pins.
 - `frames_over_1px` lists frames where the camera is unsure. Look at the tracks there.
 - `unsolved_frames` means too few tracks there: back to step 4.
 
@@ -125,14 +250,31 @@ the camera solve. A rigid object needs 6 or more good tracks on it. Give `scale`
 - the solved points as locators,
 - the objects.
 
-Then orient it. A solve's axes and size are arbitrary until you set them:
+Then set it on the ground. `matchmove("ground", {...})` finds the floor and puts it level at height 0:
 
-- **Ground**: `matchmove("orient", {"how": "ground", "points": [ids of 3+ tracks on the floor]})`.
+- `{"how": "auto"}` - the widest low flat surface among the solved points. Try this first.
+- `{"how": "points", "points": [3+ track ids on the floor]}` - when auto picks a table or a wall.
+- `{"how": "ai", "prompt": "floor"}` - SAM 3 finds the floor (or "road", "grass") on 5 frames; the tracks on
+  it make the plane. Good when few tracks lie on the ground.
+- `{"how": "depth"}` - a depth model on 5 frames gives dense points for the plane, scaled onto the solve's
+  tracks. With the metric model (`metres`: true, the default) the world comes out in metres and
+  `ground.camera_height` says how high the camera was: check it against what the user knows.
+- `{"how": "phone"}` - an iPhone Cinematic film's own depth: no model and no ComfyUI job. Not in metres.
+
+Read `ground.tilt` (degrees off level the cameras suggest; a few is fine) and `ground.below` (points under
+the floor: many means the wrong surface). `lift` (scene units) raises or lowers it, `flip` turns it over
+when the camera comes out below the floor.
+
+Then orient the rest (not after a solve on geometry pins, which is already placed). A solve's axes and size
+are arbitrary until you set them:
+
+- **Ground by hand**: `matchmove("orient", {"how": "ground", "points": [ids of 3+ tracks on the floor]})`
+  (the same as ground `points`, without the search).
 - **Origin**: `{"how": "origin", "points": [id]}` on a meaningful spot, such as where CG will stand.
 - **Axis**: `{"how": "x", "points": [a, b]}` along a wall or road.
 - **Scale**: `{"how": "scale", "points": [a, b], "distance": 1.8}` uses two points whose real distance is
   known (a door's height, a car's length). The 3D space is in metres, Y up. A wrong scale makes CG look
-  like a miniature.
+  like a miniature. Skip it when a distance was measured (step 5) or the metric depth set the scale.
 
 Use track ids that have a 3D point (the solve's points: tracks deleted before the last solve have none).
 
@@ -150,7 +292,9 @@ The camera lives in the 3D scene, and the scene saves as USD with the camera key
 Tell the user:
 
 - the solve's rms in pixels and what it means (very good / usable / not yet),
-- the focal length found,
+- the focal length found (and whether the focal check called it weak),
+- the scale: measured, from metric depth, from geometry pins (and how far they land off), or not set,
 - how many tracks were kept,
-- what you masked and why,
+- what you masked and why (by hand or with AI),
+- for an iPhone plate: which camera, and whether its depth was used,
 - anything you could not fix (thin frames, guessed corners of the lens, a tripod shot without depth).
